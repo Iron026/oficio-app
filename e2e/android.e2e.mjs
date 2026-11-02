@@ -35,7 +35,13 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 const resumedPackage = () => adb('shell', 'dumpsys', 'activity', 'activities').match(/(?:mResumedActivity|ResumedActivity).*?\{[^}]*\s([\w.]+)\/[\w.]+/)?.[1] ?? '';
-const back = () => adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+const back = () => {
+  // Fecha diálogos do sistema que possam ter surgido antes de pressionar Voltar.
+  try {
+    adb('shell', 'am', 'broadcast', '-a', 'android.intent.action.CLOSE_SYSTEM_DIALOGS');
+  } catch { /* opcional */ }
+  adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+};
 /**
  * Toque em um elemento. O Playwright às vezes calcula mal a viewport de
  * WebViews Android via CDP ("element is outside of the viewport"); nesse
@@ -65,6 +71,17 @@ async function launch() {
 let page;
 let backupJson = '';
 try {
+  await step('Preparar emulador', async () => {
+    // Emuladores do CI às vezes exibem "app não está respondendo" do launcher,
+    // que cobre a tela e consome toques. Oculta esses avisos do sistema.
+    adb('shell', 'settings', 'put', 'global', 'hide_error_dialogs', '1');
+    adb('shell', 'settings', 'put', 'secure', 'anr_show_background', '0');
+    adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP');
+    adb('shell', 'wm', 'dismiss-keyguard');
+    await wait(15_000); // deixa o launcher terminar de iniciar
+    adb('shell', 'am', 'broadcast', '-a', 'android.intent.action.CLOSE_SYSTEM_DIALOGS');
+  });
+
   await step('Instalar APK', async () => {
     adb('install', '-r', apk);
     adb('shell', 'pm', 'clear', PKG);
