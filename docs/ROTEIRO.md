@@ -3,6 +3,9 @@
 ## 0.1 (atual)
 Base funcional offline: cadastro, profissões, clientes, agenda, finanças, evolução, ajustes, backup, tema claro/escuro, testes e CI.
 
+## Repositório
+Código em https://github.com/Iron026/oficio-app (a cópia original da 0.1 permanece em `Iron026/teste`, branch `ccr-189116ae-np6ak8`).
+
 ## Próximos passos sugeridos
 1. **0.2 — App Android:** Capacitor, ícone/splash, build AAB na nuvem (GitHub Actions), teste interno na Play Store.
 2. **0.3 — Produtividade:** lembretes/notificações locais, recibos e orçamentos simples, relatório mensal.

@@ -1,4 +1,4 @@
-# Publica o app no GitHub Pages a cada push na branch principal.
+# Publica o app em https://iron026.github.io/oficio-app/ a cada push na main.
 # Ative uma vez em: Settings → Pages → Build and deployment → Source: GitHub Actions.
 name: Deploy GitHub Pages
 
@@ -29,8 +29,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
       - run: npm run build
+        env:
+          VITE_BASE: /oficio-app/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

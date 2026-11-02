@@ -1,23 +1,25 @@
 # Como visualizar o Ofício no celular
 
-Não é preciso instalar nada no celular além do navegador.
+**Endereço oficial:** https://iron026.github.io/oficio-app/
 
-## Opção 1 — GitHub Pages (link permanente, recomendado)
+Basta abrir no navegador do celular. Para usar como app, toque em ⋮ → **Adicionar à tela inicial** (Chrome) ou ☰ → **Adicionar página a → Tela inicial** (Samsung Internet).
 
-1. No GitHub (pelo navegador do celular), faça o *merge* da branch de desenvolvimento na `main` (abrindo/aprovando o Pull Request).
-2. Abra o repositório → **Settings** → **Pages**.
-3. Em **Build and deployment → Source**, escolha **GitHub Actions**.
-4. Vá em **Actions** → **Deploy GitHub Pages** → **Run workflow** (ou faça qualquer push na `main`).
-5. Após ~2 minutos o app estará em `https://<seu-usuario>.github.io/<repositorio>/`.
+## Como a publicação funciona
 
-> Em repositórios privados, o GitHub Pages exige plano pago. Se o repositório for privado no plano gratuito, use a opção 2 ou torne o repositório público.
+- Cada push na branch `main` executa o workflow **Deploy GitHub Pages** (`.github/workflows/pages.yml`): typecheck, lint, testes, build com `VITE_BASE=/oficio-app/` e publicação.
+- Se algum teste falhar, nada é publicado.
+- Acompanhe em **Actions** no repositório.
 
-**Dica:** no Chrome/Samsung Internet, toque em ⋮ → **Adicionar à tela inicial** para abrir como app.
+### Configuração única (já feita uma vez por repositório)
 
-## Opção 2 — Arquivo único
+Repositório → **Settings** → **Pages** → **Build and deployment → Source: GitHub Actions**.
 
-`npm run build:single` gera `dist-single/index.html`, que contém o app inteiro em um só arquivo e pode ser hospedado em qualquer lugar (ou aberto como página publicada).
+Para republicar manualmente: **Actions → Deploy GitHub Pages → Run workflow**.
+
+## Arquivo único (alternativa)
+
+`npm run build:single` gera `dist-single/index.html` com o app inteiro em um só arquivo.
 
 ## Sobre os dados
 
-Os dados ficam salvos no navegador do aparelho (IndexedDB), separados por endereço: o app aberto pelo GitHub Pages e por outro link têm dados independentes. Use **Ajustes → Exportar backup** para levar os dados de um para outro.
+Os dados ficam salvos no navegador do aparelho (IndexedDB), separados por endereço. Use **Ajustes → Exportar backup** para levar os dados de um endereço/aparelho para outro.

@@ -8,3 +8,4 @@ Projeto **React 19 + TypeScript + Vite + Tailwind CSS v4** (não é Next.js).
 - Textos da interface em português brasileiro; use a terminologia da profissão (`profession.terms`).
 - Antes de commitar: `npm run check` (typecheck, lint, testes e build).
 - Não implemente cobrança real nem apresente compras fictícias como funcionais.
+- Publicação: push na `main` → GitHub Pages em https://iron026.github.io/oficio-app/ (`VITE_BASE=/oficio-app/`).

@@ -4,10 +4,15 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
-// base './' gera caminhos relativos: funciona no GitHub Pages (subpasta)
-// e dentro do WebView do Capacitor (file://).
+// Caminho base dos arquivos publicados:
+// - GitHub Pages: o workflow define VITE_BASE=/oficio-app/
+//   (https://iron026.github.io/oficio-app/).
+// - Padrão './' (caminhos relativos): funciona no Capacitor (Android),
+//   em arquivo único e em qualquer subpasta.
+const base = process.env.VITE_BASE || './';
+
 export default defineConfig(({ mode }) => ({
-  base: './',
+  base,
   plugins: [react(), tailwindcss(), ...(mode === 'single' ? [viteSingleFile()] : [])],
   build: {
     outDir: mode === 'single' ? 'dist-single' : 'dist',

@@ -5,6 +5,11 @@
 Aplicativo freemium para profissionais autônomos (manutenção, beleza, limpeza, alimentação e outros) organizarem clientes, agenda e finanças — e acompanharem a própria evolução profissional com níveis, missões, metas e conquistas.
 
 > Versão **0.1** · funciona no navegador do celular · dados salvos apenas no aparelho (IndexedDB).
+>
+> **Acesse:** https://iron026.github.io/oficio-app/
+
+[![CI](https://github.com/Iron026/oficio-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Iron026/oficio-app/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Iron026/oficio-app/actions/workflows/pages.yml/badge.svg)](https://github.com/Iron026/oficio-app/actions/workflows/pages.yml)
 
 ## O que tem na 0.1
 
