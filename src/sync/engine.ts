@@ -112,14 +112,14 @@ export class SyncEngine implements ChangeTracker {
   private constructor(
     private service: AppService,
     private storage: TrackedStorage,
-    private remote: RemoteStore,
+    private remoteStore: RemoteStore | null,
     state: SyncState,
     private opts: { now: () => Date; autoSync: boolean; isOnline: () => boolean },
   ) {
     this.state = state;
   }
 
-  static async create(service: AppService, storage: TrackedStorage, remote: RemoteStore, opts: Partial<{ now: () => Date; autoSync: boolean; isOnline: () => boolean }> = {}) {
+  static async create(service: AppService, storage: TrackedStorage, remote: RemoteStore | null, opts: Partial<{ now: () => Date; autoSync: boolean; isOnline: () => boolean }> = {}) {
     const saved = await storage.kvGet<SyncState>(STATE_KEY);
     const state = saved?.version === 1 ? saved : freshState(newId());
     if (!saved) await storage.kvSet(STATE_KEY, state);
@@ -133,6 +133,18 @@ export class SyncEngine implements ChangeTracker {
   }
 
   // ------------------------------------------------------------- estado
+
+  /** Conecta a nuvem (carregada sob demanda após a abertura do app). */
+  setRemote(remote: RemoteStore | null) {
+    this.remoteStore = remote;
+  }
+  get cloudAvailable() {
+    return !!this.remoteStore;
+  }
+  private get remote(): RemoteStore {
+    if (!this.remoteStore) throw new Error('Sincronização indisponível nesta versão.');
+    return this.remoteStore;
+  }
 
   get deviceId() {
     return this.state.deviceId;
@@ -324,7 +336,7 @@ export class SyncEngine implements ChangeTracker {
   // ------------------------------------------------------------- sincronização
 
   sync(): Promise<void> {
-    if (!this.uid || this.uid !== this.state.linkedUid) return Promise.resolve();
+    if (!this.remoteStore || !this.uid || this.uid !== this.state.linkedUid) return Promise.resolve();
     if (this.running) {
       this.rerun = true;
       return this.running;

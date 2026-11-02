@@ -12,6 +12,8 @@ import { TextField } from '../ui/Field';
 import { ProfessionIcon } from '../ui/icons';
 import { useToast } from '../ui/Toast';
 import { Logo } from './Shell';
+import { GoogleButton, useAccountFlow } from './Account';
+import { useCloud } from '../state/CloudContext';
 
 type Step = 'welcome' | 'profession' | 'profile';
 
@@ -37,6 +39,8 @@ export function Onboarding() {
 }
 
 function Welcome({ onNext }: { onNext: () => void }) {
+  const { available } = useCloud();
+  const flow = useAccountFlow();
   const items = [
     { icon: Users, title: 'Clientes e agenda', text: 'Tudo organizado em um só lugar.' },
     { icon: LineChart, title: 'Dinheiro sob controle', text: 'Receitas, despesas e saldo do mês.' },
@@ -70,6 +74,12 @@ function Welcome({ onNext }: { onNext: () => void }) {
         <ShieldCheck size={16} aria-hidden="true" /> Seus dados ficam salvos apenas neste aparelho.
       </p>
       <Button size="lg" block onClick={onNext} icon={<ArrowRight size={20} />} className="flex-row-reverse">Começar</Button>
+      {available && (
+        <div className="mt-3">
+          <GoogleButton onClick={flow.start} busy={flow.busy} label="Já uso o Ofício: recuperar com Google" />
+        </div>
+      )}
+      {flow.sheet}
     </div>
   );
 }

@@ -5,6 +5,11 @@ import { hideSplash, minimizeApp, onAndroidBack, setupKeyboard } from './platfor
 import { navigate, useRoute, type Route } from './state/router';
 import { AppService } from './state/service';
 import { createStorage, type StorageAdapter } from './storage';
+import { createCloud, type Cloud } from './cloud';
+import { AccountController } from './state/account';
+import { CloudProvider } from './state/CloudContext';
+import { SyncEngine } from './sync/engine';
+import { TrackedStorage } from './sync/tracked';
 import { ConfirmProvider } from './ui/Confirm';
 import { ToastProvider } from './ui/Toast';
 import { Agenda } from './screens/Agenda';
@@ -16,20 +21,40 @@ import { Onboarding } from './screens/Onboarding';
 import { Settings } from './screens/Settings';
 import { Logo, Shell } from './screens/Shell';
 
-type Boot = { service: AppService; persistent: boolean };
+type Boot = { service: AppService; persistent: boolean; sync: SyncEngine };
 
-/** `storageFactory` permite injetar outro armazenamento (ex.: em testes). */
-export function App({ storageFactory }: { storageFactory?: () => Promise<{ storage: StorageAdapter; persistent: boolean }> }) {
+interface AppProps {
+  /** Permite injetar outro armazenamento (ex.: em testes). */
+  storageFactory?: () => Promise<{ storage: StorageAdapter; persistent: boolean }>;
+  /** Permite injetar a nuvem (ex.: autenticação simulada em testes). */
+  cloudFactory?: () => Promise<Cloud>;
+}
+
+export function App({ storageFactory, cloudFactory }: AppProps) {
   const [boot, setBoot] = useState<Boot | null>(null);
+  const [account, setAccount] = useState<AccountController | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const { storage, persistent } = await (storageFactory ?? createStorage)();
-      const service = await AppService.load(storage);
-      if (!cancelled) setBoot({ service, persistent });
+      const tracked = new TrackedStorage(storage);
+      const service = await AppService.load(tracked);
+      const sync = await SyncEngine.create(service, tracked, null);
+      if (cancelled) return;
+      setBoot({ service, persistent, sync });
       void setupKeyboard();
+      // Conta Google e nuvem carregam depois, sem atrasar a abertura (e o app funciona sem elas).
+      void (cloudFactory ?? createCloud)().then(async (cloud) => {
+        if (cancelled) return;
+        sync.setRemote(cloud.remote);
+        const controller = new AccountController(cloud.auth, sync);
+        cloud.auth.onChange((u) => void sync.setUser(u?.uid ?? null));
+        await cloud.auth.ready().catch(() => undefined);
+        await sync.setUser(cloud.auth.current()?.uid ?? null);
+        if (!cancelled) setAccount(controller);
+      });
     })()
       .catch((err: unknown) => {
         console.error(err);
@@ -39,7 +64,7 @@ export function App({ storageFactory }: { storageFactory?: () => Promise<{ stora
     return () => {
       cancelled = true;
     };
-  }, [storageFactory]);
+  }, [storageFactory, cloudFactory]);
 
   if (error) return <Splash message={error} />;
   if (!boot) return <Splash />;
@@ -47,7 +72,9 @@ export function App({ storageFactory }: { storageFactory?: () => Promise<{ stora
     <ToastProvider>
       <ConfirmProvider>
         <AppProvider service={boot.service} persistent={boot.persistent}>
-          <Root />
+          <CloudProvider sync={boot.sync} account={account}>
+            <Root />
+          </CloudProvider>
         </AppProvider>
       </ConfirmProvider>
     </ToastProvider>
