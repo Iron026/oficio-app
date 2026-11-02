@@ -28,7 +28,11 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const panel = panelRef.current;
-    const first = panel?.querySelector<HTMLElement>('input, select, textarea, button:not([data-close])');
+    // Em telas de toque, focar um campo abriria o teclado e cobriria metade do
+    // painel: o foco vai para o próprio painel (o leitor de tela anuncia o título)
+    // e o teclado só abre quando a pessoa toca no campo.
+    const touch = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    const first = touch ? null : panel?.querySelector<HTMLElement>('input, select, textarea, button:not([data-close])');
     (first ?? panel)?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCloseRef.current();
