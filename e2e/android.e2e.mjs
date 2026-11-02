@@ -112,10 +112,11 @@ try {
     const edgeToEdge = m.insetTop > 0;
     if (edgeToEdge) assert(m.paddingTop >= m.insetTop, `padding ${m.paddingTop}px < inset ${m.insetTop}px`);
     else assert(m.screenH - m.innerH > 40, 'WebView ocupa a tela inteira sem recuo das barras do sistema');
-    // Nenhuma barra de título nativa deve aparecer sobre o app.
+    // Nenhuma barra de título nativa deve aparecer sobre o app
+    // (id exato "action_bar"; "action_bar_root" é só o contêiner do AppCompat).
     adb('shell', 'uiautomator', 'dump', '/sdcard/ui.xml');
     const ui = adb('shell', 'cat', '/sdcard/ui.xml');
-    assert(!/id\/action_bar/.test(ui), 'barra de título nativa (action_bar) visível');
+    assert(!/id\/action_bar"/.test(ui), 'barra de título nativa (action_bar) visível');
   });
 
   await step('Voltar no cadastro retorna ao passo anterior', async () => {
