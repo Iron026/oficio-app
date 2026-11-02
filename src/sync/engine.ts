@@ -308,7 +308,8 @@ export class SyncEngine implements ChangeTracker {
         await this.storage.untracked(() => this.service.applySyncedData(data));
       } else {
         const d = this.service.data;
-        for (const c of SYNC_COLLECTIONS) for (const e of d[c]) next.records[recordKey(c, e.id)] = { baseRev: 0, base: null, dirty: true, seq: 1 };
+        for (const c of SYNC_COLLECTIONS)
+          for (const e of d[c] as unknown as Entity[]) if (!e.isDemo) next.records[recordKey(c, e.id)] = { baseRev: 0, base: null, dirty: true, seq: 1 };
         next.meta = { baseRev: 0, base: null, dirty: !!d.profile, seq: 1 };
         this.state = next;
         await this.applyRemote(pulled.records, pulled.meta);
@@ -389,6 +390,12 @@ export class SyncEngine implements ChangeTracker {
       const k = parseRecordKey(key);
       if (!k) continue;
       const data = r.deleted ? null : this.localEntity(k.collection, k.id);
+      // Dados de demonstração (fictícios) nunca vão para a nuvem.
+      if (data?.isDemo) {
+        if (r.baseRev === 0) delete this.state.records[key];
+        else r.dirty = false;
+        continue;
+      }
       items.push({ collection: k.collection, id: k.id, data, expectedRev: r.baseRev });
       seqs.set(key, r.seq);
     }

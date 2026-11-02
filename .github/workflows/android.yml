@@ -15,7 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  APP_VERSION: 0.2.0
+  APP_VERSION: 0.3.0
+  # Configuração pública do app web do Firebase (variáveis do repositório).
+  # Ausentes → o app é gerado sem conta Google (funciona só no aparelho).
+  VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+  VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+  VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+  VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+  VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+  VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
 
 jobs:
   apk:
@@ -41,6 +49,30 @@ jobs:
         run: npm test
       - name: Build web
         run: npm run build
+
+      # Arquivo do Firebase para Android, vindo do segredo GOOGLE_SERVICES_JSON
+      # (nunca versionado). Sem ele, o login Google não é incluído no APK.
+      - name: Configuração do Firebase (Android)
+        id: firebase
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          FIREBASE_ANDROID_APP_ID: ${{ vars.FIREBASE_ANDROID_APP_ID }}
+          FIREBASE_WEB_CLIENT_ID: ${{ vars.FIREBASE_WEB_CLIENT_ID }}
+          FIREBASE_ANDROID_API_KEY: ${{ vars.FIREBASE_ANDROID_API_KEY }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          elif [ -n "$FIREBASE_ANDROID_APP_ID" ]; then
+            node ci/make-google-services.mjs
+          fi
+          if [ -f android/app/google-services.json ]; then
+            python3 -c "import json;d=json.load(open('android/app/google-services.json'));assert any(c['client_info']['android_client_info']['package_name']=='io.github.iron026.oficio' for c in d['client']), 'google-services.json não contém o pacote io.github.iron026.oficio'"
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Configuração Firebase do Android ausente: APK gerado sem login Google (somente local)."
+          fi
+          if [ -z "$VITE_FIREBASE_API_KEY" ]; then echo "::notice::Variáveis VITE_FIREBASE_* ausentes: conta Google desativada no app."; fi
 
       - uses: actions/setup-java@v5
         with:
@@ -95,11 +127,18 @@ jobs:
           $APKSIGNER verify --print-certs "out/$NAME" | tee out/assinatura.txt
           sha256sum "out/$NAME" | tee -a out/assinatura.txt
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          SHA1=$(grep -m1 'SHA-1 digest' out/assinatura.txt | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
+          SHA256=$(grep -m1 'SHA-256 digest' out/assinatura.txt | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
           {
             echo "### APK de teste pronto"
             echo "- Arquivo: \`$NAME\`"
             echo "- Versão: ${APP_VERSION} (build ${{ github.run_number }})"
+            echo "- Login Google incluído: **${{ steps.firebase.outputs.configured }}**"
             echo "- Baixe em **Artifacts → oficio-apk-debug** nesta página."
+            echo ""
+            echo "#### Impressões digitais da assinatura (cadastrar no Firebase → Configurações do projeto → app Android)"
+            echo "- SHA-1: \`$SHA1\`"
+            echo "- SHA-256: \`$SHA256\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v6
@@ -110,6 +149,33 @@ jobs:
             out/assinatura.txt
           retention-days: 30
           if-no-files-found: error
+
+  login-google-compila:
+    name: Compilação do login Google (configuração provisória)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      # Valores FALSOS, apenas para verificar que o código nativo compila.
+      # Este APK não é distribuído.
+      - run: cp ci/google-services.placeholder.json android/app/google-services.json
+      - run: npx cap sync android
+      - name: Verificar plugin de login incluído
+        run: grep -q '@capacitor-firebase/authentication' android/app/src/main/assets/capacitor.plugins.json
+      - name: Compilar
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
 
   e2e:
     name: Teste no emulador Android

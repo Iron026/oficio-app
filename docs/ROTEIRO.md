@@ -1,6 +1,9 @@
 # Roteiro
 
-## 0.2 (atual)
+## 0.3 (em desenvolvimento — branch v0.3-google-auth)
+Conta Google opcional (Firebase Auth) e sincronização offline-first com o Cloud Firestore: migração segura dos dados locais, recuperação em nova instalação, conflitos financeiros revisados pelo usuário, exclusão de conta.
+
+## 0.2 (estável — tag/ref `release/v0.2.0`)
 App Android via Capacitor: APK de depuração compilado no GitHub Actions, teste em emulador, botão Voltar, tela inteira, teclado, backup no Android.
 
 ## 0.1

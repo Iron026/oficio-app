@@ -11,3 +11,5 @@ Projeto **React 19 + TypeScript + Vite + Tailwind CSS v4** (não é Next.js).
 - Publicação: push na `main` → GitHub Pages em https://iron026.github.io/oficio-app/ (`VITE_BASE=/oficio-app/`).
 - Android: Capacitor 8 em `android/` (versionado). Código nativo-dependente só em `src/platform/`. Não altere `appId` nem a origem `https://localhost`.
 - Nunca versione chaves (`*.jks`, `*.keystore`). Assinatura de produção só com autorização do responsável.
+- Sincronização: alterações locais passam por `TrackedStorage`; nunca grave no Firestore fora do `SyncEngine`. Mudanças em `firestore.rules` exigem testes em `src/cloud/firestore.emulator.test.ts`.
+- Configuração do Firebase só por variáveis/segredos do GitHub (`VITE_FIREBASE_*`, `FIREBASE_*`); nunca versione `google-services.json`.

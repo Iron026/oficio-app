@@ -273,6 +273,23 @@ describe('funcionamento offline', () => {
   });
 });
 
+describe('dados de demonstração', () => {
+  it('não são enviados para a nuvem', async () => {
+    const remote = new MemoryRemote();
+    const a = await onboarded(remote);
+    await a.service.loadDemoData();
+    await a.service.saveClient(client('Real'));
+    await a.sync.setUser('uid-1');
+    await a.sync.link('uid-1', 'mesclar');
+    await a.service.saveClient(client('Real 2'));
+    await a.sync.sync();
+    expect(a.sync.pendingCount).toBe(0);
+    const names = [...remote.dump('uid-1')!.records.values()].filter((r) => r.collection === 'clients').map((r) => r.data?.name);
+    expect(names.sort()).toEqual(['Real', 'Real 2']);
+    expect([...remote.dump('uid-1')!.records.values()].some((r) => r.data?.isDemo)).toBe(false);
+  });
+});
+
 describe('isolamento, desconexão e exclusão', () => {
   it('contas diferentes não veem os dados uma da outra', async () => {
     const remote = new MemoryRemote();

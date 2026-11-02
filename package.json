@@ -1,6 +1,6 @@
 {
   "name": "oficio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Ofício — Seu trabalho. Sua evolução. Gestão e evolução para profissionais autônomos.",
@@ -21,7 +21,7 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "android:sync": "npm run build && cap sync android",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
-    "test:emulator": "firebase emulators:exec --only firestore --project demo-oficio 'TZ=America/Sao_Paulo vitest run --config vitest.emulator.config.ts'"
+    "test:emulator": "npx -y firebase-tools@15.34.2 emulators:exec --only firestore --project demo-oficio 'TZ=America/Sao_Paulo vitest run --config vitest.emulator.config.ts'"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.6.0",
