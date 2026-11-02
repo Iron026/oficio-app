@@ -165,7 +165,7 @@ try {
     await form.getByLabel(/valor/i).fill('70,00');
     await tap(form.getByRole('button', { name: /^agendar$/i }));
     await form.waitFor({ state: 'detached' });
-    await tap(page.getByRole('link', { name: /agenda/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /agenda/i }));
     await tap(page.getByRole('button', { name: /corte antecipado/i }));
     await tap(page.getByRole('button', { name: /concluir atendimento/i }));
     const aviso = page.getByRole('dialog', { name: 'Data futura' });
@@ -177,15 +177,15 @@ try {
     await tap(page.getByRole('button', { name: /concluir atendimento/i }));
     await tap(page.getByRole('dialog', { name: 'Data futura' }).getByRole('button', { name: /concluir mesmo assim/i }));
     await page.getByText(/atendimento concluído/i).first().waitFor();
-    await tap(page.getByRole('link', { name: /finanças/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
     await page.getByTestId('data-futura').waitFor();
     await wait(600);
     shot('08-financas-data-futura');
-    await tap(page.getByRole('link', { name: /painel/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
   });
 
   await step('Voltar em outra tela retorna ao Painel', async () => {
-    await tap(page.getByRole('link', { name: /finanças/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
     await page.waitForFunction(() => location.hash === '#/financas');
     back();
     await page.waitForFunction(() => location.hash === '#/painel');
@@ -195,7 +195,7 @@ try {
     await tap(page.getByRole('button', { name: /ajustes/i }));
     await tap(page.getByRole('radio', { name: /escuro/i }));
     await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
-    await tap(page.getByRole('link', { name: /painel/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
     await wait(1000);
     shot('04-painel-escuro');
     await tap(page.getByRole('button', { name: /^agendar$/i }));
@@ -222,7 +222,7 @@ try {
   });
 
   await step('Botão Voltar no Painel minimiza o app', async () => {
-    await tap(page.getByRole('link', { name: /painel/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
     await page.waitForFunction(() => location.hash === '#/painel');
     back();
     await wait(1500);
@@ -237,11 +237,11 @@ try {
     const xp = await page.getByText(/\d+ XP/).first().textContent();
     assert(xp && parseInt(xp) > 0, `XP não persistiu (${xp})`);
     assert(await page.evaluate(() => document.documentElement.classList.contains('dark')), 'tema escuro não persistiu');
-    await tap(page.getByRole('link', { name: /finanças/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
     await page.getByTestId('data-futura').waitFor(); // receita antecipada e selo preservados
     const receitas = await page.getByText('Corte antecipado').count();
     assert(receitas === 1, `receita antecipada duplicada ou ausente (${receitas})`);
-    await tap(page.getByRole('link', { name: /clientes/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /clientes/i }));
     await page.getByText('Cliente Persistente').waitFor();
     shot('06-clientes-apos-reabrir');
   });
@@ -253,7 +253,7 @@ try {
     await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
     await tap(page.getByRole('button', { name: /^importar$/i }));
     await page.getByText(/backup importado/i).first().waitFor();
-    await tap(page.getByRole('link', { name: /clientes/i }));
+    await tap(page.getByRole('navigation').getByRole('link', { name: /clientes/i }));
     await page.getByText('Cliente Importado').waitFor();
     await page.getByText('Cliente Persistente').waitFor();
   });
