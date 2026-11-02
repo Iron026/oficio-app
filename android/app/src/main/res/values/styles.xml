@@ -13,15 +13,15 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Cor exibida atrás das barras do sistema quando o WebView é
+             posicionado entre elas (WebView < 140). -->
+        <item name="android:windowBackground">@color/app_background</item>
     </style>
 
 
-    <!-- Tela de abertura: Android 12+ usa a API SplashScreen (cor + ícone);
-         versões anteriores usam a imagem @drawable/splash. -->
+    <!-- Tela de abertura (padrão do Capacitor): Android 12+ mostra o ícone do
+         app; versões anteriores usam a imagem @drawable/splash. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
-        <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
-        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

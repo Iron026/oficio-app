@@ -64,14 +64,24 @@ try {
     shot('01-boas-vindas');
   });
 
-  await step('Área segura da barra de status é respeitada', async () => {
-    const insets = await page.evaluate(() => {
+  await step('Conteúdo não fica sob a barra de status', async () => {
+    // Dois modos válidos (Capacitor SystemBars):
+    // - WebView >= 140: tela inteira, com --safe-area-inset-top > 0 aplicado no layout;
+    // - WebView < 140: o WebView é posicionado entre as barras (viewport menor que a tela).
+    const m = await page.evaluate(() => {
       const cs = getComputedStyle(document.documentElement);
-      return { injected: cs.getPropertyValue('--safe-area-inset-top'), safeTop: cs.getPropertyValue('--safe-top') };
+      return {
+        insetTop: parseFloat(cs.getPropertyValue('--safe-area-inset-top')) || 0,
+        paddingTop: parseFloat(getComputedStyle(document.querySelector('.min-h-dvh')).paddingTop),
+        screenH: screen.height,
+        innerH: innerHeight,
+        webview: navigator.userAgent.match(/Chrome\/([\d.]+)/)?.[1],
+      };
     });
-    console.log('\n  insets:', JSON.stringify(insets));
-    const pt = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.min-h-dvh')).paddingTop));
-    assert(pt > 21, `padding superior ${pt}px não cobre a barra de status`);
+    console.log('\n  medidas:', JSON.stringify(m));
+    const edgeToEdge = m.insetTop > 0;
+    if (edgeToEdge) assert(m.paddingTop >= m.insetTop, `padding ${m.paddingTop}px < inset ${m.insetTop}px`);
+    else assert(m.screenH - m.innerH > 40, 'WebView ocupa a tela inteira sem recuo das barras do sistema');
   });
 
   await step('Voltar no cadastro retorna ao passo anterior', async () => {
