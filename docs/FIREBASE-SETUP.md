@@ -68,6 +68,7 @@ alteração do código (workflow **CI → Regras e sincronização**).
 
 1. Obtenha as impressões digitais da assinatura do APK:
    - Abra **https://github.com/Iron026/oficio-app/actions/workflows/android.yml**
+   - Antes: crie o segredo `OFICIO_DEBUG_SEED` (ver `docs/ANDROID.md` → *Assinatura estável*) e rode o workflow; o resumo deve dizer **Assinatura estável: true**.
    - Toque na execução mais recente da branch **v0.3-google-auth** com ✅.
    - No **resumo** (Summary), seção *Impressões digitais da assinatura*, copie **SHA-1** e **SHA-256**.
 2. No Firebase: ⚙️ **Configurações do projeto → Seus apps → Adicionar app → Android**.

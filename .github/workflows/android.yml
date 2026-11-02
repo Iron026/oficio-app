@@ -80,31 +80,24 @@ jobs:
           java-version: 21
           cache: gradle
 
-      # Chave de DEPURAÇÃO estável entre builds, para o APK novo atualizar o
-      # anterior sem precisar desinstalar (o que apagaria os dados do app).
-      # Não é chave de produção e não fica no repositório: é gerada no próprio
-      # CI e guardada no cache do GitHub Actions. Opcionalmente, defina o
-      # segredo ANDROID_DEBUG_KEYSTORE_BASE64 para fixá-la permanentemente.
-      - name: Restaurar chave de depuração
-        uses: actions/cache@v5
-        with:
-          path: ~/.android/debug.keystore
-          key: oficio-debug-keystore-v1
+      # Chave de DEPURAÇÃO estável: derivada do segredo OFICIO_DEBUG_SEED
+      # (ci/debug_keystore.py). Mesma chave em todos os builds e branches →
+      # o APK atualiza por cima sem perder dados e o SHA-1 do Firebase não muda.
+      # Nenhuma chave privada fica no repositório. Não é a chave de produção.
       - name: Preparar chave de depuração
+        id: keystore
         env:
-          DEBUG_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+          OFICIO_DEBUG_SEED: ${{ secrets.OFICIO_DEBUG_SEED }}
         run: |
-          mkdir -p ~/.android
-          if [ -n "$DEBUG_KEYSTORE_B64" ]; then
-            echo "$DEBUG_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
-            echo "Usando chave de depuração do segredo do repositório."
-          elif [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android \
-              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
-              -validity 10000 -dname "CN=Oficio Debug,O=Oficio,C=BR"
-            echo "::notice::Nova chave de depuração criada. Se já houver um APK do Ofício instalado com outra chave, faça backup e desinstale antes de instalar este."
+          if [ -n "$OFICIO_DEBUG_SEED" ]; then
+            python3 -m pip install --quiet --disable-pip-version-check cryptography
+            python3 ci/debug_keystore.py "$RUNNER_TEMP/oficio-debug.p12" | tee "$RUNNER_TEMP/fingerprints.txt"
+            echo "OFICIO_DEBUG_KEYSTORE=$RUNNER_TEMP/oficio-debug.p12" >> "$GITHUB_ENV"
+            echo "sha1=$(grep 'SHA-1' "$RUNNER_TEMP/fingerprints.txt" | awk '{print $NF}')" >> "$GITHUB_OUTPUT"
+            echo "stable=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Chave de depuração restaurada do cache."
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Segredo OFICIO_DEBUG_SEED ausente: a assinatura deste APK pode mudar a cada build (atualizar por cima pode falhar e o SHA-1 do Firebase deixa de valer). Ver docs/ANDROID.md."
           fi
 
       - name: Sincronizar Capacitor
@@ -128,12 +121,16 @@ jobs:
           sha256sum "out/$NAME" | tee -a out/assinatura.txt
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           SHA1=$(grep -m1 'SHA-1 digest' out/assinatura.txt | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
+          if [ "${{ steps.keystore.outputs.stable }}" = "true" ] && [ "$SHA1" != "${{ steps.keystore.outputs.sha1 }}" ]; then
+            echo "::error::O APK não foi assinado com a chave estável (esperado ${{ steps.keystore.outputs.sha1 }}, obtido $SHA1)."; exit 1
+          fi
           SHA256=$(grep -m1 'SHA-256 digest' out/assinatura.txt | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
           {
             echo "### APK de teste pronto"
             echo "- Arquivo: \`$NAME\`"
             echo "- Versão: ${APP_VERSION} (build ${{ github.run_number }})"
             echo "- Login Google incluído: **${{ steps.firebase.outputs.configured }}**"
+            echo "- Assinatura estável (segredo OFICIO_DEBUG_SEED): **${{ steps.keystore.outputs.stable }}**"
             echo "- Baixe em **Artifacts → oficio-apk-debug** nesta página."
             echo ""
             echo "#### Impressões digitais da assinatura (cadastrar no Firebase → Configurações do projeto → app Android)"
@@ -173,9 +170,23 @@ jobs:
       - run: npx cap sync android
       - name: Verificar plugin de login incluído
         run: grep -q '@capacitor-firebase/authentication' android/app/src/main/assets/capacitor.plugins.json
+      # Semente PÚBLICA de teste (somente para este APK descartável): valida que o
+      # Gradle assina com a chave derivada e que a impressão digital é a esperada.
+      - name: Chave de depuração de teste
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check cryptography
+          OFICIO_DEBUG_SEED=ci-teste-publico-nao-usar-em-producao python3 ci/debug_keystore.py "$RUNNER_TEMP/teste.p12" | tee "$RUNNER_TEMP/fp.txt"
+          echo "OFICIO_DEBUG_KEYSTORE=$RUNNER_TEMP/teste.p12" >> "$GITHUB_ENV"
       - name: Compilar
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
+      - name: Conferir assinatura determinística
+        run: |
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          GOT=$($APKSIGNER verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA-1 digest' | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
+          WANT=$(grep 'SHA-1' "$RUNNER_TEMP/fp.txt" | awk '{print $NF}')
+          echo "esperado=$WANT obtido=$GOT"
+          [ "$GOT" = "$WANT" ]
 
   e2e:
     name: Teste no emulador Android
