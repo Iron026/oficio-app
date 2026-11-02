@@ -1,0 +1,35 @@
+import type { AppData, Appointment, Client, Profile, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
+
+export interface EntityStore<T extends { id: string }> {
+  list(): Promise<T[]>;
+  get(id: string): Promise<T | undefined>;
+  put(item: T): Promise<void>;
+  /** Grava vários itens em uma única transação. */
+  putMany(items: T[]): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+/**
+ * Contrato de persistência do app. A interface não sabe nada sobre IndexedDB:
+ * no futuro, uma implementação com sincronização em nuvem pode substituí-la
+ * sem alterar telas nem regras de negócio.
+ */
+export interface StorageAdapter {
+  readonly kind: string;
+  clients: EntityStore<Client>;
+  appointments: EntityStore<Appointment>;
+  transactions: EntityStore<Transaction>;
+  xpEvents: EntityStore<XpEvent>;
+  achievements: EntityStore<UnlockedAchievement>;
+  getProfile(): Promise<Profile | null>;
+  saveProfile(profile: Profile): Promise<void>;
+  getSettings(): Promise<Settings>;
+  saveSettings(settings: Settings): Promise<void>;
+  loadAll(): Promise<AppData>;
+  /** Substitui todos os dados (importação de backup). */
+  replaceAll(data: AppData): Promise<void>;
+  clearAll(): Promise<void>;
+}
+
+export const ENTITY_STORES = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements'] as const;
+export type EntityStoreName = (typeof ENTITY_STORES)[number];

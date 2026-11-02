@@ -1,0 +1,6 @@
+{
+  "appId": "app.oficio.mobile",
+  "appName": "Ofício",
+  "webDir": "dist",
+  "android": { "allowMixedContent": false }
+}

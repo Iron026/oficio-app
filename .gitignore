@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-single
+coverage
+*.tsbuildinfo
+.DS_Store
+*.pem
+*.log
+.env*
+!.env.example
+# Capacitor (gerado futuramente)
+android/app/build
+ios/App/build
