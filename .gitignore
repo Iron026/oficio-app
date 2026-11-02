@@ -11,3 +11,4 @@ coverage
 # Capacitor (gerado futuramente)
 android/app/build
 ios/App/build
+e2e-results

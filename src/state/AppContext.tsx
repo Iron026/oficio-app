@@ -2,8 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useSyncExternalStore
 import { getProfession, type ProfessionModule } from '../domain/professions';
 import type { AppData } from '../domain/types';
 import { useToast } from '../ui/Toast';
+import { friendlyError } from '../lib/errors';
+import { hapticSuccess, setSystemBarsDark } from '../platform/native';
 import type { AppService, Feedback } from './service';
-import { ValidationError } from './service';
 
 interface Ctx { service: AppService; persistent: boolean }
 
@@ -29,6 +30,7 @@ export function useFeedback() {
   return useCallback(
     (message: string, feedback?: Feedback, description?: string) => {
       toast({ title: message, description, tone: 'success', xp: feedback?.xpGained || undefined });
+      void hapticSuccess(!!feedback && (feedback.achievements.length > 0 || !!feedback.levelUp));
       if (!feedback) return;
       for (const e of feedback.events) {
         if (e.category === 'missao' || e.category === 'meta') toast({ title: e.label, tone: 'xp', xp: e.xp });
@@ -47,9 +49,10 @@ export function useErrorHandler() {
   const toast = useToast();
   return useCallback(
     (err: unknown) => {
-      if (err instanceof ValidationError) return;
+      const msg = friendlyError(err);
+      if (!msg) return;
       console.error(err);
-      toast({ title: 'Não foi possível concluir', description: err instanceof Error ? err.message : 'Tente novamente.', tone: 'error' });
+      toast({ ...msg, tone: 'error' });
     },
     [toast],
   );
@@ -62,6 +65,7 @@ export function useThemeEffect(theme: AppData['settings']['theme']) {
     const apply = () => {
       const dark = theme === 'dark' || (theme === 'system' && !!media?.matches);
       document.documentElement.classList.toggle('dark', dark);
+      void setSystemBarsDark(dark);
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0a1215' : '#0f7b71');
     };
     apply();

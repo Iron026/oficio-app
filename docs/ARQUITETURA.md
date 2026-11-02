@@ -5,7 +5,8 @@
 - **React 19 + TypeScript (strict)** — interface.
 - **Vite** — build; `base: './'` gera caminhos relativos (funciona no GitHub Pages, em subpastas e no WebView do Capacitor).
 - **Tailwind CSS v4** — estilos, com tokens semânticos (`bg-surface`, `text-muted`, `border-line`...) definidos em `src/index.css`. O modo escuro troca apenas as variáveis CSS.
-- **IndexedDB** — persistência local.
+- **IndexedDB** — persistência local (no Android, dentro do WebView do app).
+- **Capacitor 8** — empacotamento Android.
 - **Vitest + Testing Library + fake-indexeddb** — testes.
 - **lucide-react** — ícones.
 
@@ -53,13 +54,14 @@ src/
 - Backup é um arquivo JSON gerado e importado localmente, com validação de formato.
 - `.env*` está no `.gitignore`; não há credenciais no código.
 
-## Capacitor (próximo passo)
+## Android (Capacitor 8)
 
-`capacitor.config.json` já aponta `webDir: dist`. Quando for gerar o app Android:
+O mesmo código web roda no app Android via Capacitor. Integrações nativas ficam isoladas em `src/platform/`:
 
-```bash
-npm i @capacitor/core @capacitor/android && npm i -D @capacitor/cli
-npm run build && npx cap add android && npx cap sync
-```
+- `native.ts` — detecção de plataforma, tela de abertura, barras do sistema, teclado, vibração e botão Voltar. No navegador, todas as funções viram no-op.
+- `backStack.ts` — pilha de “voltar”: cada painel (`Sheet`) aberto registra como se fecha.
+- `files.ts` — salvar/compartilhar o backup (download no navegador; Documentos ou menu de compartilhar no Android).
 
-O build do APK/AAB pode ser feito na nuvem (ex.: GitHub Actions com `gradlew bundleRelease`), sem computador local.
+Valores que não podem mudar depois de publicado: `appId` e a origem `https://localhost` (ver `capacitor.config.ts`). Detalhes e instalação em [ANDROID.md](ANDROID.md).
+
+O diretório `android/` é versionado (projeto nativo). Arquivos gerados (`assets/public`, `build/`, chaves `*.jks`/`*.keystore`) são ignorados.

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ofício</string>
+    <string name="title_activity_main">Ofício</string>
+    <string name="package_name">io.github.iron026.oficio</string>
+    <string name="custom_url_scheme">io.github.iron026.oficio</string>
+</resources>

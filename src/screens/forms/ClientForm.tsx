@@ -53,9 +53,9 @@ function ClientForm({ client, onDone }: { client?: Client; onDone: (c: Client) =
 
   return (
     <form onSubmit={submit} noValidate className="space-y-4">
-      <TextField label="Nome" value={v.name} onChange={set('name')} error={errors.name} autoComplete="name" maxLength={80} />
-      <TextField label="Telefone / WhatsApp" value={v.phone} onChange={set('phone')} error={errors.phone} inputMode="tel" placeholder="(11) 91234-5678" optional />
-      <TextField label="E-mail" value={v.email} onChange={set('email')} error={errors.email} type="email" inputMode="email" optional />
+      <TextField label="Nome" value={v.name} onChange={set('name')} error={errors.name} autoComplete="name" autoCapitalize="words" enterKeyHint="next" maxLength={80} />
+      <TextField label="Telefone / WhatsApp" value={v.phone} onChange={set('phone')} error={errors.phone} inputMode="tel" autoComplete="tel" enterKeyHint="next" placeholder="(11) 91234-5678" optional />
+      <TextField label="E-mail" value={v.email} onChange={set('email')} error={errors.email} type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="email" enterKeyHint="next" optional />
       <TextField label="Endereço" value={v.address} onChange={set('address')} optional maxLength={120} />
       <TextArea label="Observações" value={v.notes} onChange={set('notes')} error={errors.notes} optional maxLength={500} placeholder="Preferências, detalhes importantes..." />
       <Button type="submit" block size="lg" disabled={saving}>{client ? 'Salvar alterações' : 'Cadastrar cliente'}</Button>

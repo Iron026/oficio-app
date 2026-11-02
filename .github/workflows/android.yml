@@ -1,0 +1,150 @@
+# Compila o APK de teste (depuração) do Ofício na nuvem.
+# O APK fica em: Actions → execução → "Artifacts" → oficio-apk-debug.
+name: Android APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_VERSION: 0.2.0
+
+jobs:
+  apk:
+    name: Verificações + APK de depuração
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      apk-name: ${{ steps.apk.outputs.name }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Nada é publicado se alguma verificação falhar.
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Testes automatizados
+        run: npm test
+      - name: Build web
+        run: npm run build
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      # Chave de DEPURAÇÃO estável entre builds, para o APK novo atualizar o
+      # anterior sem precisar desinstalar (o que apagaria os dados do app).
+      # Não é chave de produção e não fica no repositório: é gerada no próprio
+      # CI e guardada no cache do GitHub Actions. Opcionalmente, defina o
+      # segredo ANDROID_DEBUG_KEYSTORE_BASE64 para fixá-la permanentemente.
+      - name: Restaurar chave de depuração
+        uses: actions/cache@v5
+        with:
+          path: ~/.android/debug.keystore
+          key: oficio-debug-keystore-v1
+      - name: Preparar chave de depuração
+        env:
+          DEBUG_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p ~/.android
+          if [ -n "$DEBUG_KEYSTORE_B64" ]; then
+            echo "$DEBUG_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+            echo "Usando chave de depuração do segredo do repositório."
+          elif [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android \
+              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Oficio Debug,O=Oficio,C=BR"
+            echo "::notice::Nova chave de depuração criada. Se já houver um APK do Ofício instalado com outra chave, faça backup e desinstale antes de instalar este."
+          else
+            echo "Chave de depuração restaurada do cache."
+          fi
+
+      - name: Sincronizar Capacitor
+        run: npx cap sync android
+
+      - name: Compilar APK
+        working-directory: android
+        run: |
+          ./gradlew assembleDebug --no-daemon \
+            -PoficioVersionCode=$((100 + ${{ github.run_number }})) \
+            -PoficioVersionName=${APP_VERSION}-build.${{ github.run_number }}
+
+      - name: Verificar assinatura e nomear APK
+        id: apk
+        run: |
+          NAME="oficio-${APP_VERSION}-build.${{ github.run_number }}-debug.apk"
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/app-debug.apk "out/$NAME"
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          $APKSIGNER verify --print-certs "out/$NAME" | tee out/assinatura.txt
+          sha256sum "out/$NAME" | tee -a out/assinatura.txt
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          {
+            echo "### APK de teste pronto"
+            echo "- Arquivo: \`$NAME\`"
+            echo "- Versão: ${APP_VERSION} (build ${{ github.run_number }})"
+            echo "- Baixe em **Artifacts → oficio-apk-debug** nesta página."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: oficio-apk-debug
+          path: |
+            out/*.apk
+            out/assinatura.txt
+          retention-days: 30
+          if-no-files-found: error
+
+  e2e:
+    name: Teste no emulador Android
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v7
+        with:
+          name: oficio-apk-debug
+          path: apk
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Executar teste de ponta a ponta
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: node e2e/android.e2e.mjs apk/${{ needs.apk.outputs.apk-name }}
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: oficio-e2e-resultados
+          path: e2e-results
+          retention-days: 14

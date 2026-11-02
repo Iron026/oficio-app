@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { IconButton } from './Button';
+import { cx } from './cx';
+import { pushBackHandler } from '../platform/backStack';
 
 interface SheetProps {
   open: boolean;
@@ -40,7 +42,9 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
       }
     };
     document.addEventListener('keydown', onKey);
+    const removeBack = pushBackHandler(() => onCloseRef.current());
     return () => {
+      removeBack();
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
       previouslyFocused?.focus?.();
@@ -58,7 +62,7 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative flex max-h-[92dvh] w-full max-w-lg animate-sheet flex-col rounded-t-3xl bg-surface shadow-2xl outline-none sm:rounded-3xl"
+        className="relative flex max-h-[calc(100dvh-var(--safe-top)-0.75rem)] w-full max-w-lg animate-sheet flex-col rounded-t-3xl bg-surface shadow-2xl outline-none sm:rounded-3xl"
       >
         <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-line sm:hidden" aria-hidden="true" />
         <div className="flex items-center justify-between gap-2 px-5 pb-1 pt-2">
@@ -67,8 +71,8 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
             <X size={20} />
           </IconButton>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 pb-4 pt-2">{children}</div>
-        {footer && <div className="border-t border-line px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">{footer}</div>}
+        <div className={cx('flex-1 overscroll-contain overflow-y-auto px-5 pt-2', footer ? 'pb-4' : 'pb-[calc(1rem+var(--safe-bottom))]')}>{children}</div>
+        {footer && <div className="border-t border-line px-5 pb-[max(1rem,var(--safe-bottom))] pt-3">{footer}</div>}
       </div>
     </div>,
     document.body,

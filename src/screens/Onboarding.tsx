@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { pushBackHandler } from '../platform/backStack';
 import { ArrowRight, ChevronLeft, LineChart, ShieldCheck, Trophy, Users } from 'lucide-react';
 import { PROFESSION_LIST } from '../domain/professions';
 import type { ProfessionId } from '../domain/types';
@@ -18,8 +19,14 @@ export function Onboarding() {
   const [step, setStep] = useState<Step>('welcome');
   const [professionId, setProfessionId] = useState<ProfessionId | null>(null);
 
+  // Botão Voltar do Android retorna ao passo anterior do cadastro.
+  useEffect(() => {
+    if (step === 'welcome') return;
+    return pushBackHandler(() => setStep(step === 'profile' ? 'profession' : 'welcome'));
+  }, [step]);
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+    <div className="mx-auto flex min-h-dvh max-w-lg flex-col px-5 pb-[max(1.5rem,var(--safe-bottom))] pt-[max(1.25rem,var(--safe-top))]">
       {step === 'welcome' && <Welcome onNext={() => setStep('profession')} />}
       {step === 'profession' && (
         <ProfessionStep value={professionId} onChange={setProfessionId} onBack={() => setStep('welcome')} onNext={() => setStep('profile')} />
@@ -145,8 +152,8 @@ function ProfileStep({ professionId, onBack }: { professionId: ProfessionId; onB
     <form onSubmit={submit} noValidate className="flex flex-1 animate-fade-up flex-col">
       <StepHeader step={2} title="Como podemos te chamar?" subtitle="Você pode alterar isso depois em Ajustes." onBack={onBack} />
       <div className="flex-1 space-y-4">
-        <TextField label="Seu nome" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} error={errors.name} autoComplete="given-name" maxLength={60} />
-        <TextField label="Nome do negócio" value={v.businessName} onChange={(e) => setV({ ...v, businessName: e.target.value })} error={errors.businessName} optional maxLength={60} placeholder="Ex.: Studio Ana Beleza" />
+        <TextField label="Seu nome" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} error={errors.name} autoComplete="given-name" autoCapitalize="words" enterKeyHint="next" maxLength={60} />
+        <TextField label="Nome do negócio" value={v.businessName} onChange={(e) => setV({ ...v, businessName: e.target.value })} error={errors.businessName} optional autoCapitalize="words" enterKeyHint="done" maxLength={60} placeholder="Ex.: Studio Ana Beleza" />
         <label className="flex items-start gap-3 rounded-2xl border border-line bg-surface p-4 text-sm">
           <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} className="mt-0.5 h-5 w-5 accent-brand-600" />
           <span>
