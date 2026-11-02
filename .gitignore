@@ -12,3 +12,4 @@ coverage
 android/app/build
 ios/App/build
 e2e-results
+firestore-debug.log

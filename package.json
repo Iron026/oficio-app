@@ -20,7 +20,8 @@
     "test:watch": "TZ=America/Sao_Paulo vitest",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "android:sync": "npm run build && cap sync android",
-    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "test:emulator": "firebase emulators:exec --only firestore --project demo-oficio 'TZ=America/Sao_Paulo vitest run --config vitest.emulator.config.ts'"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.6.0",

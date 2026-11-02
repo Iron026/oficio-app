@@ -50,7 +50,7 @@ export class MemoryRemote implements RemoteStore {
       const key = recordKey(it.collection, it.id);
       const cur = u.records.get(key);
       const curRev = cur?.rev ?? 0;
-      if (curRev !== it.expectedRev) return { ok: false as const, current: structuredClone(cur!) };
+      if (cur && curRev !== it.expectedRev) return { ok: false as const, current: structuredClone(cur) };
       const rec: RemoteRecord = { collection: it.collection, id: it.id, data: it.data ? structuredClone(it.data) : null, rev: curRev + 1, updatedAt: ++this.clock, deviceId };
       u.records.set(key, rec);
       return { ok: true as const, rev: rec.rev };
@@ -61,7 +61,7 @@ export class MemoryRemote implements RemoteStore {
     this.check();
     const u = this.user(uid);
     const curRev = u.meta?.rev ?? 0;
-    if (curRev !== expectedRev) return { ok: false, current: structuredClone(u.meta!) };
+    if (u.meta && curRev !== expectedRev) return { ok: false, current: structuredClone(u.meta) };
     u.meta = { data: structuredClone(data), rev: curRev + 1, updatedAt: ++this.clock, deviceId };
     return { ok: true, rev: u.meta.rev };
   }
