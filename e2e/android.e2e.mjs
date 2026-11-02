@@ -140,6 +140,7 @@ try {
   await step('Voltar fecha o painel aberto sem sair do app', async () => {
     await tap(page.getByRole('button', { name: /^cliente$/i }));
     await page.getByRole('dialog').waitFor();
+    await wait(1200); // aguarda a animação de entrada do painel
     shot('03-formulario');
     back();
     await page.getByRole('dialog').waitFor({ state: 'detached' });
@@ -168,6 +169,12 @@ try {
     await tap(page.getByRole('link', { name: /painel/i }));
     await wait(1000);
     shot('04-painel-escuro');
+    await tap(page.getByRole('button', { name: /^agendar$/i }));
+    await page.getByRole('dialog').waitFor();
+    await wait(1200);
+    shot('04b-agendar-escuro');
+    back();
+    await page.getByRole('dialog').waitFor({ state: 'detached' });
   });
 
   await step('Exportar backup para Documentos', async () => {
@@ -175,6 +182,7 @@ try {
     await tap(page.getByRole('button', { name: /exportar backup/i }));
     await tap(page.getByRole('button', { name: /salvar em documentos/i }));
     await page.getByText(/backup salvo/i).first().waitFor();
+    await wait(800);
     shot('05-backup-salvo');
     const files = adb('shell', 'ls', '/sdcard/Documents/Oficio/').trim().split(/\s+/);
     console.log('\n  arquivos:', files.join(', '));

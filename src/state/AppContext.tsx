@@ -58,18 +58,38 @@ export function useErrorHandler() {
   );
 }
 
+/**
+ * Cor dos ícones das barras do sistema no Android.
+ * - Tela inteira (WebView >= 140): o app aparece atrás das barras → segue o tema do app.
+ * - WebView posicionado entre as barras (WebView < 140): atrás delas fica o fundo
+ *   da janela nativa, que segue o tema do SISTEMA → os ícones seguem o sistema.
+ */
+export function systemBarsShouldBeDark(appDark: boolean, systemDark: boolean, injectedInsetTop: number): boolean {
+  const edgeToEdge = injectedInsetTop > 0;
+  return edgeToEdge ? appDark : systemDark;
+}
+
 /** Aplica o tema (claro/escuro/sistema) ao documento. */
 export function useThemeEffect(theme: AppData['settings']['theme']) {
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-color-scheme: dark)');
     const apply = () => {
-      const dark = theme === 'dark' || (theme === 'system' && !!media?.matches);
+      const systemDark = !!media?.matches;
+      const dark = theme === 'dark' || (theme === 'system' && systemDark);
       document.documentElement.classList.toggle('dark', dark);
-      void setSystemBarsDark(dark);
+      const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-top')) || 0;
+      void setSystemBarsDark(systemBarsShouldBeDark(dark, systemDark, inset));
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0a1215' : '#0f7b71');
     };
     apply();
+    // O Capacitor injeta as áreas seguras após o carregamento: reavalia depois.
+    const t = setTimeout(apply, 600);
     media?.addEventListener?.('change', apply);
-    return () => media?.removeEventListener?.('change', apply);
+    window.addEventListener('resize', apply);
+    return () => {
+      clearTimeout(t);
+      media?.removeEventListener?.('change', apply);
+      window.removeEventListener('resize', apply);
+    };
   }, [theme]);
 }
