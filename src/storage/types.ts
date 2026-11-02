@@ -29,6 +29,14 @@ export interface StorageAdapter {
   /** Substitui todos os dados (importação de backup). */
   replaceAll(data: AppData): Promise<void>;
   clearAll(): Promise<void>;
+  /**
+   * Armazenamento chave-valor auxiliar (estado de sincronização, cópias de
+   * segurança). Separado dos dados: NÃO é afetado por replaceAll/clearAll.
+   */
+  kvGet<T>(key: string): Promise<T | undefined>;
+  kvSet(key: string, value: unknown): Promise<void>;
+  kvDelete(key: string): Promise<void>;
+  kvKeys(prefix?: string): Promise<string[]>;
 }
 
 export const ENTITY_STORES = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements'] as const;

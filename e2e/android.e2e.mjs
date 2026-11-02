@@ -52,7 +52,9 @@ const tap = async (locator) => {
   try {
     await locator.click({ timeout: 3000 });
   } catch {
-    await locator.evaluate((el) => el.click());
+    // O clique pode ter funcionado mas demorado a ser confirmado (o painel já
+    // fechou): só usa o plano B se o elemento ainda existir.
+    if ((await locator.count()) > 0) await locator.first().evaluate((el) => el.click()).catch(() => undefined);
   }
 };
 
@@ -140,7 +142,7 @@ try {
   await step('Voltar fecha o painel aberto sem sair do app', async () => {
     await tap(page.getByRole('button', { name: /^cliente$/i }));
     await page.getByRole('dialog').waitFor();
-    await wait(1200); // aguarda a animação de entrada do painel
+    await wait(1500); // aguarda a animação de entrada do painel
     shot('03-formulario');
     back();
     await page.getByRole('dialog').waitFor({ state: 'detached' });
@@ -170,7 +172,7 @@ try {
     await tap(page.getByRole('button', { name: /concluir atendimento/i }));
     const aviso = page.getByRole('dialog', { name: 'Data futura' });
     await aviso.waitFor();
-    await wait(800);
+    await wait(1500);
     shot('07-aviso-data-futura');
     await tap(aviso.getByRole('button', { name: 'Voltar' }));
     await aviso.waitFor({ state: 'detached' });

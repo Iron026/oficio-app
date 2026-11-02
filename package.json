@@ -23,6 +23,7 @@
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.6.0",
     "@capacitor/android": "^8.6.0",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.0",
@@ -31,6 +32,7 @@
     "@capacitor/keyboard": "^8.0.6",
     "@capacitor/share": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.2",
+    "firebase": "^12.19.0",
     "lucide-react": "^1.66.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
@@ -39,6 +41,7 @@
     "@capacitor/assets": "^4.0.0",
     "@capacitor/cli": "^8.6.0",
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
