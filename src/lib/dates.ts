@@ -82,3 +82,11 @@ export function relativeDayLabel(key: string, now = new Date()): string {
   const label = formatDateLong(key);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
+
+/**
+ * true se a data (YYYY-MM-DD) é posterior a HOJE no fuso local do aparelho.
+ * Compara chaves de data locais, sem conversão para UTC (evita erros de fuso).
+ */
+export function isFutureDateKey(key: string, now = new Date()): boolean {
+  return key > toDateKey(now);
+}

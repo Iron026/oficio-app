@@ -47,6 +47,16 @@
   }
 }
 
+/* Áreas seguras (barra de status, navegação por gestos, recortes da câmera).
+   No Android, o Capacitor injeta --safe-area-inset-* com os valores corretos
+   mesmo em WebViews antigas; no navegador usamos env(). */
+:root {
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+}
+
 /* Tokens semânticos: o modo escuro troca apenas estas variáveis. */
 :root {
   --bg: #f5f7f8;
@@ -85,6 +95,18 @@
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  /* Evita o "puxar para atualizar"/efeito elástico que recarregaria o app. */
+  overscroll-behavior-y: none;
+}
+body {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+/* Toques: sem atraso de 300 ms e sem seleção acidental de texto em botões. */
+button, a, [role='radio'] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 body {
   @apply bg-bg text-fg font-sans antialiased;

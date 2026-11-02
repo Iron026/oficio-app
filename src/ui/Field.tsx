@@ -2,7 +2,7 @@ import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttribu
 import { cx } from './cx';
 
 const control =
-  'w-full rounded-xl border bg-surface px-3.5 text-[15px] text-fg placeholder:text-muted/70 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25';
+  'w-full rounded-xl border bg-surface px-3.5 text-base text-fg placeholder:text-muted/70 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25';
 
 interface Wrap { label: string; error?: string; hint?: string; children: (props: { id: string; describedBy?: string; invalid: boolean }) => ReactNode; optional?: boolean }
 

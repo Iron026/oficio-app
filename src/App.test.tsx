@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { createIndexedDbAdapter } from './storage/indexeddb';
@@ -41,5 +41,30 @@ describe('fluxo principal', () => {
     window.location.hash = '#/clientes';
     render(<App storageFactory={factory} />);
     expect(await screen.findByText('Carla')).toBeInTheDocument();
+  });
+});
+
+describe('Android: botão Voltar fecha painéis', () => {
+  it('painel aberto registra-se na pilha de voltar e fecha com popBack', async () => {
+    const { popBack } = await import('./platform/backStack');
+    const dbName = `ui-back-${Math.random()}`;
+    const factory = async () => ({ storage: await createIndexedDbAdapter(dbName), persistent: true });
+    const user = userEvent.setup();
+    window.location.hash = '#/painel';
+    render(<App storageFactory={factory} />);
+    await user.click(await screen.findByRole('button', { name: /começar/i }));
+    // no passo de profissão, Voltar retorna às boas-vindas
+    expect(popBack()).toBe(true);
+    expect(await screen.findByRole('button', { name: /começar/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /começar/i }));
+    await user.click(screen.getByRole('radio', { name: /limpeza/i }));
+    await user.click(screen.getByRole('button', { name: /continuar/i }));
+    await user.type(screen.getByLabelText(/seu nome/i), 'Rita');
+    await user.click(screen.getByRole('button', { name: /entrar no ofício/i }));
+    await screen.findByText('Rita');
+    await user.click(screen.getByRole('button', { name: /^agendar$/i }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(popBack()).toBe(true);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });

@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp, useThemeEffect, AppProvider } from './state/AppContext';
-import { useRoute, type Route } from './state/router';
+import { decideBack } from './platform/backStack';
+import { hideSplash, minimizeApp, onAndroidBack, setupKeyboard } from './platform/native';
+import { navigate, useRoute, type Route } from './state/router';
 import { AppService } from './state/service';
 import { createStorage, type StorageAdapter } from './storage';
 import { ConfirmProvider } from './ui/Confirm';
@@ -27,10 +29,13 @@ export function App({ storageFactory }: { storageFactory?: () => Promise<{ stora
       const { storage, persistent } = await (storageFactory ?? createStorage)();
       const service = await AppService.load(storage);
       if (!cancelled) setBoot({ service, persistent });
-    })().catch((err: unknown) => {
-      console.error(err);
-      if (!cancelled) setError('Não foi possível abrir seus dados. Recarregue a página.');
-    });
+      void setupKeyboard();
+    })()
+      .catch((err: unknown) => {
+        console.error(err);
+        if (!cancelled) setError('Não foi possível abrir seus dados. Feche e abra o app novamente. Se o problema continuar, restaure um backup em Ajustes.');
+      })
+      .finally(() => void hideSplash());
     return () => {
       cancelled = true;
     };
@@ -66,6 +71,7 @@ function Root() {
   const { data } = useApp();
   const route = useRoute();
   useThemeEffect(data.settings.theme);
+  useAndroidBack(route, !data.profile);
   if (!data.profile) return <Onboarding />;
   const screens: Record<Route, React.ReactNode> = {
     painel: <Dashboard />, agenda: <Agenda />, clientes: <Clients />, financas: <Finance />, evolucao: <Evolution />, ajustes: <Settings />,
@@ -75,4 +81,28 @@ function Root() {
       {screens[route]}
     </Shell>
   );
+}
+
+/** Botão Voltar do Android: fecha painéis, volta ao Painel e, por fim, minimiza o app. */
+function useAndroidBack(route: Route, onboarding: boolean) {
+  const state = useRef({ route, onboarding });
+  useEffect(() => {
+    state.current = { route, onboarding };
+  });
+  useEffect(() => {
+    let remove: (() => void) | undefined;
+    let disposed = false;
+    void onAndroidBack(() => {
+      const action = decideBack(state.current.route, state.current.onboarding);
+      if (action === 'home') navigate('painel');
+      else if (action === 'exit') void minimizeApp();
+    }).then((r) => {
+      if (disposed) r();
+      else remove = r;
+    });
+    return () => {
+      disposed = true;
+      remove?.();
+    };
+  }, []);
 }

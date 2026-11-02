@@ -1,13 +1,16 @@
 # Roteiro
 
-## 0.1 (atual)
+## 0.2 (atual)
+App Android via Capacitor: APK de depuração compilado no GitHub Actions, teste em emulador, botão Voltar, tela inteira, teclado, backup no Android.
+
+## 0.1
 Base funcional offline: cadastro, profissões, clientes, agenda, finanças, evolução, ajustes, backup, tema claro/escuro, testes e CI.
 
 ## Repositório
 Código em https://github.com/Iron026/oficio-app (a cópia original da 0.1 permanece em `Iron026/teste`, branch `ccr-189116ae-np6ak8`).
 
 ## Próximos passos sugeridos
-1. **0.2 — App Android:** Capacitor, ícone/splash, build AAB na nuvem (GitHub Actions), teste interno na Play Store.
+1. ~~**0.2 — App Android:** Capacitor, ícone/splash, APK de teste na nuvem~~ (feito). Pendente: assinatura de produção e AAB para a Play Store (exige autorização).
 2. **0.3 — Produtividade:** lembretes/notificações locais, recibos e orçamentos simples, relatório mensal.
 3. **0.4 — Conta e nuvem:** login, `StorageAdapter` com sincronização, backup automático (Premium).
 4. **0.5 — Monetização:** Google Play Billing via `BillingProvider`, Premium e compras únicas de verdade.

@@ -28,7 +28,7 @@ export function Shell({ route, title, children, action }: { route: Route; title:
   const { data, service, persistent } = useApp();
   return (
     <div className="mx-auto min-h-dvh max-w-lg">
-      <header className="sticky top-0 z-30 border-b border-line/70 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-line/70 bg-bg/85 pt-[var(--safe-top)] backdrop-blur-md">
         <div className="flex h-14 items-center gap-3 px-4">
           <Logo size={28} />
           <div className="min-w-0 flex-1">
@@ -57,8 +57,8 @@ export function Shell({ route, title, children, action }: { route: Route; title:
           <span>Dados de demonstração ativos. Toque para removê-los em Ajustes.</span>
         </button>
       )}
-      <main key={route} className="animate-fade-up px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-4">{children}</main>
-      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md">
+      <main key={route} className="animate-fade-up px-4 pb-[calc(6rem+var(--safe-bottom))] pt-4">{children}</main>
+      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[var(--safe-bottom)] backdrop-blur-md">
         <ul className="mx-auto grid max-w-lg grid-cols-5">
           {TABS.map(({ route: r, label, icon: Icon }) => {
             const active = r === route;
@@ -89,7 +89,7 @@ export function Fab({ label, onClick, icon }: { label: string; onClick: () => vo
     <button
       type="button"
       onClick={onClick}
-      className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-[max(1rem,calc(50%-15rem))] z-20 flex h-14 items-center gap-2 rounded-2xl bg-brand-600 pl-4 pr-5 font-semibold text-white shadow-lg shadow-brand-600/30 transition-transform hover:bg-brand-700 active:scale-95"
+      className="fixed bottom-[calc(5rem+var(--safe-bottom))] right-[max(1rem,calc(50%-15rem))] z-20 flex h-14 items-center gap-2 rounded-2xl bg-brand-600 pl-4 pr-5 font-semibold text-white shadow-lg shadow-brand-600/30 transition-transform hover:bg-brand-700 active:scale-95"
     >
       {icon}
       {label}

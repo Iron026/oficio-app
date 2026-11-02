@@ -1,4 +1,4 @@
-import { addMonths, isInMonth, monthKey } from '../lib/dates';
+import { addMonths, isFutureDateKey, isInMonth, monthKey } from '../lib/dates';
 import type { Transaction } from './types';
 
 export interface Totals { income: number; expense: number; balance: number }
@@ -40,4 +40,21 @@ export function byCategory(transactions: Transaction[], type: Transaction['type'
 
 export function sortByDateDesc<T extends { date: string; createdAt: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => (b.date === a.date ? b.createdAt.localeCompare(a.createdAt) : b.date.localeCompare(a.date)));
+}
+
+/**
+ * Receita gerada pela conclusão antecipada de um serviço cuja data ainda é
+ * futura. Retorna a data do serviço (para exibir) ou null.
+ * É derivado (não é gravado): some sozinho quando a data chega ou é alterada.
+ * Não altera valores nem cálculos financeiros.
+ */
+export function futureServiceDateFor(
+  t: Transaction,
+  appointments: { id: string; date: string; status: string }[],
+  now = new Date(),
+): string | null {
+  if (t.type !== 'receita' || !t.appointmentId) return null;
+  const a = appointments.find((x) => x.id === t.appointmentId);
+  if (!a || a.status !== 'concluido') return null;
+  return isFutureDateKey(a.date, now) ? a.date : null;
 }

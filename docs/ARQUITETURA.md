@@ -5,7 +5,8 @@
 - **React 19 + TypeScript (strict)** — interface.
 - **Vite** — build; `base: './'` gera caminhos relativos (funciona no GitHub Pages, em subpastas e no WebView do Capacitor).
 - **Tailwind CSS v4** — estilos, com tokens semânticos (`bg-surface`, `text-muted`, `border-line`...) definidos em `src/index.css`. O modo escuro troca apenas as variáveis CSS.
-- **IndexedDB** — persistência local.
+- **IndexedDB** — persistência local (no Android, dentro do WebView do app).
+- **Capacitor 8** — empacotamento Android.
 - **Vitest + Testing Library + fake-indexeddb** — testes.
 - **lucide-react** — ícones.
 
@@ -42,10 +43,11 @@ src/
 6. **Roteamento por hash** — funciona sem configuração de servidor (Pages, arquivo único, Capacitor).
 7. **Operações serializadas** — `AppService` enfileira gravações para evitar condições de corrida.
 8. **Concluir ⇄ financeiro.** Ao concluir um serviço, a receita pode ser lançada automaticamente e fica vinculada (`appointmentId`/`transactionId`). Reabrir, cancelar ou excluir o serviço remove essa receita para não duplicar valores.
-9. **Excluir cliente** mantém o histórico de serviços e o financeiro, apenas desvinculando o cliente.
-10. **Dados de demonstração** têm `isDemo: true`, exibem o selo “Demonstração”, geram um aviso global, não contam para XP/conquistas e podem ser removidos de uma vez.
-11. **Monetização preparada, não ativa.** `monetization/catalog.ts` descreve recursos gratuitos, Premium (assinatura) e compras únicas; `entitlements.ts` responde “pode usar?”. A interface `BillingProvider` define o contrato para o futuro Google Play Billing. Itens futuros aparecem como “Em breve” e não podem ser adquiridos.
-12. **Acessibilidade.** Rótulos associados a campos, mensagens de erro com `role="alert"`, diálogos com `aria-modal` e foco preso, `role="progressbar"`, navegação com `aria-current`, alvos de toque ≥ 44 px, `prefers-reduced-motion` respeitado.
+9. **Conclusão antecipada.** Concluir um serviço cuja data (local) ainda não chegou pede confirmação (“Voltar” / “Concluir mesmo assim”); datas de hoje ou anteriores não perguntam nada. A receita gerada mantém a regra atual (data de hoje) e, em Finanças, exibe o selo discreto “Data futura · dd mmm”. O selo é **derivado** (`futureServiceDateFor`): não é gravado, não altera cálculos e some sozinho quando a data chega ou o serviço é reagendado. A receita ainda não distingue previsto × recebido (planejado para versões futuras).
+10. **Excluir cliente** mantém o histórico de serviços e o financeiro, apenas desvinculando o cliente.
+11. **Dados de demonstração** têm `isDemo: true`, exibem o selo “Demonstração”, geram um aviso global, não contam para XP/conquistas e podem ser removidos de uma vez.
+12. **Monetização preparada, não ativa.** `monetization/catalog.ts` descreve recursos gratuitos, Premium (assinatura) e compras únicas; `entitlements.ts` responde “pode usar?”. A interface `BillingProvider` define o contrato para o futuro Google Play Billing. Itens futuros aparecem como “Em breve” e não podem ser adquiridos.
+13. **Acessibilidade.** Rótulos associados a campos, mensagens de erro com `role="alert"`, diálogos com `aria-modal` e foco preso, `role="progressbar"`, navegação com `aria-current`, alvos de toque ≥ 44 px, `prefers-reduced-motion` respeitado.
 
 ## Privacidade e segurança
 
@@ -53,13 +55,14 @@ src/
 - Backup é um arquivo JSON gerado e importado localmente, com validação de formato.
 - `.env*` está no `.gitignore`; não há credenciais no código.
 
-## Capacitor (próximo passo)
+## Android (Capacitor 8)
 
-`capacitor.config.json` já aponta `webDir: dist`. Quando for gerar o app Android:
+O mesmo código web roda no app Android via Capacitor. Integrações nativas ficam isoladas em `src/platform/`:
 
-```bash
-npm i @capacitor/core @capacitor/android && npm i -D @capacitor/cli
-npm run build && npx cap add android && npx cap sync
-```
+- `native.ts` — detecção de plataforma, tela de abertura, barras do sistema, teclado, vibração e botão Voltar. No navegador, todas as funções viram no-op.
+- `backStack.ts` — pilha de “voltar”: cada painel (`Sheet`) aberto registra como se fecha.
+- `files.ts` — salvar/compartilhar o backup (download no navegador; Documentos ou menu de compartilhar no Android).
 
-O build do APK/AAB pode ser feito na nuvem (ex.: GitHub Actions com `gradlew bundleRelease`), sem computador local.
+Valores que não podem mudar depois de publicado: `appId` e a origem `https://localhost` (ver `capacitor.config.ts`). Detalhes e instalação em [ANDROID.md](ANDROID.md).
+
+O diretório `android/` é versionado (projeto nativo). Arquivos gerados (`assets/public`, `build/`, chaves `*.jks`/`*.keystore`) são ignorados.
