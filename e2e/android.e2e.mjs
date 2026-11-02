@@ -36,6 +36,19 @@ const assert = (cond, msg) => {
 };
 const resumedPackage = () => adb('shell', 'dumpsys', 'activity', 'activities').match(/(?:mResumedActivity|ResumedActivity).*?\{[^}]*\s([\w.]+)\/[\w.]+/)?.[1] ?? '';
 const back = () => adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+/**
+ * Toque em um elemento. O Playwright às vezes calcula mal a viewport de
+ * WebViews Android via CDP ("element is outside of the viewport"); nesse
+ * caso o clique é disparado diretamente no elemento.
+ */
+const tap = async (locator) => {
+  await locator.waitFor();
+  try {
+    await locator.click({ timeout: 3000 });
+  } catch {
+    await locator.evaluate((el) => el.click());
+  }
+};
 
 const [device] = await android.devices({ omitDriverInstall: true });
 assert(device, 'Nenhum dispositivo Android encontrado.');
@@ -82,28 +95,32 @@ try {
     const edgeToEdge = m.insetTop > 0;
     if (edgeToEdge) assert(m.paddingTop >= m.insetTop, `padding ${m.paddingTop}px < inset ${m.insetTop}px`);
     else assert(m.screenH - m.innerH > 40, 'WebView ocupa a tela inteira sem recuo das barras do sistema');
+    // Nenhuma barra de título nativa deve aparecer sobre o app.
+    adb('shell', 'uiautomator', 'dump', '/sdcard/ui.xml');
+    const ui = adb('shell', 'cat', '/sdcard/ui.xml');
+    assert(!/id\/action_bar/.test(ui), 'barra de título nativa (action_bar) visível');
   });
 
   await step('Voltar no cadastro retorna ao passo anterior', async () => {
-    await page.getByRole('button', { name: /começar/i }).click();
+    await tap(page.getByRole('button', { name: /começar/i }));
     await page.getByRole('radio', { name: /beleza/i }).waitFor();
     back();
     await page.getByRole('button', { name: /começar/i }).waitFor();
   });
 
   await step('Cadastro inicial (Beleza)', async () => {
-    await page.getByRole('button', { name: /começar/i }).click();
-    await page.getByRole('radio', { name: /beleza/i }).click();
-    await page.getByRole('button', { name: /continuar/i }).click();
+    await tap(page.getByRole('button', { name: /começar/i }));
+    await tap(page.getByRole('radio', { name: /beleza/i }));
+    await tap(page.getByRole('button', { name: /continuar/i }));
     await page.getByLabel(/seu nome/i).fill('Ana Teste');
-    await page.getByRole('button', { name: /entrar no ofício/i }).click();
+    await tap(page.getByRole('button', { name: /entrar no ofício/i }));
     await page.getByText(/atendimentos na semana/i).waitFor();
     await wait(1500);
     shot('02-painel-claro');
   });
 
   await step('Voltar fecha o painel aberto sem sair do app', async () => {
-    await page.getByRole('button', { name: /^cliente$/i }).click();
+    await tap(page.getByRole('button', { name: /^cliente$/i }));
     await page.getByRole('dialog').waitFor();
     shot('03-formulario');
     back();
@@ -112,33 +129,33 @@ try {
   });
 
   await step('Cadastrar cliente', async () => {
-    await page.getByRole('button', { name: /^cliente$/i }).click();
+    await tap(page.getByRole('button', { name: /^cliente$/i }));
     await page.getByLabel(/^nome/i).fill('Cliente Persistente');
     await page.getByLabel(/telefone/i).fill('11912345678');
-    await page.getByRole('button', { name: /cadastrar cliente/i }).click();
+    await tap(page.getByRole('button', { name: /cadastrar cliente/i }));
     await page.getByText(/cliente cadastrado/i).first().waitFor();
   });
 
   await step('Voltar em outra tela retorna ao Painel', async () => {
-    await page.getByRole('link', { name: /finanças/i }).click();
+    await tap(page.getByRole('link', { name: /finanças/i }));
     await page.waitForFunction(() => location.hash === '#/financas');
     back();
     await page.waitForFunction(() => location.hash === '#/painel');
   });
 
   await step('Modo escuro', async () => {
-    await page.getByRole('button', { name: /ajustes/i }).click();
-    await page.getByRole('radio', { name: /escuro/i }).click();
+    await tap(page.getByRole('button', { name: /ajustes/i }));
+    await tap(page.getByRole('radio', { name: /escuro/i }));
     await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
-    await page.getByRole('link', { name: /painel/i }).click();
+    await tap(page.getByRole('link', { name: /painel/i }));
     await wait(1000);
     shot('04-painel-escuro');
   });
 
   await step('Exportar backup para Documentos', async () => {
-    await page.getByRole('button', { name: /ajustes/i }).click();
-    await page.getByRole('button', { name: /exportar backup/i }).click();
-    await page.getByRole('button', { name: /salvar em documentos/i }).click();
+    await tap(page.getByRole('button', { name: /ajustes/i }));
+    await tap(page.getByRole('button', { name: /exportar backup/i }));
+    await tap(page.getByRole('button', { name: /salvar em documentos/i }));
     await page.getByText(/backup salvo/i).first().waitFor();
     shot('05-backup-salvo');
     const files = adb('shell', 'ls', '/sdcard/Documents/Oficio/').trim().split(/\s+/);
@@ -150,7 +167,7 @@ try {
   });
 
   await step('Botão Voltar no Painel minimiza o app', async () => {
-    await page.getByRole('link', { name: /painel/i }).click();
+    await tap(page.getByRole('link', { name: /painel/i }));
     await page.waitForFunction(() => location.hash === '#/painel');
     back();
     await wait(1500);
@@ -165,7 +182,7 @@ try {
     const xp = await page.getByText(/\d+ XP/).first().textContent();
     assert(xp && parseInt(xp) > 0, `XP não persistiu (${xp})`);
     assert(await page.evaluate(() => document.documentElement.classList.contains('dark')), 'tema escuro não persistiu');
-    await page.getByRole('link', { name: /clientes/i }).click();
+    await tap(page.getByRole('link', { name: /clientes/i }));
     await page.getByText('Cliente Persistente').waitFor();
     shot('06-clientes-apos-reabrir');
   });
@@ -173,11 +190,11 @@ try {
   await step('Importar backup (ex.: vindo da versão web)', async () => {
     const data = JSON.parse(backupJson);
     data.data.clients.push({ ...data.data.clients[0], id: 'importado-1', name: 'Cliente Importado' });
-    await page.getByRole('button', { name: /ajustes/i }).click();
+    await tap(page.getByRole('button', { name: /ajustes/i }));
     await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
-    await page.getByRole('button', { name: /^importar$/i }).click();
+    await tap(page.getByRole('button', { name: /^importar$/i }));
     await page.getByText(/backup importado/i).first().waitFor();
-    await page.getByRole('link', { name: /clientes/i }).click();
+    await tap(page.getByRole('link', { name: /clientes/i }));
     await page.getByText('Cliente Importado').waitFor();
     await page.getByText('Cliente Persistente').waitFor();
   });
