@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useRef, useState, type ReactNod
 import { Button } from './Button';
 import { Sheet } from './Sheet';
 
-interface ConfirmOptions { title: string; message: string; confirmLabel?: string; danger?: boolean }
+interface ConfirmOptions { title: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }
 type ConfirmFn = (o: ConfirmOptions) => Promise<boolean>;
 
 const Ctx = createContext<ConfirmFn>(async () => false);
@@ -29,7 +29,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         onClose={() => close(false)}
         footer={
           <div className="flex gap-3">
-            <Button variant="secondary" block onClick={() => close(false)}>Cancelar</Button>
+            <Button variant="secondary" block onClick={() => close(false)}>{opts?.cancelLabel ?? 'Cancelar'}</Button>
             <Button variant={opts?.danger ? 'danger' : 'primary'} block onClick={() => close(true)}>{opts?.confirmLabel ?? 'Confirmar'}</Button>
           </div>
         }

@@ -43,10 +43,11 @@ src/
 6. **Roteamento por hash** — funciona sem configuração de servidor (Pages, arquivo único, Capacitor).
 7. **Operações serializadas** — `AppService` enfileira gravações para evitar condições de corrida.
 8. **Concluir ⇄ financeiro.** Ao concluir um serviço, a receita pode ser lançada automaticamente e fica vinculada (`appointmentId`/`transactionId`). Reabrir, cancelar ou excluir o serviço remove essa receita para não duplicar valores.
-9. **Excluir cliente** mantém o histórico de serviços e o financeiro, apenas desvinculando o cliente.
-10. **Dados de demonstração** têm `isDemo: true`, exibem o selo “Demonstração”, geram um aviso global, não contam para XP/conquistas e podem ser removidos de uma vez.
-11. **Monetização preparada, não ativa.** `monetization/catalog.ts` descreve recursos gratuitos, Premium (assinatura) e compras únicas; `entitlements.ts` responde “pode usar?”. A interface `BillingProvider` define o contrato para o futuro Google Play Billing. Itens futuros aparecem como “Em breve” e não podem ser adquiridos.
-12. **Acessibilidade.** Rótulos associados a campos, mensagens de erro com `role="alert"`, diálogos com `aria-modal` e foco preso, `role="progressbar"`, navegação com `aria-current`, alvos de toque ≥ 44 px, `prefers-reduced-motion` respeitado.
+9. **Conclusão antecipada.** Concluir um serviço cuja data (local) ainda não chegou pede confirmação (“Voltar” / “Concluir mesmo assim”); datas de hoje ou anteriores não perguntam nada. A receita gerada mantém a regra atual (data de hoje) e, em Finanças, exibe o selo discreto “Data futura · dd mmm”. O selo é **derivado** (`futureServiceDateFor`): não é gravado, não altera cálculos e some sozinho quando a data chega ou o serviço é reagendado. A receita ainda não distingue previsto × recebido (planejado para versões futuras).
+10. **Excluir cliente** mantém o histórico de serviços e o financeiro, apenas desvinculando o cliente.
+11. **Dados de demonstração** têm `isDemo: true`, exibem o selo “Demonstração”, geram um aviso global, não contam para XP/conquistas e podem ser removidos de uma vez.
+12. **Monetização preparada, não ativa.** `monetization/catalog.ts` descreve recursos gratuitos, Premium (assinatura) e compras únicas; `entitlements.ts` responde “pode usar?”. A interface `BillingProvider` define o contrato para o futuro Google Play Billing. Itens futuros aparecem como “Em breve” e não podem ser adquiridos.
+13. **Acessibilidade.** Rótulos associados a campos, mensagens de erro com `role="alert"`, diálogos com `aria-modal` e foco preso, `role="progressbar"`, navegação com `aria-current`, alvos de toque ≥ 44 px, `prefers-reduced-motion` respeitado.
 
 ## Privacidade e segurança
 

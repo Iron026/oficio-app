@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Ban, Check, Clock, MessageCircle, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
 import type { Appointment } from '../domain/types';
-import { relativeDayLabel, todayKey } from '../lib/dates';
+import { formatDateShort, isFutureDateKey, relativeDayLabel, todayKey } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { useApp, useErrorHandler, useFeedback } from '../state/AppContext';
 import { Button } from '../ui/Button';
@@ -78,6 +78,19 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
   const wa = client ? whatsappLink(client.phone) : null;
 
   async function complete() {
+    // Conclusão antecipada: só pergunta quando a data do serviço é futura
+    // (data local do aparelho). Não impede a conclusão.
+    if (isFutureDateKey(a.date)) {
+      const este = t.serviceArticle === 'a' ? 'Esta' : 'Este';
+      const agendado = t.serviceArticle === 'a' ? 'agendada' : 'agendado';
+      const ok = await confirm({
+        title: 'Data futura',
+        message: `${este} ${t.service.toLowerCase()} está ${agendado} para uma data futura (${formatDateShort(a.date)}). Deseja marcá-l${t.serviceArticle} como ${t.completedLabel} mesmo assim?`,
+        cancelLabel: 'Voltar',
+        confirmLabel: 'Concluir mesmo assim',
+      });
+      if (!ok) return;
+    }
     try {
       const fb = await service.completeAppointment(a.id, { registerIncome });
       feedback(`${t.service} ${t.completedLabel}!`, fb, registerIncome && a.price > 0 ? `Receita de ${formatMoney(a.price)} lançada.` : undefined);

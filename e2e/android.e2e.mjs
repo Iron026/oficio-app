@@ -155,6 +155,35 @@ try {
     await page.getByText(/cliente cadastrado/i).first().waitFor();
   });
 
+  await step('Serviço com data futura: aviso, Voltar e Concluir mesmo assim', async () => {
+    const t = new Date(Date.now() + 2 * 86_400_000);
+    const amanha = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    await tap(page.getByRole('button', { name: /^agendar$/i }));
+    const form = page.getByRole('dialog');
+    await form.getByLabel(/descrição/i).fill('Corte antecipado');
+    await form.getByLabel(/^data/i).fill(amanha);
+    await form.getByLabel(/valor/i).fill('70,00');
+    await tap(form.getByRole('button', { name: /^agendar$/i }));
+    await form.waitFor({ state: 'detached' });
+    await tap(page.getByRole('link', { name: /agenda/i }));
+    await tap(page.getByRole('button', { name: /corte antecipado/i }));
+    await tap(page.getByRole('button', { name: /concluir atendimento/i }));
+    const aviso = page.getByRole('dialog', { name: 'Data futura' });
+    await aviso.waitFor();
+    await wait(800);
+    shot('07-aviso-data-futura');
+    await tap(aviso.getByRole('button', { name: 'Voltar' }));
+    await aviso.waitFor({ state: 'detached' });
+    await tap(page.getByRole('button', { name: /concluir atendimento/i }));
+    await tap(page.getByRole('dialog', { name: 'Data futura' }).getByRole('button', { name: /concluir mesmo assim/i }));
+    await page.getByText(/atendimento concluído/i).first().waitFor();
+    await tap(page.getByRole('link', { name: /finanças/i }));
+    await page.getByTestId('data-futura').waitFor();
+    await wait(600);
+    shot('08-financas-data-futura');
+    await tap(page.getByRole('link', { name: /painel/i }));
+  });
+
   await step('Voltar em outra tela retorna ao Painel', async () => {
     await tap(page.getByRole('link', { name: /finanças/i }));
     await page.waitForFunction(() => location.hash === '#/financas');
@@ -208,6 +237,10 @@ try {
     const xp = await page.getByText(/\d+ XP/).first().textContent();
     assert(xp && parseInt(xp) > 0, `XP não persistiu (${xp})`);
     assert(await page.evaluate(() => document.documentElement.classList.contains('dark')), 'tema escuro não persistiu');
+    await tap(page.getByRole('link', { name: /finanças/i }));
+    await page.getByTestId('data-futura').waitFor(); // receita antecipada e selo preservados
+    const receitas = await page.getByText('Corte antecipado').count();
+    assert(receitas === 1, `receita antecipada duplicada ou ausente (${receitas})`);
     await tap(page.getByRole('link', { name: /clientes/i }));
     await page.getByText('Cliente Persistente').waitFor();
     shot('06-clientes-apos-reabrir');

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Link2, Receipt } from 'lucide-react';
-import { byCategory, sortByDateDesc, totals, transactionsInMonth } from '../domain/finance';
+import { ArrowDownRight, ArrowUpRight, CalendarClock, ChevronLeft, ChevronRight, Link2, Receipt } from 'lucide-react';
+import { byCategory, futureServiceDateFor, sortByDateDesc, totals, transactionsInMonth } from '../domain/finance';
 import type { Transaction, TransactionType } from '../domain/types';
-import { addMonths, monthKey, monthLabel, parseDateKey, relativeDayLabel } from '../lib/dates';
+import { addMonths, formatDateShort, monthKey, monthLabel, parseDateKey, relativeDayLabel } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { useApp } from '../state/AppContext';
 import { Button, IconButton } from '../ui/Button';
@@ -88,10 +88,11 @@ export function Finance() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{t.description}</span>
-                        <span className="flex items-center gap-1.5 text-[13px] text-muted">
+                        <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-muted">
                           {t.category}
                           {t.appointmentId && <Link2 size={12} aria-label="Gerado por serviço concluído" />}
                           {t.isDemo && <DemoBadge />}
+                          <FutureServiceBadge date={futureServiceDateFor(t, data.appointments)} />
                         </span>
                       </span>
                       <span className={cx('shrink-0 font-semibold tabular-nums', t.type === 'receita' ? 'text-income' : 'text-expense')}>
@@ -108,5 +109,20 @@ export function Finance() {
       <TransactionFormSheet open={!!creating} defaultType={creating ?? 'receita'} onClose={() => setCreating(null)} />
       <TransactionFormSheet open={!!editing} transaction={editing ?? undefined} onClose={() => setEditing(null)} />
     </div>
+  );
+}
+
+/** Selo discreto: receita de serviço concluído antes da data marcada. */
+function FutureServiceBadge({ date }: { date: string | null }) {
+  if (!date) return null;
+  return (
+    <span
+      data-testid="data-futura"
+      title="Serviço concluído antes da data marcada"
+      className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-muted"
+    >
+      <CalendarClock size={12} aria-hidden="true" />
+      Data futura · {formatDateShort(date)}
+    </span>
   );
 }
