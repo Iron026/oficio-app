@@ -95,7 +95,8 @@ export function Clients() {
           </ul>
         </>
       )}
-      <Fab label="Cliente" icon={<Plus size={20} />} onClick={() => setCreating(true)} />
+      {/* Sem clientes, o estado vazio já oferece "Cadastrar cliente". */}
+      {data.clients.length > 0 && <Fab label="Cliente" icon={<Plus size={20} />} onClick={() => setCreating(true)} />}
       <ClientFormSheet open={creating} onClose={() => setCreating(false)} />
       {selectedClient && <ClientDetail client={selectedClient} onClose={() => setSelected(null)} />}
     </div>

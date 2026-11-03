@@ -61,7 +61,8 @@ export function Agenda() {
           ))}
         </div>
       )}
-      <Fab label="Agendar" icon={<Plus size={20} />} onClick={() => setCreating(true)} />
+      {/* Sem itens, o estado vazio já oferece "Agendar": o botão flutuante seria a mesma ação repetida. */}
+      {list.length > 0 && <Fab label="Agendar" icon={<Plus size={20} />} onClick={() => setCreating(true)} />}
       <AppointmentFormSheet open={creating} onClose={() => setCreating(false)} />
     </div>
   );
