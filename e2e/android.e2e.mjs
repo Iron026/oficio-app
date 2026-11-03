@@ -102,6 +102,31 @@ const noteToast = async (page, re) => {
   console.log(`\n  aviso "${re.source}": ${seen ? 'exibido' : 'não observado (temporário)'}`);
 };
 
+/** Lê a árvore de elementos da tela (inclui janelas do sistema, como a "Salvar como"). */
+const uiNodes = () => {
+  adb('shell', 'uiautomator', 'dump', '/sdcard/ui.xml');
+  const xml = adb('shell', 'cat', '/sdcard/ui.xml');
+  return [...xml.matchAll(/<node [^>]*>/g)].map(([tag]) => {
+    const attr = (k) => tag.match(new RegExp(`${k}="([^"]*)"`))?.[1] ?? '';
+    const [, x1, y1, x2, y2] = attr('bounds').match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/) ?? [];
+    return { text: attr('text'), id: attr('resource-id'), enabled: attr('enabled') === 'true', x: Math.round((+x1 + +x2) / 2), y: Math.round((+y1 + +y2) / 2) };
+  });
+};
+const findUiNode = (pred) => uiNodes().find(pred) ?? null;
+
+/** Procura arquivos de backup do Ofício no armazenamento compartilhado. */
+const findBackupFiles = () => {
+  try {
+    // Comando único com aspas: o shell do aparelho não expande os curingas; erros de pasta sem acesso são ignorados.
+    return adb('shell', "find /sdcard/ -name 'oficio-backup-*.json' -not -path '*/Android/*' 2>/dev/null; true")
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+
 const namesIn = (rows) => rows.map((r) => r.name ?? r.title ?? r.description);
 
 const [device] = await android.devices({ omitDriverInstall: true });
@@ -271,27 +296,47 @@ try {
     await page.getByRole('dialog').waitFor({ state: 'detached' });
   });
 
-  await step('Exportar backup para Documentos', async () => {
+  await step('Exportar backup: cancelar a janela "Salvar como" não salva nada', async () => {
     await tap(page.getByRole('button', { name: /ajustes/i }));
     await tap(page.getByRole('button', { name: /exportar backup/i }));
-    await tap(page.getByRole('button', { name: /salvar em documentos/i }));
+    const sheet = page.getByRole('dialog', { name: /exportar backup/i });
+    await tap(sheet.getByRole('button', { name: /salvar no aparelho/i }));
+    await eventually(() => /documentsui/.test(resumedPackage()), 'janela "Salvar como" do Android não abriu');
+    await wait(1500);
+    shot('05a-janela-salvar-como');
+    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK'); // cancela a janela do sistema
+    await eventually(() => resumedPackage() === PKG, 'o app não voltou ao primeiro plano após cancelar');
+    await sheet.waitFor(); // opções continuam abertas para tentar de novo
+    await noteToast(page, /exportação cancelada/i);
+    assert(findBackupFiles().length === 0, 'cancelar criou um arquivo de backup');
+  });
+
+  await step('Exportar backup: salvar pela janela "Salvar como" grava o JSON íntegro', async () => {
+    const sheet = page.getByRole('dialog', { name: /exportar backup/i });
+    await tap(sheet.getByRole('button', { name: /salvar no aparelho/i }));
+    await eventually(() => /documentsui/.test(resumedPackage()), 'janela "Salvar como" do Android não abriu');
+    // Botão "Salvar" da janela do sistema (texto depende do idioma do aparelho).
+    const save = await eventually(() => findUiNode((n) => /^(save|salvar)$/i.test(n.text) && n.enabled), 'botão Salvar da janela do sistema não encontrado', 15_000);
+    adb('shell', 'input', 'tap', String(save.x), String(save.y));
+    await eventually(() => resumedPackage() === PKG, 'o app não voltou após salvar');
+    await sheet.waitFor({ state: 'detached' }); // só fecha quando a gravação foi concluída
     await noteToast(page, /backup salvo/i);
-    // Prova durável: o arquivo existe em Documentos/Oficio.
-    await eventually(() => {
-      try {
-        return /oficio-backup-/.test(adb('shell', 'ls', '/sdcard/Documents/Oficio/'));
-      } catch {
-        return false;
-      }
-    }, 'arquivo de backup não criado');
-    await wait(800);
+    const files = await eventually(() => {
+      const f = findBackupFiles();
+      return f.length ? f : null;
+    }, 'arquivo de backup não encontrado no armazenamento');
+    console.log('\n  arquivo salvo:', files.join(', '));
+    assert(files.length === 1, `esperado 1 arquivo de backup, encontrados ${files.length}`);
     shot('05-backup-salvo');
-    const files = adb('shell', 'ls', '/sdcard/Documents/Oficio/').trim().split(/\s+/);
-    console.log('\n  arquivos:', files.join(', '));
-    const file = files.find((f) => f.startsWith('oficio-backup-'));
-    assert(file, 'arquivo de backup não encontrado em Documentos/Oficio');
-    backupJson = adb('shell', 'cat', `/sdcard/Documents/Oficio/${file}`);
-    assert(JSON.parse(backupJson).data.clients.some((c) => c.name === 'Cliente Persistente'), 'backup sem o cliente cadastrado');
+    backupJson = adb('shell', 'cat', files[0]);
+    const saved = JSON.parse(backupJson);
+    // Conteúdo íntegro: igual ao que está gravado no app.
+    const dbClients = namesIn(await readStore(page, 'clients')).sort();
+    const dbTx = (await readStore(page, 'transactions')).length;
+    assert(saved.format === 'oficio-backup', 'formato do backup inválido');
+    assert(JSON.stringify(namesIn(saved.data.clients).sort()) === JSON.stringify(dbClients), 'clientes do backup diferem do app');
+    assert(saved.data.transactions.length === dbTx, 'lançamentos do backup diferem do app');
+    assert(saved.data.clients.some((c) => c.name === 'Cliente Persistente'), 'backup sem o cliente cadastrado');
   });
 
   await step('Botão Voltar no Painel minimiza o app', async () => {

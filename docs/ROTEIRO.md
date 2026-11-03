@@ -1,5 +1,12 @@
 # Roteiro
 
+## 0.3.1 (manutenção — branch `fix/v0.3.1-maintenance`, aguardando aprovação)
+- Exportar backup no Android: “Salvar no aparelho” pela janela “Salvar como” (Storage Access
+  Framework), sem permissão de armazenamento; corrige o “Permissão negada” da 0.3.0.
+- Botões de Ajustes/Conta sem texto cortado em telas estreitas.
+- Tela de Privacidade alinhada à Política revisada, com link para o documento completo.
+- Versão lida do `package.json` no workflow Android (APK `oficio-0.3.1-build.N-debug.apk`).
+
 ## 0.3 (em desenvolvimento — branch v0.3-google-auth)
 Conta Google opcional (Firebase Auth) e sincronização offline-first com o Cloud Firestore: migração segura dos dados locais, recuperação em nova instalação, conflitos financeiros revisados pelo usuário, exclusão de conta.
 

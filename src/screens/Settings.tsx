@@ -291,17 +291,17 @@ function PrivacyCard() {
         <>
           <p className="text-muted">
             <strong>Com conta conectada:</strong> seus dados ficam neste aparelho e uma cópia é guardada na nuvem (Google Cloud Firestore, via Firebase), vinculada à sua conta
-            Google, acessível somente por você. Do Google, o Ofício usa apenas nome, e-mail, foto e um identificador da conta.
+            Google. Regras de acesso permitem que somente a sua conta leia e grave esses dados. Do Google, o Ofício usa apenas nome, e-mail, foto e um identificador da conta.
           </p>
           <p className="text-muted">Você pode exportar seus dados, desconectar ou excluir a conta e os dados da nuvem a qualquer momento em “Conta e sincronização”.</p>
         </>
       ) : (
         <p className="text-muted">
-          <strong>Sem conta conectada:</strong> tudo fica salvo apenas neste aparelho; nada é enviado para a internet. {isNative() ? 'O backup automático do Android está desativado.' : ''} Faça
+          <strong>Sem conta conectada:</strong> seus registros ficam salvos apenas neste aparelho e não são enviados para a internet. {isNative() ? 'O backup automático do Android está desativado.' : ''} Faça
           backups periódicos — desinstalar o app ou limpar os dados do navegador apaga as informações.
         </p>
       )}
-      <p className="text-muted">Não usamos seus dados para publicidade, não vendemos dados e não usamos rastreadores.</p>
+      <p className="text-muted">Não vendemos dados nem os usamos para publicidade. O app não inclui SDKs de anúncios nem de análise de uso.</p>
       <p className="text-muted">
         <a
           className="inline-flex items-center gap-1.5 font-semibold text-brand-600 underline underline-offset-2 dark:text-brand-300"

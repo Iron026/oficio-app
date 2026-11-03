@@ -14,7 +14,7 @@ Aplicativo freemium para profissionais autônomos (manutenção, beleza, limpeza
 
 ## O que tem na 0.2
 
-Tudo da 0.1, agora também como **app Android**: ícone e tela de abertura próprios, tela inteira com barras do sistema no tema, botão Voltar nativo, teclado ajustado, vibração de confirmação e backup para Documentos ou compartilhamento.
+Tudo da 0.1, agora também como **app Android**: ícone e tela de abertura próprios, tela inteira com barras do sistema no tema, botão Voltar nativo, teclado ajustado, vibração de confirmação e backup salvo onde você escolher (janela “Salvar como”, desde a 0.3.1) ou compartilhado.
 
 ### Recursos
 

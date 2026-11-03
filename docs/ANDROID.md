@@ -40,8 +40,16 @@ A importação **substitui** os dados do app pelos do arquivo.
 ## Backup no app Android
 
 **Ajustes → Exportar backup** oferece:
-- **Compartilhar**: envia o arquivo para Google Drive, e-mail, WhatsApp etc.
-- **Salvar em Documentos**: grava em `Documentos/Oficio/` (app *Meus arquivos*).
+- **Compartilhar (Drive, e-mail…)**: envia o arquivo para Google Drive, e-mail, WhatsApp etc.
+- **Salvar no aparelho** (desde a 0.3.1): abre a janela **Salvar como** do Android (Storage Access
+  Framework). Você escolhe a pasta e o nome; o app grava o JSON (UTF-8) só nesse arquivo.
+  Cancelar a janela não cria arquivo e mostra “Exportação cancelada”.
+
+O app **não pede permissão de armazenamento** (o manifesto declara apenas `INTERNET`). Até a 0.3.0
+o botão “Salvar em Documentos” gravava direto em `Documentos/Oficio/` e falhava com “Permissão
+negada” quando a pasta tinha sido criada por uma instalação anterior (assinatura diferente) — por
+isso foi substituído. A gravação nativa fica no plugin local `OficioFiles`
+(`android/app/src/main/java/io/github/iron026/oficio/BackupFilePlugin.java`).
 
 O backup automático do Android para a nuvem está **desativado** (`allowBackup=false`): nenhum dado sai do aparelho sem você exportar.
 
