@@ -102,10 +102,24 @@ const noteToast = async (page, re) => {
   console.log(`\n  aviso "${re.source}": ${seen ? 'exibido' : 'não observado (temporário)'}`);
 };
 
+// `uiautomator dump` às vezes termina com código 137 no emulador mesmo após gravar o XML:
+// aceita a saída "dumped", apaga o arquivo antigo antes e tenta de novo se não houver XML.
+const dumpUi = () => {
+  for (let i = 0; i < 3; i++) {
+    adb('shell', 'rm', '-f', '/sdcard/ui.xml');
+    try {
+      adb('shell', 'uiautomator', 'dump', '/sdcard/ui.xml');
+    } catch (err) {
+      if (!/dumped/i.test(String(err?.stdout ?? ''))) continue;
+    }
+    const xml = adb('shell', "cat /sdcard/ui.xml 2>/dev/null; true");
+    if (xml.includes('<hierarchy')) return xml;
+  }
+  throw new Error('uiautomator dump falhou 3 vezes');
+};
 /** Lê a árvore de elementos da tela (inclui janelas do sistema, como a "Salvar como"). */
 const uiNodes = () => {
-  adb('shell', 'uiautomator', 'dump', '/sdcard/ui.xml');
-  const xml = adb('shell', 'cat', '/sdcard/ui.xml');
+  const xml = dumpUi();
   return [...xml.matchAll(/<node [^>]*>/g)].map(([tag]) => {
     const attr = (k) => tag.match(new RegExp(`${k}="([^"]*)"`))?.[1] ?? '';
     const [, x1, y1, x2, y2] = attr('bounds').match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/) ?? [];
@@ -187,8 +201,7 @@ try {
     else assert(m.screenH - m.innerH > 40, 'WebView ocupa a tela inteira sem recuo das barras do sistema');
     // Nenhuma barra de título nativa deve aparecer sobre o app
     // (id exato "action_bar"; "action_bar_root" é só o contêiner do AppCompat).
-    adb('shell', 'uiautomator', 'dump', '/sdcard/ui.xml');
-    const ui = adb('shell', 'cat', '/sdcard/ui.xml');
+    const ui = dumpUi();
     assert(!/id\/action_bar"/.test(ui), 'barra de título nativa (action_bar) visível');
   });
 
