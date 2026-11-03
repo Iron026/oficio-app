@@ -65,7 +65,7 @@ O mesmo código web roda no app Android via Capacitor. Integrações nativas fic
 
 - `native.ts` — detecção de plataforma, tela de abertura, barras do sistema, teclado, vibração e botão Voltar. No navegador, todas as funções viram no-op.
 - `backStack.ts` — pilha de “voltar”: cada painel (`Sheet`) aberto registra como se fecha.
-- `files.ts` — salvar/compartilhar o backup (download no navegador; Documentos ou menu de compartilhar no Android).
+- `files.ts` — salvar/compartilhar o backup (download no navegador; janela “Salvar como” do Android via plugin `OficioFiles`, ou menu de compartilhar).
 
 Valores que não podem mudar depois de publicado: `appId` e a origem `https://localhost` (ver `capacitor.config.ts`). Detalhes e instalação em [ANDROID.md](ANDROID.md).
 

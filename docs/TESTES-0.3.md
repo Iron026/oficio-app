@@ -4,7 +4,7 @@ Pré-requisito: Firebase configurado (`docs/FIREBASE-SETUP.md`) e APK gerado com
 **“Login Google incluído: true”** no resumo do workflow **Android APK** da branch `v0.3-google-auth`.
 
 ## 0. Antes de instalar (proteja seus dados da 0.2)
-- [ ] No Ofício 0.2: **Ajustes → Exportar backup → Salvar em Documentos** (e/ou Compartilhar para o Drive).
+- [ ] No Ofício 0.2: **Ajustes → Exportar backup → Salvar em Documentos** (na 0.3.1+: **Salvar no aparelho**) (e/ou Compartilhar para o Drive).
 - [ ] Instale o APK da 0.3 por cima. Se o Android disser **“conflito de pacote” / “App não instalado”**
       (assinatura diferente da 0.2 que você tinha): desinstale o Ofício, instale a 0.3 e use
       **Ajustes → Importar backup**.

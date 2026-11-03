@@ -3,7 +3,7 @@ import { AlertTriangle, Cloud, CloudOff, Download, LogOut, RefreshCw, ShieldChec
 import type { LinkAnalysis, LinkMode } from '../sync/engine';
 import type { SyncConflict, SyncStatus } from '../sync/types';
 import { formatMoney } from '../lib/money';
-import { saveTextFile } from '../platform/files';
+import { useBackupExport } from './BackupExport';
 import { useApp, useErrorHandler } from '../state/AppContext';
 import { useCloud } from '../state/CloudContext';
 import { navigate } from '../state/router';
@@ -209,7 +209,7 @@ function LinkSheet({ analysis, onDone }: { analysis: LinkAnalysis; onDone: () =>
 
 export function AccountSection() {
   const { account, available, user, linked, status, sync } = useCloud();
-  const { profession, service } = useApp();
+  const { profession } = useApp();
   const flow = useAccountFlow();
   const confirm = useConfirm();
   const toast = useToast();
@@ -273,10 +273,7 @@ export function AccountSection() {
     toast({ title: 'Conta e dados na nuvem excluídos', tone: 'info' });
   });
 
-  const exportBackup = run(async () => {
-    const { where } = await saveTextFile(`oficio-backup-${new Date().toISOString().slice(0, 10)}.json`, service.exportBackup());
-    toast({ title: 'Backup salvo', description: where });
-  });
+  const backup = useBackupExport();
 
   let body: ReactNode;
   if (!account) {
@@ -349,13 +346,13 @@ export function AccountSection() {
         ) : (
           <Button block onClick={flow.start} disabled={flow.busy}>Conectar os dados deste aparelho</Button>
         )}
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" size="sm" icon={<Download size={16} />} onClick={exportBackup} disabled={busy}>Exportar backup</Button>
-          <Button variant="secondary" size="sm" icon={<LogOut size={16} />} onClick={disconnect} disabled={busy}>Desconectar</Button>
+        <div className="flex flex-col gap-2 border-t border-line pt-3">
+          <Button variant="secondary" block icon={<Download size={18} />} onClick={backup.start} disabled={busy || backup.busy}>Exportar backup</Button>
+          <Button variant="secondary" block icon={<LogOut size={18} />} onClick={disconnect} disabled={busy}>Desconectar</Button>
+          <Button variant="ghost" block className="text-red-600 dark:text-red-400" icon={<Trash2 size={18} />} onClick={remove} disabled={busy}>
+            Excluir conta e dados na nuvem
+          </Button>
         </div>
-        <Button variant="ghost" size="sm" block className="text-red-600 dark:text-red-400" icon={<Trash2 size={16} />} onClick={remove} disabled={busy}>
-          Excluir conta e dados na nuvem
-        </Button>
       </div>
     );
   }
@@ -365,6 +362,7 @@ export function AccountSection() {
       <SectionTitle>Conta e sincronização</SectionTitle>
       <Card>{body}</Card>
       {flow.sheet}
+      {backup.sheet}
       <ConflictsSheet open={conflictsOpen} onClose={() => setConflictsOpen(false)} serviceLabel={profession.terms.service} />
     </>
   );

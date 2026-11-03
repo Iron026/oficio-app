@@ -37,22 +37,26 @@ export function App({ storageFactory, cloudFactory }: AppProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let sync: SyncEngine | null = null;
+    let stopAuth: (() => void) | undefined;
     (async () => {
       const { storage, persistent } = await (storageFactory ?? createStorage)();
       const tracked = new TrackedStorage(storage);
       const service = await AppService.load(tracked);
-      const sync = await SyncEngine.create(service, tracked, null);
-      if (cancelled) return;
-      setBoot({ service, persistent, sync });
+      const engine = await SyncEngine.create(service, tracked, null);
+      sync = engine;
+      if (cancelled) return engine.dispose();
+      setBoot({ service, persistent, sync: engine });
       void setupKeyboard();
       // Conta Google e nuvem carregam depois, sem atrasar a abertura (e o app funciona sem elas).
       void (cloudFactory ?? createCloud)().then(async (cloud) => {
         if (cancelled) return;
-        sync.setRemote(cloud.remote);
-        const controller = new AccountController(cloud.auth, sync);
-        cloud.auth.onChange((u) => void sync.setUser(u?.uid ?? null));
+        engine.setRemote(cloud.remote);
+        const controller = new AccountController(cloud.auth, engine);
+        stopAuth = cloud.auth.onChange((u) => void engine.setUser(u?.uid ?? null));
         await cloud.auth.ready().catch(() => undefined);
-        await sync.setUser(cloud.auth.current()?.uid ?? null);
+        if (cancelled) return;
+        await engine.setUser(cloud.auth.current()?.uid ?? null);
         if (!cancelled) setAccount(controller);
       });
     })()
@@ -62,7 +66,10 @@ export function App({ storageFactory, cloudFactory }: AppProps) {
       })
       .finally(() => void hideSplash());
     return () => {
+      // Ao desmontar, nenhum temporizador ou ouvinte do app pode continuar ativo.
       cancelled = true;
+      stopAuth?.();
+      sync?.dispose();
     };
   }, [storageFactory, cloudFactory]);
 

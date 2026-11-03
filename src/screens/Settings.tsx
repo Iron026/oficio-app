@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
-import { Check, Crown, Database, Download, FlaskConical, FolderDown, Lock, Monitor, Moon, Pencil, Share2, ShieldCheck, Sun, Trash2, Upload } from 'lucide-react';
-import { canShareFiles, saveTextFile, shareTextFile } from '../platform/files';
+import { Check, Crown, Database, Download, ExternalLink, FlaskConical, Lock, Monitor, Moon, Pencil, ShieldCheck, Sun, Trash2, Upload } from 'lucide-react';
 import { isNative, platformName } from '../platform/native';
 import { PROFESSION_LIST } from '../domain/professions';
 import type { ProfessionId, ThemePreference } from '../domain/types';
@@ -17,10 +16,14 @@ import { ProfessionIcon } from '../ui/icons';
 import { Card, SectionTitle } from '../ui/Misc';
 import { Sheet } from '../ui/Sheet';
 import { AccountSection } from './Account';
+import { useBackupExport } from './BackupExport';
 import { useCloud } from '../state/CloudContext';
 import { useToast } from '../ui/Toast';
 
 export const APP_VERSION = __APP_VERSION__;
+
+/** Política de privacidade pública (abre no navegador). */
+export const PRIVACY_POLICY_URL = 'https://github.com/Iron026/oficio-app/blob/main/docs/PRIVACIDADE.md';
 
 export function Settings() {
   const { data, service, profession, persistent } = useApp();
@@ -28,8 +31,7 @@ export function Settings() {
   const confirm = useConfirm();
   const toast = useToast();
   const onError = useErrorHandler();
-  const [sheet, setSheet] = useState<null | 'perfil' | 'profissao' | 'planos' | 'exportar'>(null);
-  const [busy, setBusy] = useState(false);
+  const [sheet, setSheet] = useState<null | 'perfil' | 'profissao' | 'planos'>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const profile = data.profile!;
   const ent = freeEntitlements();
@@ -41,37 +43,7 @@ export function Settings() {
     { value: 'system', label: 'Sistema', icon: Monitor },
   ];
 
-  const backupName = () => `oficio-backup-${new Date().toISOString().slice(0, 10)}.json`;
-
-  async function saveBackup() {
-    setBusy(true);
-    try {
-      const { where } = await saveTextFile(backupName(), service.exportBackup());
-      toast({ title: 'Backup salvo', description: isNative() ? `Arquivo em ${where}. Guarde uma cópia fora do aparelho.` : 'Guarde o arquivo em local seguro.' });
-      setSheet(null);
-    } catch (err) {
-      onError(err);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function shareBackup() {
-    setBusy(true);
-    try {
-      await shareTextFile(backupName(), service.exportBackup(), 'Backup do Ofício');
-      setSheet(null);
-    } catch (err) {
-      onError(err);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function exportData() {
-    if (canShareFiles()) setSheet('exportar');
-    else void saveBackup();
-  }
+  const backup = useBackupExport();
 
   async function importData(file: File) {
     const linked = cloud.linked;
@@ -162,7 +134,7 @@ export function Settings() {
 
       <SectionTitle>Dados</SectionTitle>
       <Card className="!p-0">
-        <Row onClick={exportData} label="Exportar backup" detail="Gera um arquivo .json com todos os seus dados" icon={<Download size={18} />} />
+        <Row onClick={backup.start} label="Exportar backup" detail="Gera um arquivo .json com todos os seus dados" icon={<Download size={18} />} />
         <Row onClick={() => fileRef.current?.click()} label="Importar backup" detail="Restaura dados de um arquivo exportado" icon={<Upload size={18} />} />
         <Row onClick={toggleDemo} label={hasDemo ? 'Remover dados de demonstração' : 'Carregar dados de demonstração'} detail={hasDemo ? 'Apaga somente os registros marcados como demonstração' : 'Exemplos fictícios, claramente identificados'} icon={<FlaskConical size={18} />} />
         <Row onClick={resetAll} label="Apagar todos os dados" detail="Remove tudo deste aparelho" icon={<Trash2 size={18} />} danger />
@@ -188,13 +160,7 @@ export function Settings() {
         <Database size={12} aria-hidden="true" /> Ofício v{APP_VERSION} · {platformName() === 'android' ? 'Android' : 'Web'} · armazenamento {persistent ? 'local' : 'temporário'}
       </p>
 
-      <Sheet open={sheet === 'exportar'} onClose={() => setSheet(null)} title="Exportar backup">
-        <p className="mb-4 text-[14px] text-muted">O arquivo contém todos os seus dados. Guarde-o em local seguro e não o envie a pessoas desconhecidas.</p>
-        <div className="space-y-2">
-          <Button block size="lg" icon={<Share2 size={20} />} disabled={busy} onClick={shareBackup}>Compartilhar (Drive, e-mail…)</Button>
-          <Button block size="lg" variant="secondary" icon={<FolderDown size={20} />} disabled={busy} onClick={saveBackup}>Salvar em Documentos</Button>
-        </div>
-      </Sheet>
+      {backup.sheet}
       <ProfileSheet open={sheet === 'perfil'} onClose={() => setSheet(null)} />
       <ProfessionSheet open={sheet === 'profissao'} onClose={() => setSheet(null)} />
       <Sheet open={sheet === 'planos'} onClose={() => setSheet(null)} title="Recursos do Ofício">
@@ -325,19 +291,26 @@ function PrivacyCard() {
         <>
           <p className="text-muted">
             <strong>Com conta conectada:</strong> seus dados ficam neste aparelho e uma cópia é guardada na nuvem (Google Cloud Firestore, via Firebase), vinculada à sua conta
-            Google, acessível somente por você. Do Google, o Ofício usa apenas nome, e-mail, foto e um identificador da conta.
+            Google. Regras de acesso permitem que somente a sua conta leia e grave esses dados. Do Google, o Ofício usa apenas nome, e-mail, foto e um identificador da conta.
           </p>
           <p className="text-muted">Você pode exportar seus dados, desconectar ou excluir a conta e os dados da nuvem a qualquer momento em “Conta e sincronização”.</p>
         </>
       ) : (
         <p className="text-muted">
-          <strong>Sem conta conectada:</strong> tudo fica salvo apenas neste aparelho; nada é enviado para a internet. {isNative() ? 'O backup automático do Android está desativado.' : ''} Faça
+          <strong>Sem conta conectada:</strong> seus registros ficam salvos apenas neste aparelho e não são enviados para a internet. {isNative() ? 'O backup automático do Android está desativado.' : ''} Faça
           backups periódicos — desinstalar o app ou limpar os dados do navegador apaga as informações.
         </p>
       )}
-      <p className="text-muted">Não usamos seus dados para publicidade, não vendemos dados e não usamos rastreadores.</p>
+      <p className="text-muted">Não vendemos dados nem os usamos para publicidade. O app não inclui SDKs de anúncios nem de análise de uso.</p>
       <p className="text-muted">
-        Política de privacidade completa: <a className="font-semibold text-brand-600 underline dark:text-brand-300" href="https://github.com/Iron026/oficio-app/blob/main/docs/PRIVACIDADE.md" target="_blank" rel="noopener noreferrer">docs/PRIVACIDADE.md</a>
+        <a
+          className="inline-flex items-center gap-1.5 font-semibold text-brand-600 underline underline-offset-2 dark:text-brand-300"
+          href={PRIVACY_POLICY_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <ExternalLink size={15} aria-hidden="true" /> Ler Política de Privacidade
+        </a>
       </p>
     </Card>
   );

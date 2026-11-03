@@ -12,9 +12,10 @@ const variants: Record<Variant, string> = {
   xp: 'bg-xp-500 text-white hover:bg-xp-600',
 };
 const sizes: Record<Size, string> = {
-  sm: 'h-9 px-3 text-sm gap-1.5 rounded-lg',
-  md: 'h-11 px-4 text-[15px] gap-2 rounded-xl',
-  lg: 'h-13 px-5 text-base gap-2 rounded-2xl',
+  // Altura mínima (não fixa): textos longos quebram sem transbordar o botão.
+  sm: 'min-h-9 py-1.5 px-3 text-sm gap-1.5 rounded-lg',
+  md: 'min-h-11 py-2 px-4 text-[15px] gap-2 rounded-xl',
+  lg: 'min-h-13 py-2.5 px-5 text-base gap-2 rounded-2xl',
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -29,7 +30,7 @@ export function Button({ variant = 'primary', size = 'md', icon, block, classNam
     <button
       type={type}
       className={cx(
-        'inline-flex items-center justify-center font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none',
+        'inline-flex items-center justify-center text-center leading-tight font-semibold [&>svg]:shrink-0 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none',
         variants[variant], sizes[size], block && 'w-full', className,
       )}
       {...rest}

@@ -378,3 +378,30 @@ describe('migração do banco local v1 → v2', () => {
     expect(await adapter.kvGet('x')).toBe(1); // kv não é afetado por replaceAll
   });
 });
+
+describe('SyncEngine.dispose', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('cancela a sincronização agendada e não agenda outra depois de encerrado', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const remote = new MemoryRemote();
+    const tracked = new TrackedStorage(createMemoryAdapter());
+    const service = await AppService.load(tracked, () => NOW);
+    const sync = await SyncEngine.create(service, tracked, remote, { autoSync: true, now: () => NOW, isOnline: () => true });
+    await service.completeOnboarding({ name: 'Ana', businessName: '', professionId: 'beleza' });
+    await sync.setUser('uid-1');
+    await sync.link('uid-1', 'mesclar');
+    await service.saveClient(client('Maria'));
+    expect(vi.getTimerCount()).toBeGreaterThan(0); // sincronização agendada (1,5 s)
+
+    const listener = vi.fn();
+    sync.subscribe(listener);
+    sync.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+
+    await service.saveClient(client('João')); // alteração local continua salva…
+    expect(vi.getTimerCount()).toBe(0); // …mas nenhum novo agendamento
+    expect(listener).not.toHaveBeenCalled();
+    expect(service.data.clients.map((c) => c.name).sort()).toEqual(['João', 'Maria']);
+  });
+});

@@ -38,7 +38,7 @@ reconexão sem duplicar registros ou XP.
 - Workflow Android: APK com assinatura estável conferida, compilação do login Google e teste no emulador Android.
 
 ## Riscos restantes (não bloqueantes)
-1. **“Salvar em Documentos”** apresenta erro de permissão no Android 17; **Compartilhar** funciona. Pendência registrada, não priorizada.
+1. ~~**“Salvar em Documentos”** apresenta erro de permissão no Android 17~~ — **corrigido na 0.3.1**: substituído por “Salvar no aparelho” (janela “Salvar como” do Android, sem permissão de armazenamento).
 2. **Conflitos raros sem resolução automática perfeita:** se a receita duplicada (achado 1) tiver sido editada manualmente antes da sincronização, a edição da cópia removida se perde (mantém-se a receita mais antiga).
 3. **Cliente excluído em um aparelho e editado em outro** é restaurado, mas os serviços do aparelho que excluiu ficam sem vínculo com ele.
 4. **Conta excluída e recriada com os mesmos dados** enquanto outro aparelho estava offline: esse aparelho pode ficar com “Alterações pendentes” até ser desassociado manualmente.
