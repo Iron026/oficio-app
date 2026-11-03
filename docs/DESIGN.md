@@ -57,7 +57,17 @@ Nada abaixo de 12 px. Não use tamanhos avulsos (`text-[13px]`).
 - `--ease-standard` para trocas de tela (200 ms) e toques (120 ms); `--ease-emphasized` para folhas (280 ms).
 - O "salto" (`animate-pop`) fica só para XP, missão concluída e conquista.
 - Barras de progresso: 500 ms. Animar apenas `transform`/`opacity`/largura de barras.
-- "Reduzir movimento" do sistema desliga as animações.
+- "Reduzir movimento" do sistema desliga as animações; Ajustes › Acessibilidade › Animações › Reduzir também.
+- 0.4: `press`/`press-soft` (100 ms) no toque; `animate-screen` na troca de tela e de aba; `enter-stagger` em listas;
+  `bar-fill`/`bar-rise` animam por `transform` com `@starting-style`; `animate-celebrate` só na transição para concluído;
+  halo + moldura (`animate-halo`/`animate-frame`) uma vez quando a categoria muda.
+
+## Identidade 0.4
+
+- Topo petróleo fixo (`hero`, `--hero-1/2`) em todas as telas, com área de conteúdo sobreposta (`HeroSlot overlap`).
+- Cor de destaque da conta (`data-accent`: petróleo, oceano, índigo, grafite) muda só a marca; receita, despesa e XP não mudam.
+- Molduras por categoria (Inicial ○, Bronze ◆, Prata ◆◆, Ouro ◆◆◆, Platina ◆◆◆◆, Diamante ◈): símbolo + nome, nunca só cor.
+- Selos: medalhão hexagonal petróleo; estágio no acabamento (I aro, II aro duplo, III marcas, IV filete dourado) e em losangos.
 
 ## Componentes (etapa 2)
 

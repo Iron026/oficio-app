@@ -54,6 +54,15 @@ src/
 
 Ver [SINCRONIZACAO.md](SINCRONIZACAO.md). Resumo: `TrackedStorage` registra alterações locais; `SyncEngine` envia/recebe pelo `RemoteStore` (Firestore) com controle de revisão e mesclagem em 3 vias; `AccountController` orquestra login e associação. Sem Firebase configurado, o app é 100% local.
 
+## Identidade e progressão (v0.4)
+
+- `src/gamification/tiers.ts`: categorias **derivadas** do nível (faixas dos títulos existentes; não são gravadas).
+- `src/gamification/seals.ts`: selos calculados dos registros reais; o maior estágio fica em `sealAwards` e nunca diminui.
+- `src/domain/preferences.ts`: preferências da conta (`settings`: destaque, avatar, selo em destaque) e do aparelho
+  (`DevicePrefs` em `kv`: tema, densidade, ocultar valores, animações — não vão para a nuvem nem para o backup).
+- `src/domain/profileImage.ts` + `src/ui/photoEncode.ts`: limites e preparo da foto no aparelho (recorte, 320 px, ≤ 64 KiB).
+- IndexedDB v3 (stores `sealAwards`, `profileImages`). Backup continua na versão 1 (campos novos opcionais).
+
 ## Privacidade e segurança
 
 - Sem conta: nenhum dado sai do aparelho. Com conta Google (opcional): cópia no Firestore, acessível só pela própria conta (ver [PRIVACIDADE.md](PRIVACIDADE.md)). Sem analytics, anúncios ou rastreadores.
