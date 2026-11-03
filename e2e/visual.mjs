@@ -9,6 +9,7 @@
 //   - sobreposição do botão flutuante sobre o fim da lista (falha).
 //
 // Uso:  npm run build && node e2e/visual.mjs [--out visual-results] [--strict]
+//        [--scale 2] [--dist outra-pasta-de-build] [--viewports celular-360,celular-412]
 // Não grava nada fora da pasta de saída e não acessa a internet nem o Firebase.
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -24,6 +25,9 @@ const opt = (name, def) => {
 const OUT = opt('out', 'visual-results');
 const STRICT = args.includes('--strict');
 const PORT = Number(opt('port', '4317'));
+const SCALE = Number(opt('scale', '1'));
+const DIST = opt('dist', 'dist');
+const ONLY = opt('viewports', '');
 const BASE = `http://localhost:${PORT}/`;
 // Quarta-feira, 4 de novembro de 2026, 10h30 em Brasília: datas e saudação estáveis.
 const NOW = new Date('2026-11-04T10:30:00-03:00');
@@ -35,6 +39,7 @@ const VIEWPORTS = [
   { id: 'computador-1280', width: 1280, height: 800, mobile: false },
 ];
 const THEMES = ['claro', 'escuro'];
+const SELECTED = ONLY ? VIEWPORTS.filter((v) => ONLY.split(',').includes(v.id)) : VIEWPORTS;
 const SCREENS = [
   { id: 'painel', hash: '#/painel' },
   { id: 'agenda', hash: '#/agenda' },
@@ -50,8 +55,11 @@ const fail = (msg) => { report.falhas.push(msg); console.log(`  ✗ ${msg}`); };
 const warn = (msg) => { report.avisos.push(msg); console.log(`  ! ${msg}`); };
 
 // ---------------------------------------------------------------- servidor local (dist/)
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
-const stopServer = () => { try { server.kill(); } catch { /* já encerrado */ } };
+// A porta precisa estar livre: um servidor antigo serviria outro build sem aviso.
+if (await fetch(BASE).then(() => true, () => false)) throw new Error(`A porta ${PORT} já está em uso; encerre o servidor anterior ou use --port.`);
+// Grupo de processos próprio: encerrar o `npx` também encerra o `vite` filho.
+const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort', '--outDir', DIST], { stdio: 'ignore', detached: true });
+const stopServer = () => { try { process.kill(-server.pid, 'SIGTERM'); } catch { /* já encerrado */ } };
 process.on('exit', stopServer);
 for (let i = 0; ; i++) {
   try { if ((await fetch(BASE)).ok) break; } catch { /* ainda subindo */ }
@@ -64,7 +72,7 @@ const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 async function newPage(vp, theme) {
   const ctx = await browser.newContext({
-    viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 1,
+    viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: SCALE,
     isMobile: vp.mobile, hasTouch: vp.mobile, colorScheme: theme === 'escuro' ? 'dark' : 'light',
     locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', reducedMotion: 'reduce',
   });
@@ -195,7 +203,7 @@ async function capture(page, vp, theme, id, opts = {}) {
 
 // ---------------------------------------------------------------- execução
 try {
-  for (const vp of VIEWPORTS) {
+  for (const vp of SELECTED) {
     for (const theme of THEMES) {
       console.log(`• ${vp.id} · ${theme}`);
       // Primeira abertura (sem dados).
