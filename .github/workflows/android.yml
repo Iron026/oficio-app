@@ -15,7 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  APP_VERSION: 0.2.0
+  APP_VERSION: 0.3.0
+  # Configuração pública do app web do Firebase (variáveis do repositório).
+  # Ausentes → o app é gerado sem conta Google (funciona só no aparelho).
+  VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+  VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+  VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+  VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+  VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+  VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
 
 jobs:
   apk:
@@ -42,41 +50,77 @@ jobs:
       - name: Build web
         run: npm run build
 
+      # Arquivo do Firebase para Android, vindo do segredo GOOGLE_SERVICES_JSON
+      # (nunca versionado). Sem ele, o login Google não é incluído no APK.
+      - name: Configuração do Firebase (Android)
+        id: firebase
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          FIREBASE_ANDROID_APP_ID: ${{ vars.FIREBASE_ANDROID_APP_ID }}
+          FIREBASE_WEB_CLIENT_ID: ${{ vars.FIREBASE_WEB_CLIENT_ID }}
+          FIREBASE_ANDROID_API_KEY: ${{ vars.FIREBASE_ANDROID_API_KEY }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          elif [ -n "$FIREBASE_ANDROID_APP_ID" ]; then
+            node ci/make-google-services.mjs
+          fi
+          if [ -f android/app/google-services.json ]; then
+            python3 -c "import json;d=json.load(open('android/app/google-services.json'));assert any(c['client_info']['android_client_info']['package_name']=='io.github.iron026.oficio' for c in d['client']), 'google-services.json não contém o pacote io.github.iron026.oficio'"
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Configuração Firebase do Android ausente: APK gerado sem login Google (somente local)."
+          fi
+          if [ -z "$VITE_FIREBASE_API_KEY" ]; then echo "::notice::Variáveis VITE_FIREBASE_* ausentes: conta Google desativada no app."; fi
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
 
-      # Chave de DEPURAÇÃO estável entre builds, para o APK novo atualizar o
-      # anterior sem precisar desinstalar (o que apagaria os dados do app).
-      # Não é chave de produção e não fica no repositório: é gerada no próprio
-      # CI e guardada no cache do GitHub Actions. Opcionalmente, defina o
-      # segredo ANDROID_DEBUG_KEYSTORE_BASE64 para fixá-la permanentemente.
-      - name: Restaurar chave de depuração
-        uses: actions/cache@v5
-        with:
-          path: ~/.android/debug.keystore
-          key: oficio-debug-keystore-v1
+      # Chave de DEPURAÇÃO estável: derivada do segredo OFICIO_DEBUG_SEED
+      # (ci/debug_keystore.py). Mesma chave em todos os builds e branches →
+      # o APK atualiza por cima sem perder dados e o SHA-1 do Firebase não muda.
+      # Nenhuma chave privada fica no repositório. Não é a chave de produção.
       - name: Preparar chave de depuração
+        id: keystore
+        shell: bash
         env:
-          DEBUG_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+          OFICIO_DEBUG_SEED: ${{ secrets.OFICIO_DEBUG_SEED }}
         run: |
-          mkdir -p ~/.android
-          if [ -n "$DEBUG_KEYSTORE_B64" ]; then
-            echo "$DEBUG_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
-            echo "Usando chave de depuração do segredo do repositório."
-          elif [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android \
-              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
-              -validity 10000 -dname "CN=Oficio Debug,O=Oficio,C=BR"
-            echo "::notice::Nova chave de depuração criada. Se já houver um APK do Ofício instalado com outra chave, faça backup e desinstale antes de instalar este."
-          else
-            echo "Chave de depuração restaurada do cache."
+          set -euo pipefail
+          KS="$RUNNER_TEMP/oficio-debug.p12"
+          if [ -z "${OFICIO_DEBUG_SEED:-}" ]; then
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Segredo OFICIO_DEBUG_SEED ausente: a assinatura deste APK pode mudar a cada build (atualizar por cima pode falhar e o SHA-1 do Firebase deixa de valer). Ver docs/ANDROID.md."
+            exit 0
           fi
+          python3 -m pip install --quiet --disable-pip-version-check cryptography
+          # Sem pipe: qualquer falha do gerador interrompe este passo.
+          python3 ci/debug_keystore.py "$KS" > "$RUNNER_TEMP/fingerprints.txt"
+          if [ ! -s "$KS" ]; then echo "::error::Arquivo de assinatura não foi criado."; exit 1; fi
+          keytool -list -keystore "$KS" -storetype PKCS12 -storepass android -alias oficio > /dev/null
+          cat "$RUNNER_TEMP/fingerprints.txt"
+          echo "OFICIO_DEBUG_KEYSTORE=$KS" >> "$GITHUB_ENV"
+          echo "sha1=$(grep 'SHA-1' "$RUNNER_TEMP/fingerprints.txt" | awk '{print $NF}')" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(grep 'SHA-256' "$RUNNER_TEMP/fingerprints.txt" | awk '{print $NF}')" >> "$GITHUB_OUTPUT"
+          echo "stable=true" >> "$GITHUB_OUTPUT"
 
       - name: Sincronizar Capacitor
         run: npx cap sync android
+
+      # Conferência imediatamente antes do Gradle (mesmo job, mesmo caminho).
+      - name: Validar arquivo de assinatura
+        if: steps.keystore.outputs.stable == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Arquivo: $OFICIO_DEBUG_KEYSTORE"
+          test -s "$OFICIO_DEBUG_KEYSTORE" || { echo "::error::Arquivo de assinatura ausente antes do Gradle."; exit 1; }
+          keytool -list -keystore "$OFICIO_DEBUG_KEYSTORE" -storetype PKCS12 -storepass android -alias oficio > /dev/null
+          echo "Arquivo de assinatura presente e legível."
 
       - name: Compilar APK
         working-directory: android
@@ -87,7 +131,9 @@ jobs:
 
       - name: Verificar assinatura e nomear APK
         id: apk
+        shell: bash
         run: |
+          set -euo pipefail
           NAME="oficio-${APP_VERSION}-build.${{ github.run_number }}-debug.apk"
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk "out/$NAME"
@@ -95,11 +141,25 @@ jobs:
           $APKSIGNER verify --print-certs "out/$NAME" | tee out/assinatura.txt
           sha256sum "out/$NAME" | tee -a out/assinatura.txt
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          SHA1=$(grep -m1 'SHA-1 digest' out/assinatura.txt | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
+          SHA256=$(grep -m1 'SHA-256 digest' out/assinatura.txt | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
+          if [ "${{ steps.keystore.outputs.stable }}" = "true" ]; then
+            if [ "$SHA1" != "${{ steps.keystore.outputs.sha1 }}" ] || [ "$SHA256" != "${{ steps.keystore.outputs.sha256 }}" ]; then
+              echo "::error::O APK não foi assinado com a chave estável (esperado SHA-1 ${{ steps.keystore.outputs.sha1 }}, obtido $SHA1)."; exit 1
+            fi
+            echo "Assinatura conferida: igual à chave derivada do segredo."
+          fi
           {
             echo "### APK de teste pronto"
             echo "- Arquivo: \`$NAME\`"
             echo "- Versão: ${APP_VERSION} (build ${{ github.run_number }})"
+            echo "- Login Google incluído: **${{ steps.firebase.outputs.configured }}**"
+            echo "- Assinatura estável (segredo OFICIO_DEBUG_SEED): **${{ steps.keystore.outputs.stable }}**"
             echo "- Baixe em **Artifacts → oficio-apk-debug** nesta página."
+            echo ""
+            echo "#### Impressões digitais da assinatura (cadastrar no Firebase → Configurações do projeto → app Android)"
+            echo "- SHA-1: \`$SHA1\`"
+            echo "- SHA-256: \`$SHA256\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v6
@@ -110,6 +170,53 @@ jobs:
             out/assinatura.txt
           retention-days: 30
           if-no-files-found: error
+
+  login-google-compila:
+    name: Compilação do login Google (configuração provisória)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      # Valores FALSOS, apenas para verificar que o código nativo compila.
+      # Este APK não é distribuído.
+      - run: cp ci/google-services.placeholder.json android/app/google-services.json
+      - run: npx cap sync android
+      - name: Verificar plugin de login incluído
+        run: grep -q '@capacitor-firebase/authentication' android/app/src/main/assets/capacitor.plugins.json
+      # Semente PÚBLICA de teste (somente para este APK descartável): valida que o
+      # Gradle assina com a chave derivada e que a impressão digital é a esperada.
+      - name: Chave de depuração de teste
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --disable-pip-version-check cryptography
+          OFICIO_DEBUG_SEED=ci-teste-publico-nao-usar-em-producao python3 ci/debug_keystore.py "$RUNNER_TEMP/teste.p12" > "$RUNNER_TEMP/fp.txt"
+          test -s "$RUNNER_TEMP/teste.p12"
+          cat "$RUNNER_TEMP/fp.txt"
+          echo "OFICIO_DEBUG_KEYSTORE=$RUNNER_TEMP/teste.p12" >> "$GITHUB_ENV"
+      - name: Compilar
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Conferir assinatura determinística
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          GOT=$($APKSIGNER verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA-1 digest' | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
+          WANT=$(grep 'SHA-1' "$RUNNER_TEMP/fp.txt" | awk '{print $NF}')
+          echo "esperado=$WANT obtido=$GOT"
+          [ "$GOT" = "$WANT" ]
 
   e2e:
     name: Teste no emulador Android

@@ -12,3 +12,8 @@ coverage
 android/app/build
 ios/App/build
 e2e-results
+firestore-debug.log
+
+# Configuração Firebase do Android (vem de segredo do repositório no CI)
+android/app/google-services.json
+.oficio-keys/

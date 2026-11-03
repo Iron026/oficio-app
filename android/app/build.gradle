@@ -17,7 +17,25 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Assinatura de DEPURAÇÃO estável: no CI, a chave é derivada do segredo
+    // OFICIO_DEBUG_SEED (ver ci/debug_keystore.py). Sem a variável, usa a
+    // chave de depuração padrão do Android. Não é a chave de produção.
+    signingConfigs {
+        debug {
+            def oficioKeystore = System.getenv('OFICIO_DEBUG_KEYSTORE')
+            if (oficioKeystore) {
+                storeFile file(oficioKeystore)
+                storeType 'pkcs12'
+                storePassword 'android'
+                keyAlias 'oficio'
+                keyPassword 'android'
+            }
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

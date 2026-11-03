@@ -1,8 +1,10 @@
 import { DEFAULT_SETTINGS, type AppData, type Profile, type Settings } from '../domain/types';
 import { ENTITY_STORES, type EntityStore, type EntityStoreName, type StorageAdapter } from './types';
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const META = 'meta';
+/** v2: armazenamento chave-valor auxiliar (sincronização, cópias de segurança). */
+const KV = 'kv';
 
 function promisify<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -29,6 +31,8 @@ export function openDatabase(name: string): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META);
+      // v1 → v2: apenas cria o novo store; os dados existentes não são tocados.
+      if (!db.objectStoreNames.contains(KV)) db.createObjectStore(KV);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -81,6 +85,25 @@ export async function createIndexedDbAdapter(dbName = 'oficio'): Promise<Storage
 
   const adapter: StorageAdapter = {
     kind: 'indexeddb',
+    async kvGet<T>(key: string) {
+      const tx = db.transaction(KV, 'readonly');
+      return (await promisify(tx.objectStore(KV).get(key))) as T | undefined;
+    },
+    async kvSet(key, value) {
+      const tx = db.transaction(KV, 'readwrite');
+      tx.objectStore(KV).put(value, key);
+      await txDone(tx);
+    },
+    async kvDelete(key) {
+      const tx = db.transaction(KV, 'readwrite');
+      tx.objectStore(KV).delete(key);
+      await txDone(tx);
+    },
+    async kvKeys(prefix = '') {
+      const tx = db.transaction(KV, 'readonly');
+      const keys = (await promisify(tx.objectStore(KV).getAllKeys())) as string[];
+      return keys.filter((k) => typeof k === 'string' && k.startsWith(prefix));
+    },
     clients: entityStore(db, 'clients'),
     appointments: entityStore(db, 'appointments'),
     transactions: entityStore(db, 'transactions'),

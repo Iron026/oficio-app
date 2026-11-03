@@ -49,9 +49,13 @@ src/
 12. **Monetização preparada, não ativa.** `monetization/catalog.ts` descreve recursos gratuitos, Premium (assinatura) e compras únicas; `entitlements.ts` responde “pode usar?”. A interface `BillingProvider` define o contrato para o futuro Google Play Billing. Itens futuros aparecem como “Em breve” e não podem ser adquiridos.
 13. **Acessibilidade.** Rótulos associados a campos, mensagens de erro com `role="alert"`, diálogos com `aria-modal` e foco preso, `role="progressbar"`, navegação com `aria-current`, alvos de toque ≥ 44 px, `prefers-reduced-motion` respeitado.
 
+## Conta e sincronização (v0.3)
+
+Ver [SINCRONIZACAO.md](SINCRONIZACAO.md). Resumo: `TrackedStorage` registra alterações locais; `SyncEngine` envia/recebe pelo `RemoteStore` (Firestore) com controle de revisão e mesclagem em 3 vias; `AccountController` orquestra login e associação. Sem Firebase configurado, o app é 100% local.
+
 ## Privacidade e segurança
 
-- Nenhum dado sai do aparelho; não há analytics, anúncios ou chamadas de rede.
+- Sem conta: nenhum dado sai do aparelho. Com conta Google (opcional): cópia no Firestore, acessível só pela própria conta (ver [PRIVACIDADE.md](PRIVACIDADE.md)). Sem analytics, anúncios ou rastreadores.
 - Backup é um arquivo JSON gerado e importado localmente, com validação de formato.
 - `.env*` está no `.gitignore`; não há credenciais no código.
 

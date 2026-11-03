@@ -24,8 +24,13 @@ export function createMemoryAdapter(): StorageAdapter {
     xpEvents: memoryStore<AppData['xpEvents'][number]>(),
     achievements: memoryStore<AppData['achievements'][number]>(),
   };
+  const kv = new Map<string, unknown>();
   const adapter: StorageAdapter = {
     kind: 'memory',
+    kvGet: async <T,>(key: string) => (kv.has(key) ? (structuredClone(kv.get(key)) as T) : undefined),
+    kvSet: async (key, value) => void kv.set(key, structuredClone(value)),
+    kvDelete: async (key) => void kv.delete(key),
+    kvKeys: async (prefix = '') => [...kv.keys()].filter((k) => k.startsWith(prefix)),
     ...stores,
     getProfile: async () => (profile ? structuredClone(profile) : null),
     saveProfile: async (p) => void (profile = structuredClone(p)),

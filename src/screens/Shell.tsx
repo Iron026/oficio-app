@@ -4,6 +4,7 @@ import { CalendarDays, LayoutDashboard, Settings, TrendingUp, Users, Wallet, Tri
 import { useApp } from '../state/AppContext';
 import { navigate, type Route } from '../state/router';
 import { IconButton } from '../ui/Button';
+import { SyncIndicator } from './Account';
 import { cx } from '../ui/cx';
 
 export function Logo({ size = 32 }: { size?: number }) {
@@ -36,6 +37,7 @@ export function Shell({ route, title, children, action }: { route: Route; title:
             {data.profile?.businessName && route === 'painel' && <p className="truncate text-xs text-muted">{data.profile.businessName}</p>}
           </div>
           {action}
+          <SyncIndicator />
           <IconButton label="Ajustes" onClick={() => navigate('ajustes')} className={cx(route === 'ajustes' && 'bg-surface-2 text-fg')}>
             <Settings size={22} />
           </IconButton>

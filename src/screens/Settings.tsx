@@ -16,12 +16,15 @@ import { TextField } from '../ui/Field';
 import { ProfessionIcon } from '../ui/icons';
 import { Card, SectionTitle } from '../ui/Misc';
 import { Sheet } from '../ui/Sheet';
+import { AccountSection } from './Account';
+import { useCloud } from '../state/CloudContext';
 import { useToast } from '../ui/Toast';
 
 export const APP_VERSION = __APP_VERSION__;
 
 export function Settings() {
   const { data, service, profession, persistent } = useApp();
+  const cloud = useCloud();
   const confirm = useConfirm();
   const toast = useToast();
   const onError = useErrorHandler();
@@ -71,7 +74,15 @@ export function Settings() {
   }
 
   async function importData(file: File) {
-    const ok = await confirm({ title: 'Importar backup?', message: 'Todos os dados atuais deste aparelho serão substituídos pelos dados do arquivo.', confirmLabel: 'Importar', danger: true });
+    const linked = cloud.linked;
+    const ok = await confirm({
+      title: 'Importar backup?',
+      message: linked
+        ? 'Todos os dados atuais serão substituídos pelos do arquivo — neste aparelho, na nuvem e nos outros aparelhos conectados. Registros criados depois desse backup serão excluídos. Uma cópia de segurança dos dados atuais é guardada neste aparelho antes.'
+        : 'Todos os dados atuais deste aparelho serão substituídos pelos dados do arquivo. Uma cópia de segurança dos dados atuais é guardada antes.',
+      confirmLabel: 'Importar',
+      danger: true,
+    });
     if (!ok) return;
     try {
       await service.importBackup(await file.text());
@@ -109,6 +120,8 @@ export function Settings() {
 
   return (
     <div>
+      <AccountSection />
+
       <SectionTitle>Perfil</SectionTitle>
       <Card className="!p-0">
         <Row onClick={() => setSheet('perfil')} label={profile.name} detail={profile.businessName || 'Nome do negócio não informado'} icon={<Pencil size={18} />} />
@@ -169,12 +182,7 @@ export function Settings() {
       />
 
       <SectionTitle>Privacidade</SectionTitle>
-      <Card className="space-y-2 text-[14px] leading-relaxed">
-        <p className="flex items-center gap-2 font-semibold"><ShieldCheck size={18} className="text-brand-600 dark:text-brand-300" aria-hidden="true" /> Seus dados são seus</p>
-        <p className="text-muted">O Ofício não tem servidor nesta versão: tudo fica salvo apenas neste aparelho (IndexedDB do navegador). Nenhum dado é enviado para a internet, e não usamos rastreadores ou anúncios.</p>
-        <p className="text-muted">Como os dados ficam só aqui, faça backups periódicos. {isNative() ? 'Desinstalar o app ou limpar os dados dele apaga as informações. O backup automático do Android está desativado para que nada seja enviado à nuvem sem você decidir.' : 'Limpar os dados do navegador apaga as informações do app.'}</p>
-        <p className="text-muted">Para levar seus dados da versão web para o app Android (ou para outro aparelho): exporte o backup em um e importe no outro.</p>
-      </Card>
+      <PrivacyCard />
 
       <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-[12px] text-muted">
         <Database size={12} aria-hidden="true" /> Ofício v{APP_VERSION} · {platformName() === 'android' ? 'Android' : 'Web'} · armazenamento {persistent ? 'local' : 'temporário'}
@@ -305,5 +313,32 @@ function ProfessionSheet({ open, onClose }: { open: boolean; onClose: () => void
         })}
       </div>
     </Sheet>
+  );
+}
+
+function PrivacyCard() {
+  const { linked } = useCloud();
+  return (
+    <Card className="space-y-2 text-[14px] leading-relaxed">
+      <p className="flex items-center gap-2 font-semibold"><ShieldCheck size={18} className="text-brand-600 dark:text-brand-300" aria-hidden="true" /> Seus dados são seus</p>
+      {linked ? (
+        <>
+          <p className="text-muted">
+            <strong>Com conta conectada:</strong> seus dados ficam neste aparelho e uma cópia é guardada na nuvem (Google Cloud Firestore, via Firebase), vinculada à sua conta
+            Google, acessível somente por você. Do Google, o Ofício usa apenas nome, e-mail, foto e um identificador da conta.
+          </p>
+          <p className="text-muted">Você pode exportar seus dados, desconectar ou excluir a conta e os dados da nuvem a qualquer momento em “Conta e sincronização”.</p>
+        </>
+      ) : (
+        <p className="text-muted">
+          <strong>Sem conta conectada:</strong> tudo fica salvo apenas neste aparelho; nada é enviado para a internet. {isNative() ? 'O backup automático do Android está desativado.' : ''} Faça
+          backups periódicos — desinstalar o app ou limpar os dados do navegador apaga as informações.
+        </p>
+      )}
+      <p className="text-muted">Não usamos seus dados para publicidade, não vendemos dados e não usamos rastreadores.</p>
+      <p className="text-muted">
+        Política de privacidade completa: <a className="font-semibold text-brand-600 underline dark:text-brand-300" href="https://github.com/Iron026/oficio-app/blob/main/docs/PRIVACIDADE.md" target="_blank" rel="noopener noreferrer">docs/PRIVACIDADE.md</a>
+      </p>
+    </Card>
   );
 }

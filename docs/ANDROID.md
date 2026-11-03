@@ -12,9 +12,23 @@
 8. Abra **Ofício** pela gaveta de apps.
 
 ### Atualizar para uma versão mais nova
-Repita os passos e toque em **Atualizar**. Os dados são mantidos, porque cada build tem número de versão maior e usa a mesma chave de depuração.
+Repita os passos e toque em **Atualizar**. Os dados são mantidos quando o novo APK tem a **mesma assinatura** do instalado.
 
-> Se o Android disser **“App não instalado: conflito de pacote”**, a chave de depuração do CI mudou (o cache do GitHub expira após 7 dias sem builds). Nesse caso: **Ajustes → Exportar backup** no app antigo → desinstale → instale o novo → **Importar backup**.
+### Assinatura estável (configurar uma única vez)
+A partir da v0.3, a chave de depuração é **derivada de um segredo** do repositório (`ci/debug_keystore.py`):
+mesma chave em todos os builds e branches, sem nenhuma chave privada no código.
+
+1. Gere um texto aleatório (mínimo **8** caracteres; recomendado **16 ou mais**) — ex.: *Gerenciador de senhas do Google → Gerar senha*.
+2. Abra **https://github.com/Iron026/oficio-app/settings/secrets/actions** → **New repository secret**.
+3. Name: `OFICIO_DEBUG_SEED` · Secret: o texto gerado → **Add secret**.
+4. Guarde esse texto em local seguro. Se perdê-lo, uma nova chave será gerada (será preciso reinstalar o app e cadastrar o novo SHA-1 no Firebase).
+
+O resumo de cada build mostra “Assinatura estável: true” e as impressões SHA-1/SHA-256.
+**Não é a chave de produção** da Play Store (essa será configurada só com sua autorização).
+
+> Se o Android disser **“App não instalado: conflito de pacote”**, o APK novo tem assinatura diferente
+> do instalado (ex.: APKs anteriores à configuração do segredo). Faça **Ajustes → Exportar backup**
+> no app antigo → desinstale → instale o novo → **Importar backup** (ou recupere pela conta Google).
 
 ## Levar os dados da versão web para o app
 

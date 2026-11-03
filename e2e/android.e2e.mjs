@@ -45,16 +45,64 @@ const back = () => {
 /**
  * Toque em um elemento. O Playwright às vezes calcula mal a viewport de
  * WebViews Android via CDP ("element is outside of the viewport"); nesse
- * caso o clique é disparado diretamente no elemento.
+ * caso o clique é disparado diretamente no elemento — mas só se ele ainda
+ * estiver visível e habilitado (o primeiro toque pode ter funcionado e
+ * apenas demorado a ser confirmado; tocar de novo poderia repetir a ação).
  */
 const tap = async (locator) => {
   await locator.waitFor();
   try {
     await locator.click({ timeout: 3000 });
   } catch {
-    await locator.evaluate((el) => el.click());
+    const el = locator.first();
+    const stillThere = (await locator.count()) > 0 && (await el.isVisible().catch(() => false)) && (await el.isEnabled().catch(() => false));
+    if (stillThere) await el.evaluate((node) => node.click()).catch(() => undefined);
   }
 };
+
+/** Lê um store do IndexedDB do app (prova durável de que o dado foi salvo). */
+const readStore = (page, store) =>
+  page.evaluate(
+    (name) =>
+      new Promise((resolve, reject) => {
+        const req = indexedDB.open('oficio');
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+          const db = req.result;
+          const q = db.transaction(name, 'readonly').objectStore(name).getAll();
+          q.onsuccess = () => {
+            resolve(q.result);
+            db.close();
+          };
+          q.onerror = () => reject(q.error);
+        };
+      }),
+    store,
+  );
+
+/** Espera até `fn` retornar verdadeiro (dados gravados de forma assíncrona). */
+const eventually = async (fn, msg, ms = 10_000) => {
+  const end = Date.now() + ms;
+  let last;
+  while (Date.now() < end) {
+    try {
+      last = await fn();
+      if (last) return last;
+    } catch (err) {
+      last = err;
+    }
+    await wait(250);
+  }
+  throw new Error(`${msg} (último valor: ${JSON.stringify(last)})`);
+};
+
+/** Avisos temporários (toasts) são apenas registrados — a prova é sempre o dado salvo. */
+const noteToast = async (page, re) => {
+  const seen = await page.getByText(re).first().isVisible().catch(() => false);
+  console.log(`\n  aviso "${re.source}": ${seen ? 'exibido' : 'não observado (temporário)'}`);
+};
+
+const namesIn = (rows) => rows.map((r) => r.name ?? r.title ?? r.description);
 
 const [device] = await android.devices({ omitDriverInstall: true });
 assert(device, 'Nenhum dispositivo Android encontrado.');
@@ -140,7 +188,7 @@ try {
   await step('Voltar fecha o painel aberto sem sair do app', async () => {
     await tap(page.getByRole('button', { name: /^cliente$/i }));
     await page.getByRole('dialog').waitFor();
-    await wait(1200); // aguarda a animação de entrada do painel
+    await wait(1500); // aguarda a animação de entrada do painel
     shot('03-formulario');
     back();
     await page.getByRole('dialog').waitFor({ state: 'detached' });
@@ -149,10 +197,21 @@ try {
 
   await step('Cadastrar cliente', async () => {
     await tap(page.getByRole('button', { name: /^cliente$/i }));
-    await page.getByLabel(/^nome/i).fill('Cliente Persistente');
-    await page.getByLabel(/telefone/i).fill('11912345678');
-    await tap(page.getByRole('button', { name: /cadastrar cliente/i }));
-    await page.getByText(/cliente cadastrado/i).first().waitFor();
+    const form = page.getByRole('dialog', { name: /novo cliente/i });
+    await form.getByLabel(/^nome/i).fill('Cliente Persistente');
+    await form.getByLabel(/telefone/i).fill('11912345678');
+    await tap(form.getByRole('button', { name: /cadastrar cliente/i }));
+    await noteToast(page, /cliente cadastrado/i);
+    // O formulário só fecha quando o cadastro é salvo com sucesso.
+    await form.waitFor({ state: 'detached' });
+    // Prova durável: gravado no IndexedDB exatamente uma vez...
+    await eventually(async () => namesIn(await readStore(page, 'clients')).filter((n) => n === 'Cliente Persistente').length === 1, 'cliente não gravado (ou gravado em duplicidade) no IndexedDB');
+    // ...e visível na lista de clientes.
+    await tap(page.getByRole('navigation').getByRole('link', { name: /clientes/i }));
+    await page.getByText('Cliente Persistente').waitFor();
+    assert((await page.getByText('Cliente Persistente').count()) === 1, 'cliente aparece mais de uma vez na lista');
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
+    await page.waitForFunction(() => location.hash === '#/painel');
   });
 
   await step('Serviço com data futura: aviso, Voltar e Concluir mesmo assim', async () => {
@@ -170,13 +229,19 @@ try {
     await tap(page.getByRole('button', { name: /concluir atendimento/i }));
     const aviso = page.getByRole('dialog', { name: 'Data futura' });
     await aviso.waitFor();
-    await wait(800);
+    await wait(1500);
     shot('07-aviso-data-futura');
     await tap(aviso.getByRole('button', { name: 'Voltar' }));
     await aviso.waitFor({ state: 'detached' });
     await tap(page.getByRole('button', { name: /concluir atendimento/i }));
     await tap(page.getByRole('dialog', { name: 'Data futura' }).getByRole('button', { name: /concluir mesmo assim/i }));
-    await page.getByText(/atendimento concluído/i).first().waitFor();
+    await noteToast(page, /atendimento concluído/i);
+    // Prova durável: serviço concluído e UMA receita vinculada gravados.
+    await eventually(async () => {
+      const ap = (await readStore(page, 'appointments')).find((a) => a.title === 'Corte antecipado');
+      const tx = (await readStore(page, 'transactions')).filter((t) => ap && t.appointmentId === ap.id);
+      return ap?.status === 'concluido' && tx.length === 1 && ap.transactionId === tx[0].id;
+    }, 'conclusão/receita não gravadas corretamente');
     await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
     await page.getByTestId('data-futura').waitFor();
     await wait(600);
@@ -210,7 +275,15 @@ try {
     await tap(page.getByRole('button', { name: /ajustes/i }));
     await tap(page.getByRole('button', { name: /exportar backup/i }));
     await tap(page.getByRole('button', { name: /salvar em documentos/i }));
-    await page.getByText(/backup salvo/i).first().waitFor();
+    await noteToast(page, /backup salvo/i);
+    // Prova durável: o arquivo existe em Documentos/Oficio.
+    await eventually(() => {
+      try {
+        return /oficio-backup-/.test(adb('shell', 'ls', '/sdcard/Documents/Oficio/'));
+      } catch {
+        return false;
+      }
+    }, 'arquivo de backup não criado');
     await wait(800);
     shot('05-backup-salvo');
     const files = adb('shell', 'ls', '/sdcard/Documents/Oficio/').trim().split(/\s+/);
@@ -241,6 +314,8 @@ try {
     await page.getByTestId('data-futura').waitFor(); // receita antecipada e selo preservados
     const receitas = await page.getByText('Corte antecipado').count();
     assert(receitas === 1, `receita antecipada duplicada ou ausente (${receitas})`);
+    const persisted = namesIn(await readStore(page, 'clients')).filter((n) => n === 'Cliente Persistente');
+    assert(persisted.length === 1, `cliente não persistiu exatamente uma vez após reabrir (${persisted.length})`);
     await tap(page.getByRole('navigation').getByRole('link', { name: /clientes/i }));
     await page.getByText('Cliente Persistente').waitFor();
     shot('06-clientes-apos-reabrir');
@@ -252,7 +327,11 @@ try {
     await tap(page.getByRole('button', { name: /ajustes/i }));
     await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
     await tap(page.getByRole('button', { name: /^importar$/i }));
-    await page.getByText(/backup importado/i).first().waitFor();
+    await noteToast(page, /backup importado/i);
+    await eventually(async () => {
+      const names = namesIn(await readStore(page, 'clients'));
+      return names.includes('Cliente Importado') && names.filter((n) => n === 'Cliente Persistente').length === 1;
+    }, 'backup não importado no IndexedDB');
     await tap(page.getByRole('navigation').getByRole('link', { name: /clientes/i }));
     await page.getByText('Cliente Importado').waitFor();
     await page.getByText('Cliente Persistente').waitFor();

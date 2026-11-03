@@ -1,0 +1,69 @@
+rules_version = '2';
+
+// Regras de segurança do Ofício.
+// Princípio: cada conta acessa SOMENTE os próprios dados (users/{uid}).
+// Tudo o que não está explicitamente permitido é negado.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Revisão: criação começa em 1; atualização exige exatamente +1
+    // (controle de concorrência: evita sobrescrever alterações de outro aparelho).
+    function validRev() {
+      return request.resource.data.rev is int
+        && (resource == null
+              ? request.resource.data.rev == 1
+              : request.resource.data.rev == resource.data.rev + 1);
+    }
+
+    // Perfil e preferências da conta.
+    match /users/{uid} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['schemaVersion', 'data', 'rev', 'updatedAt', 'deviceId'])
+        && request.resource.data.data is map
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.deviceId is string
+        && request.resource.data.deviceId.size() <= 64
+        && validRev();
+
+      // Registros: clientes, serviços, lançamentos, XP e conquistas.
+      match /records/{recordId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['collection', 'id', 'data', 'deleted', 'rev', 'updatedAt', 'deviceId'])
+          && request.resource.data.collection in ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements']
+          && request.resource.data.id is string
+          && request.resource.data.id.size() <= 128
+          && recordId == request.resource.data.collection + '__' + request.resource.data.id
+          && request.resource.data.deleted is bool
+          && (request.resource.data.deleted
+                ? request.resource.data.data == null
+                : (request.resource.data.data is map && request.resource.data.data.id == request.resource.data.id))
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.deviceId is string
+          && request.resource.data.deviceId.size() <= 64
+          && validRev();
+      }
+
+      // Direitos Premium (futuro): somente leitura pelo app. A gravação será feita
+      // apenas por um servidor após verificar a compra no Google Play Billing.
+      // O login Google, sozinho, nunca concede Premium.
+      match /entitlements/{doc} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

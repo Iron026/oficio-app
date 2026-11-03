@@ -72,6 +72,20 @@ export class AppService {
     this.listeners.forEach((l) => l(data));
   }
 
+  /** Executa `fn` com acesso exclusivo aos dados (usado pela sincronização). */
+  exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    return this.run(fn);
+  }
+
+  /**
+   * Substitui os dados pelos resultantes da sincronização, numa única
+   * transação. Deve ser chamado dentro de `exclusive`.
+   */
+  async applySyncedData(data: AppData): Promise<void> {
+    await this.storage.replaceAll(data);
+    this.set(data);
+  }
+
   /** Serializa as operações para evitar condições de corrida. */
   private run<T>(op: () => Promise<T>): Promise<T> {
     const next = this.queue.then(op, op);
