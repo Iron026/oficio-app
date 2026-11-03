@@ -3,7 +3,8 @@ export function totalXpForLevel(level: number): number {
   return 50 * level * (level - 1);
 }
 
-const TITLES: [number, string][] = [
+/** Títulos por nível mínimo (exportado para as categorias visuais; valores inalterados). */
+export const LEVEL_TITLES: readonly (readonly [number, string])[] = [
   [1, 'Iniciante'],
   [3, 'Aprendiz'],
   [5, 'Profissional'],
@@ -13,8 +14,8 @@ const TITLES: [number, string][] = [
 ];
 
 export function levelTitle(level: number): string {
-  let title = TITLES[0]![1];
-  for (const [min, t] of TITLES) if (level >= min) title = t;
+  let title = LEVEL_TITLES[0]![1];
+  for (const [min, t] of LEVEL_TITLES) if (level >= min) title = t;
   return title;
 }
 

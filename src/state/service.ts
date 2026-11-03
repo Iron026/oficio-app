@@ -1,6 +1,8 @@
 import { buildDemoData } from '../domain/demo';
 import { getProfession } from '../domain/professions';
-import type { AppData, Appointment, Client, Profile, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
+import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
+import { isValidProfileImage } from '../domain/profileImage';
+import { awardsToSave, mergeAward } from '../gamification/seals';
 import { DEFAULT_SETTINGS } from '../domain/types';
 import { actionAward, evaluate, totalXp, type ActionType } from '../gamification/engine';
 import { levelInfo } from '../gamification/levels';
@@ -26,12 +28,14 @@ export interface Feedback {
   events: XpEvent[];
   achievements: UnlockedAchievement[];
   levelUp: number | null;
+  /** Selos que subiram de estágio nesta operação (não dão XP). */
+  seals: SealAward[];
 }
 
-const emptyFeedback = (): Feedback => ({ xpGained: 0, events: [], achievements: [], levelUp: null });
+const emptyFeedback = (): Feedback => ({ xpGained: 0, events: [], achievements: [], levelUp: null, seals: [] });
 
 export const emptyData = (): AppData => ({
-  profile: null, settings: { ...DEFAULT_SETTINGS }, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [],
+  profile: null, settings: { ...DEFAULT_SETTINGS }, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [],
 });
 
 type Listener = (data: AppData) => void;
@@ -115,13 +119,40 @@ export class AppService {
     if (result.achievements.length) await this.storage.achievements.putMany(result.achievements);
     const xpEvents = [...d.xpEvents, ...events];
     this.set({ ...d, xpEvents, achievements: [...d.achievements, ...result.achievements] });
+    const seals = await this.awardSeals();
     const after = levelInfo(totalXp(xpEvents)).level;
     return {
       xpGained: events.reduce((s, e) => s + e.xp, 0),
       events,
       achievements: result.achievements,
       levelUp: after > before ? after : null,
+      seals,
     };
+  }
+
+  /**
+   * Grava o maior estágio já merecido de cada selo (sem XP, sem tocar no histórico).
+   * Nunca reduz um estágio guardado. Devolve os selos que subiram de estágio.
+   */
+  private async awardSeals(): Promise<SealAward[]> {
+    const d = this._data;
+    if (!d.profile) return [];
+    const changed = awardsToSave(d, d.sealAwards, this.now());
+    if (!changed.length) return [];
+    await this.storage.sealAwards.putMany(changed);
+    const byId = new Map(d.sealAwards.map((a) => [a.id, a]));
+    const raised = changed.filter((c) => c.stage > (byId.get(c.id)?.stage ?? 0));
+    for (const c of changed) byId.set(c.id, c);
+    this.set({ ...this._data, sealAwards: [...byId.values()] });
+    return raised;
+  }
+
+  /**
+   * Reconhece selos já merecidos pelos registros atuais (primeira abertura da 0.4,
+   * depois de sincronizar ou importar). Idempotente; não cria XP.
+   */
+  reconcileSeals(): Promise<SealAward[]> {
+    return this.run(() => this.awardSeals());
   }
 
   // ------------------------------------------------------------ perfil
@@ -154,6 +185,27 @@ export class AppService {
       await this.storage.saveProfile(profile);
       this.set({ ...this._data, profile });
       return this.gamify();
+    });
+  }
+
+  /** Define a foto de perfil (já otimizada pela interface) e a seleciona como imagem do perfil. */
+  setProfileImage(img: ProfileImage): Promise<void> {
+    return this.run(async () => {
+      if (!isValidProfileImage(img)) throw new Error('Foto inválida ou grande demais.');
+      await this.storage.profileImages.put(img);
+      const settings: Settings = { ...this._data.settings, avatar: { kind: 'foto' } };
+      await this.storage.saveSettings(settings);
+      this.set({ ...this._data, profileImages: [img], settings });
+    });
+  }
+
+  /** Remove a foto (do aparelho e, com conta conectada, da nuvem) e volta para as iniciais. */
+  removeProfileImage(): Promise<void> {
+    return this.run(async () => {
+      for (const img of this._data.profileImages) await this.storage.profileImages.remove(img.id);
+      const settings: Settings = { ...this._data.settings, avatar: { kind: 'iniciais' } };
+      await this.storage.saveSettings(settings);
+      this.set({ ...this._data, profileImages: [], settings });
     });
   }
 
@@ -374,9 +426,17 @@ export class AppService {
 
   importBackup(text: string): Promise<void> {
     return this.run(async () => {
-      const data = parseBackup(text);
+      const parsed = parseBackup(text);
+      // Selos são permanentes: um backup mais antigo nunca reduz o estágio já alcançado.
+      const byId = new Map(parsed.sealAwards.map((a) => [a.id, a]));
+      for (const cur of this._data.sealAwards) {
+        const imp = byId.get(cur.id);
+        byId.set(cur.id, imp ? mergeAward(cur, imp) : cur);
+      }
+      const data = { ...parsed, sealAwards: [...byId.values()] };
       await this.storage.replaceAll(data);
       this.set(data);
+      await this.awardSeals();
     });
   }
 

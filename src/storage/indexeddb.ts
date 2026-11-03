@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS, type AppData, type Profile, type Settings } from '../domain/types';
 import { ENTITY_STORES, type EntityStore, type EntityStoreName, type StorageAdapter } from './types';
 
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const META = 'meta';
 /** v2: armazenamento chave-valor auxiliar (sincronização, cópias de segurança). */
 const KV = 'kv';
@@ -33,6 +33,7 @@ export function openDatabase(name: string): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META);
       // v1 → v2: apenas cria o novo store; os dados existentes não são tocados.
       if (!db.objectStoreNames.contains(KV)) db.createObjectStore(KV);
+      // v2 → v3 (0.4): stores `sealAwards` e `profileImages`, criados pelo laço acima; nada é apagado.
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -109,6 +110,8 @@ export async function createIndexedDbAdapter(dbName = 'oficio'): Promise<Storage
     transactions: entityStore(db, 'transactions'),
     xpEvents: entityStore(db, 'xpEvents'),
     achievements: entityStore(db, 'achievements'),
+    sealAwards: entityStore(db, 'sealAwards'),
+    profileImages: entityStore(db, 'profileImages'),
     async getProfile() {
       return (await getMeta<Profile>('profile')) ?? null;
     },
@@ -118,11 +121,12 @@ export async function createIndexedDbAdapter(dbName = 'oficio'): Promise<Storage
     },
     saveSettings: (s) => setMeta('settings', s),
     async loadAll(): Promise<AppData> {
-      const [profile, settings, clients, appointments, transactions, xpEvents, achievements] = await Promise.all([
+      const [profile, settings, clients, appointments, transactions, xpEvents, achievements, sealAwards, profileImages] = await Promise.all([
         adapter.getProfile(), adapter.getSettings(), adapter.clients.list(), adapter.appointments.list(),
         adapter.transactions.list(), adapter.xpEvents.list(), adapter.achievements.list(),
+        adapter.sealAwards.list(), adapter.profileImages.list(),
       ]);
-      return { profile, settings, clients, appointments, transactions, xpEvents, achievements };
+      return { profile, settings, clients, appointments, transactions, xpEvents, achievements, sealAwards, profileImages };
     },
     async replaceAll(data) {
       // Uma única transação: ou tudo é importado, ou nada muda.
@@ -130,7 +134,7 @@ export async function createIndexedDbAdapter(dbName = 'oficio'): Promise<Storage
       for (const name of ENTITY_STORES) {
         const store = tx.objectStore(name);
         store.clear();
-        for (const item of data[name]) store.put(item);
+        for (const item of data[name] ?? []) store.put(item);
       }
       const meta = tx.objectStore(META);
       meta.clear();

@@ -24,6 +24,8 @@ export class TrackedStorage implements StorageAdapter {
   readonly transactions: EntityStore<AppData['transactions'][number]>;
   readonly xpEvents: EntityStore<AppData['xpEvents'][number]>;
   readonly achievements: EntityStore<AppData['achievements'][number]>;
+  readonly sealAwards: EntityStore<AppData['sealAwards'][number]>;
+  readonly profileImages: EntityStore<AppData['profileImages'][number]>;
 
   constructor(readonly inner: StorageAdapter) {
     this.clients = this.wrap('clients');
@@ -31,6 +33,8 @@ export class TrackedStorage implements StorageAdapter {
     this.transactions = this.wrap('transactions');
     this.xpEvents = this.wrap('xpEvents');
     this.achievements = this.wrap('achievements');
+    this.sealAwards = this.wrap('sealAwards');
+    this.profileImages = this.wrap('profileImages');
   }
 
   get kind() {

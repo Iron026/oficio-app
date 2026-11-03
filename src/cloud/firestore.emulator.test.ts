@@ -191,3 +191,115 @@ describe('sincronização real com o Firestore (emulador)', () => {
     expect(a.service.data.clients).toHaveLength(1); // aparelho preservado
   });
 });
+
+// ------------------------------------------------------------------ 0.4: selos e foto
+describe('regras 0.4: selos permanentes (sealAwards)', () => {
+  const seal = (over: Record<string, unknown> = {}, data: Record<string, unknown> = {}) => ({
+    collection: 'sealAwards', id: 'experiencia', deleted: false, rev: 1, updatedAt: serverTimestamp(), deviceId: 'dev-1',
+    data: { id: 'experiencia', stage: 2, reachedAt: ['2026-02-01T10:00:00.000Z', '2026-05-01T10:00:00.000Z', null, null], createdAt: 'x', updatedAt: 'y', ...data },
+    ...over,
+  });
+  const ref = (uid: string, id = 'experiencia') => doc(db(uid), `users/alice/records/sealAwards__${id}`);
+
+  it('o dono grava e lê; outra conta e visitante não', async () => {
+    await assertSucceeds(setDoc(ref('alice'), seal()));
+    await assertSucceeds(getDoc(ref('alice')));
+    await assertFails(getDoc(ref('bob')));
+    await assertFails(setDoc(doc(db('bob'), 'users/alice/records/sealAwards__metas'), seal({ id: 'metas' }, { id: 'metas' })));
+    await assertFails(getDoc(doc(db(null), 'users/alice/records/sealAwards__experiencia')));
+  });
+
+  it('rejeita selo inventado, estágio fora de 1..4, campos extras e lápide', async () => {
+    await assertFails(setDoc(doc(db('alice'), 'users/alice/records/sealAwards__vip'), seal({ id: 'vip' }, { id: 'vip' })));
+    for (const stage of [0, 5, 2.5, '3']) await assertFails(setDoc(ref('alice'), seal({}, { stage })));
+    await assertFails(setDoc(ref('alice'), seal({}, { xp: 500 })));
+    await assertFails(setDoc(ref('alice'), seal({}, { reachedAt: ['a', 'b', 'c', 'd', 'e'] })));
+    await assertFails(setDoc(ref('alice'), { ...seal(), deleted: true, data: null }));
+  });
+
+  it('o estágio nunca diminui no servidor (atualização atrasada é recusada)', async () => {
+    await assertSucceeds(setDoc(ref('alice'), seal({}, { stage: 3 })));
+    await assertFails(setDoc(ref('alice'), seal({ rev: 2 }, { stage: 2 })));
+    await assertFails(setDoc(ref('alice'), { ...seal({ rev: 2 }), deleted: true, data: null }));
+    await assertSucceeds(setDoc(ref('alice'), seal({ rev: 2 }, { stage: 3 }))); // mesmo estágio (datas mais antigas)
+    await assertSucceeds(setDoc(ref('alice'), seal({ rev: 3 }, { stage: 4 })));
+  });
+});
+
+describe('regras 0.4: foto de perfil (profileImages)', () => {
+  const MAX = 87_384;
+  const img = (over: Record<string, unknown> = {}, data: Record<string, unknown> = {}) => ({
+    collection: 'profileImages', id: 'atual', deleted: false, rev: 1, updatedAt: serverTimestamp(), deviceId: 'dev-1',
+    data: { id: 'atual', mime: 'image/webp', data: 'A'.repeat(40_000), bytes: 30_000, width: 320, height: 320, hash: 'abc', createdAt: 'x', updatedAt: 'y', ...data },
+    ...over,
+  });
+  const ref = (uid: string, id = 'atual') => doc(db(uid), `users/alice/records/profileImages__${id}`);
+
+  it('somente o dono lê e grava a foto', async () => {
+    await assertSucceeds(setDoc(ref('alice'), img()));
+    await assertSucceeds(getDoc(ref('alice')));
+    await assertFails(getDoc(ref('bob')));
+    await assertFails(setDoc(ref('bob'), img({ rev: 2 })));
+    await assertFails(getDoc(ref(null as unknown as string)));
+  });
+
+  it('aceita o tamanho máximo (64 KiB = 87 384 caracteres) e recusa acima', async () => {
+    await assertSucceeds(setDoc(ref('alice'), img({}, { data: 'A'.repeat(MAX), bytes: 65_536 })));
+    await env.clearFirestore();
+    await assertFails(setDoc(ref('alice'), img({}, { data: 'A'.repeat(MAX + 4) })));
+    await assertFails(setDoc(ref('alice'), img({}, { bytes: 65_537 })));
+  });
+
+  it('limita quantidade (só "atual"), formato e dimensões', async () => {
+    await assertFails(setDoc(ref('alice', 'segunda'), img({ id: 'segunda' }, { id: 'segunda' })));
+    for (const mime of ['image/png', 'image/svg+xml', 'text/html']) await assertFails(setDoc(ref('alice'), img({}, { mime })));
+    await assertFails(setDoc(ref('alice'), img({}, { width: 2048 })));
+    await assertFails(setDoc(ref('alice'), img({}, { height: 64 })));
+    await assertFails(setDoc(ref('alice'), img({}, { url: 'https://exemplo' })));
+  });
+
+  it('pode ser removida (lápide) e recolocada', async () => {
+    await assertSucceeds(setDoc(ref('alice'), img()));
+    await assertSucceeds(setDoc(ref('alice'), { ...img({ rev: 2 }), deleted: true, data: null }));
+    await assertSucceeds(setDoc(ref('alice'), img({ rev: 3 })));
+  });
+});
+
+describe('sincronização 0.4 real (emulador, coleções novas ativadas)', () => {
+  const NOW = new Date(2026, 10, 4, 10);
+  const V04 = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages'] as const;
+  async function device(uid: string) {
+    const tracked = new TrackedStorage(createMemoryAdapter());
+    const service = await AppService.load(tracked, () => NOW);
+    const sync = await SyncEngine.create(service, tracked, new FirestoreRemote(db(uid)), { autoSync: false, now: () => NOW, isOnline: () => true, collections: V04 });
+    return { service, sync };
+  }
+  const photo = { id: 'atual' as const, mime: 'image/webp' as const, data: 'A'.repeat(60_000), bytes: 45_000, width: 320, height: 320, hash: 'h1', createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() };
+
+  it('selos e foto chegam ao outro aparelho; XP intacto; excluir a conta remove tudo', async () => {
+    const a = await device('alice');
+    await a.service.completeOnboarding({ name: 'Alice', businessName: '', professionId: 'beleza' });
+    for (let i = 0; i < 20; i++) await a.service.saveClient({ name: `C${i}`, phone: '', email: '', address: '', notes: '' });
+    await a.service.setProfileImage(photo);
+    const xpBefore = totalXp(a.service.data.xpEvents);
+    expect(a.service.data.sealAwards.find((s) => s.id === 'carteira')?.stage).toBe(1);
+    await a.sync.setUser('alice');
+    await a.sync.link('alice', 'mesclar');
+    expect(a.sync.getStatus().state).toBe('sincronizado');
+
+    const b = await device('alice');
+    await b.sync.setUser('alice');
+    await b.sync.link('alice', 'usarNuvem');
+    expect(b.service.data.profileImages[0]?.hash).toBe('h1');
+    expect(b.service.data.sealAwards.find((s) => s.id === 'carteira')?.stage).toBe(1);
+    expect(totalXp(b.service.data.xpEvents)).toBe(xpBefore);
+
+    // Documento da foto: tamanho real no servidor (base64 + campos) fica abaixo de 90 KB.
+    const snap = await getDoc(doc(db('alice'), 'users/alice/records/profileImages__atual'));
+    expect(JSON.stringify(snap.data()).length).toBeLessThan(90_000);
+
+    await a.sync.deleteCloudData('alice');
+    const left = await getDocs(collection(db('alice'), 'users/alice/records'));
+    expect(left.size).toBe(0);
+  });
+});

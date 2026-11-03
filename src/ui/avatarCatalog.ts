@@ -1,0 +1,71 @@
+// Avatares internos do Ofício (pack "Avatares minimalistas revisados").
+// Imagens locais em WebP (256 px, qualidade 82), empacotadas no app: funcionam offline.
+// Os ids são estáveis: ficam gravados nas preferências da conta (settings.avatar).
+//
+// Símbolos 06–10 do pack (Ciência, Agronegócio, Educação, Engenharia, Negócios) NÃO
+// foram incluídos: têm um disco branco deslocado atrás do círculo e, em dois casos,
+// o desenho cortado na borda. Ver docs/AVATARES.md.
+import retratoGeral from '../assets/avatars/retrato-01_perfil_geral.webp';
+import retratoSaude from '../assets/avatars/retrato-02_saude.webp';
+import retratoDireito from '../assets/avatars/retrato-03_direito.webp';
+import retratoCriatividade from '../assets/avatars/retrato-04_criatividade.webp';
+import retratoConstrucao from '../assets/avatars/retrato-05_construcao_civil.webp';
+import retratoGastronomia from '../assets/avatars/retrato-06_gastronomia.webp';
+import retratoSeguranca from '../assets/avatars/retrato-07_seguranca.webp';
+import retratoBombeiros from '../assets/avatars/retrato-08_bombeiros.webp';
+import retratoArquitetura from '../assets/avatars/retrato-09_arquitetura.webp';
+import retratoEducacao from '../assets/avatars/retrato-10_educacao.webp';
+import retratoTecnologia from '../assets/avatars/retrato-11_tecnologia.webp';
+import retratoConsultoria from '../assets/avatars/retrato-12_consultoria.webp';
+import simboloSaude from '../assets/avatars/simbolo-01_saude.webp';
+import simboloDireito from '../assets/avatars/simbolo-02_direito.webp';
+import simboloFinancas from '../assets/avatars/simbolo-03_financas.webp';
+import simboloTecnologia from '../assets/avatars/simbolo-04_tecnologia.webp';
+import simboloDesign from '../assets/avatars/simbolo-05_design.webp';
+
+export type AvatarArea = 'geral' | 'saude' | 'direito-financas' | 'criatividade' | 'obras' | 'alimentacao' | 'seguranca' | 'educacao' | 'tecnologia';
+export type AvatarKind = 'retrato' | 'simbolo';
+
+export interface InternalAvatar {
+  id: string;
+  name: string;
+  area: AvatarArea;
+  kind: AvatarKind;
+  src: string;
+}
+
+export const AVATAR_AREAS: { id: AvatarArea; label: string }[] = [
+  { id: 'geral', label: 'Geral' },
+  { id: 'saude', label: 'Saúde' },
+  { id: 'direito-financas', label: 'Direito e finanças' },
+  { id: 'criatividade', label: 'Criatividade' },
+  { id: 'obras', label: 'Obras e manutenção' },
+  { id: 'alimentacao', label: 'Alimentação' },
+  { id: 'seguranca', label: 'Segurança' },
+  { id: 'educacao', label: 'Educação' },
+  { id: 'tecnologia', label: 'Tecnologia' },
+];
+
+export const INTERNAL_AVATARS: InternalAvatar[] = [
+  { id: 'retrato-perfil-geral', name: 'Perfil geral', area: 'geral', kind: 'retrato', src: retratoGeral },
+  { id: 'retrato-consultoria', name: 'Consultoria', area: 'geral', kind: 'retrato', src: retratoConsultoria },
+  { id: 'retrato-saude', name: 'Saúde', area: 'saude', kind: 'retrato', src: retratoSaude },
+  { id: 'simbolo-saude', name: 'Estetoscópio', area: 'saude', kind: 'simbolo', src: simboloSaude },
+  { id: 'retrato-direito', name: 'Direito', area: 'direito-financas', kind: 'retrato', src: retratoDireito },
+  { id: 'simbolo-direito', name: 'Balança', area: 'direito-financas', kind: 'simbolo', src: simboloDireito },
+  { id: 'simbolo-financas', name: 'Gráfico de crescimento', area: 'direito-financas', kind: 'simbolo', src: simboloFinancas },
+  { id: 'retrato-criatividade', name: 'Criatividade', area: 'criatividade', kind: 'retrato', src: retratoCriatividade },
+  { id: 'simbolo-design', name: 'Paleta e pincel', area: 'criatividade', kind: 'simbolo', src: simboloDesign },
+  { id: 'retrato-construcao', name: 'Construção civil', area: 'obras', kind: 'retrato', src: retratoConstrucao },
+  { id: 'retrato-arquitetura', name: 'Arquitetura', area: 'obras', kind: 'retrato', src: retratoArquitetura },
+  { id: 'retrato-gastronomia', name: 'Gastronomia', area: 'alimentacao', kind: 'retrato', src: retratoGastronomia },
+  { id: 'retrato-seguranca', name: 'Segurança', area: 'seguranca', kind: 'retrato', src: retratoSeguranca },
+  { id: 'retrato-bombeiros', name: 'Brigada de incêndio', area: 'seguranca', kind: 'retrato', src: retratoBombeiros },
+  { id: 'retrato-educacao', name: 'Educação', area: 'educacao', kind: 'retrato', src: retratoEducacao },
+  { id: 'retrato-tecnologia', name: 'Tecnologia', area: 'tecnologia', kind: 'retrato', src: retratoTecnologia },
+  { id: 'simbolo-tecnologia', name: 'Notebook com código', area: 'tecnologia', kind: 'simbolo', src: simboloTecnologia },
+];
+
+export function getInternalAvatar(id: string | undefined): InternalAvatar | undefined {
+  return id ? INTERNAL_AVATARS.find((a) => a.id === id) : undefined;
+}

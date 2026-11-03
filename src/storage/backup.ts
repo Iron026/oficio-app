@@ -1,3 +1,4 @@
+import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
 import { isProfessionId } from '../domain/professions';
 import { DEFAULT_SETTINGS, type AppData } from '../domain/types';
 
@@ -48,5 +49,8 @@ export function parseBackup(text: string): AppData {
     transactions: d.transactions as AppData['transactions'],
     xpEvents: d.xpEvents as AppData['xpEvents'],
     achievements: d.achievements as AppData['achievements'],
+    // 0.4 (opcionais: backups antigos não têm). Itens inválidos são descartados.
+    sealAwards: Array.isArray(d.sealAwards) ? d.sealAwards.filter(isValidSealAward) : [],
+    profileImages: Array.isArray(d.profileImages) ? d.profileImages.filter(isValidProfileImage).slice(0, 1) : [],
   };
 }

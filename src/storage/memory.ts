@@ -23,6 +23,8 @@ export function createMemoryAdapter(): StorageAdapter {
     transactions: memoryStore<AppData['transactions'][number]>(),
     xpEvents: memoryStore<AppData['xpEvents'][number]>(),
     achievements: memoryStore<AppData['achievements'][number]>(),
+    sealAwards: memoryStore<AppData['sealAwards'][number]>(),
+    profileImages: memoryStore<AppData['profileImages'][number]>(),
   };
   const kv = new Map<string, unknown>();
   const adapter: StorageAdapter = {
@@ -42,6 +44,7 @@ export function createMemoryAdapter(): StorageAdapter {
         clients: await stores.clients.list(), appointments: await stores.appointments.list(),
         transactions: await stores.transactions.list(), xpEvents: await stores.xpEvents.list(),
         achievements: await stores.achievements.list(),
+        sealAwards: await stores.sealAwards.list(), profileImages: await stores.profileImages.list(),
       };
     },
     async replaceAll(data) {
@@ -53,6 +56,8 @@ export function createMemoryAdapter(): StorageAdapter {
       await stores.transactions.putMany(data.transactions);
       await stores.xpEvents.putMany(data.xpEvents);
       await stores.achievements.putMany(data.achievements);
+      await stores.sealAwards.putMany(data.sealAwards ?? []);
+      await stores.profileImages.putMany(data.profileImages ?? []);
     },
     async clearAll() {
       profile = null;

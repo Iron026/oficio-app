@@ -46,6 +46,8 @@ export function App({ storageFactory, cloudFactory }: AppProps) {
       const engine = await SyncEngine.create(service, tracked, null);
       sync = engine;
       if (cancelled) return engine.dispose();
+      // 0.4: reconhece selos já merecidos pelo histórico (idempotente, sem XP).
+      await service.reconcileSeals();
       setBoot({ service, persistent, sync: engine });
       void setupKeyboard();
       // Conta Google e nuvem carregam depois, sem atrasar a abertura (e o app funciona sem elas).

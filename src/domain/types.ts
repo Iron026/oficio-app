@@ -23,8 +23,55 @@ export interface Profile {
   monthlyGoalRevenue: number;
 }
 
+/** Cores de destaque (0.4). Mudam só a marca; receita, despesa e XP não mudam. */
+export type AccentId = 'petroleo' | 'oceano' | 'indigo' | 'grafite';
+
+/** Imagem do perfil escolhida (a foto em si fica em `profileImages`). */
+export type AvatarChoice = { kind: 'iniciais' } | { kind: 'interno'; id: string } | { kind: 'foto' };
+
+export type SealId = 'constancia' | 'fidelizacao' | 'metas' | 'experiencia' | 'carteira' | 'saude';
+
+/** Preferências da conta (sincronizadas). Campos novos são opcionais: versões antigas os preservam. */
 export interface Settings {
+  /**
+   * Legado: até a 0.4.0-beta.1 o tema valia para a conta. A partir da 0.4 o tema é
+   * por aparelho (DevicePrefs); este campo só é lido uma vez, na migração, e
+   * continua existindo para versões anteriores.
+   */
   theme: ThemePreference;
+  accent?: AccentId;
+  avatar?: AvatarChoice;
+  /** Selo exibido no perfil; 'auto' = o de maior estágio (padrão). */
+  featuredSeal?: SealId | 'auto';
+}
+
+/**
+ * Maior estágio já alcançado em um selo (0.4). Só cresce: a mesclagem fica com o
+ * maior estágio e, por estágio, a data mais antiga. Não concede XP.
+ */
+export interface SealAward {
+  id: SealId;
+  stage: 1 | 2 | 3 | 4;
+  /** Data (ISO) em que cada estágio foi alcançado; índice 0 = estágio I. */
+  reachedAt: (string | null)[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Foto de perfil (0.4): um único registro por conta, id "atual". */
+export interface ProfileImage {
+  id: 'atual';
+  mime: 'image/webp' | 'image/jpeg';
+  /** Imagem codificada em base64 (sem prefixo data:). */
+  data: string;
+  /** Tamanho do arquivo decodificado, em bytes. */
+  bytes: number;
+  width: number;
+  height: number;
+  /** Impressão digital do conteúdo (evita reprocessar a mesma imagem). */
+  hash: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Client extends BaseEntity {
@@ -92,6 +139,10 @@ export interface AppData {
   transactions: Transaction[];
   xpEvents: XpEvent[];
   achievements: UnlockedAchievement[];
+  /** 0.4: maior estágio já alcançado de cada selo. */
+  sealAwards: SealAward[];
+  /** 0.4: foto de perfil (no máximo um registro, id "atual"). */
+  profileImages: ProfileImage[];
 }
 
 export const DEFAULT_SETTINGS: Settings = { theme: 'system' };

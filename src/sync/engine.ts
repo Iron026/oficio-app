@@ -1,10 +1,13 @@
 import type { AppData } from '../domain/types';
+import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
 import { newId } from '../lib/id';
 import { serializeBackup } from '../storage/backup';
 import type { AppService } from '../state/service';
 import { duplicateAutoIncomeIds, duplicateXpIds, mergeMeta, mergeRecord } from './merge';
 import type { ChangeTracker, TrackedStorage } from './tracked';
 import {
+  BASE_SYNC_COLLECTIONS,
+  V04_SYNC_COLLECTIONS,
   FINANCIAL_COLLECTIONS,
   parseRecordKey,
   recordKey,
@@ -86,8 +89,24 @@ function hasContent(data: Pick<AppData, 'profile' | 'clients' | 'appointments' |
 }
 
 /** Converte registros remotos (sem lápides) em coleções locais. */
+/**
+ * Coleções sincronizadas por padrão. As da 0.4 (selos e foto) só entram com
+ * VITE_SYNC_SEALS_PHOTO=1, depois que as regras novas forem publicadas no Firebase.
+ */
+export function defaultSyncCollections(env: Record<string, string | boolean | undefined> = import.meta.env): readonly SyncCollection[] {
+  return env.VITE_SYNC_SEALS_PHOTO === '1' ? [...BASE_SYNC_COLLECTIONS, ...V04_SYNC_COLLECTIONS] : BASE_SYNC_COLLECTIONS;
+}
+
+/** Defesa extra (as regras do Firestore já validam): selo ou foto malformados vindos da nuvem são ignorados. */
+function validRemote(r: RemoteRecord): boolean {
+  if (r.data === null) return true;
+  if (r.collection === 'sealAwards') return isValidSealAward(r.data);
+  if (r.collection === 'profileImages') return isValidProfileImage(r.data);
+  return true;
+}
+
 function remoteToData(records: RemoteRecord[], meta: RemoteMeta | null, fallbackSettings: AppData['settings']): AppData {
-  const data: AppData = { profile: meta?.data.profile ?? null, settings: meta?.data.settings ?? fallbackSettings, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [] };
+  const data: AppData = { profile: meta?.data.profile ?? null, settings: meta?.data.settings ?? fallbackSettings, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [] };
   for (const r of records) if (r.data) (data[r.collection] as unknown as Entity[]).push(clone(r.data));
   return data;
 }
@@ -119,12 +138,22 @@ export class SyncEngine implements ChangeTracker {
     private storage: TrackedStorage,
     private remoteStore: RemoteStore | null,
     state: SyncState,
-    private opts: { now: () => Date; autoSync: boolean; isOnline: () => boolean },
+    private opts: { now: () => Date; autoSync: boolean; isOnline: () => boolean; collections: readonly SyncCollection[] },
   ) {
     this.state = state;
   }
 
-  static async create(service: AppService, storage: TrackedStorage, remote: RemoteStore | null, opts: Partial<{ now: () => Date; autoSync: boolean; isOnline: () => boolean }> = {}) {
+  /** A coleção participa da sincronização nesta versão/configuração? */
+  private syncs(c: SyncCollection): boolean {
+    return this.opts.collections.includes(c);
+  }
+
+  /** Descarta registros remotos de coleções desativadas (ficam só no aparelho). */
+  private onlyEnabled<T extends { records: RemoteRecord[] }>(pulled: T): T {
+    return { ...pulled, records: pulled.records.filter((r) => this.syncs(r.collection) && validRemote(r)) };
+  }
+
+  static async create(service: AppService, storage: TrackedStorage, remote: RemoteStore | null, opts: Partial<{ now: () => Date; autoSync: boolean; isOnline: () => boolean; collections: readonly SyncCollection[] }> = {}) {
     const saved = await storage.kvGet<SyncState>(STATE_KEY);
     const state = saved?.version === 1 ? saved : freshState(newId());
     if (!saved) await storage.kvSet(STATE_KEY, state);
@@ -132,6 +161,7 @@ export class SyncEngine implements ChangeTracker {
       now: opts.now ?? (() => new Date()),
       autoSync: opts.autoSync ?? true,
       isOnline: opts.isOnline ?? (() => typeof navigator === 'undefined' || navigator.onLine !== false),
+      collections: opts.collections ?? defaultSyncCollections(),
     });
     storage.tracker = engine;
     return engine;
@@ -215,7 +245,7 @@ export class SyncEngine implements ChangeTracker {
   // ------------------------------------------------------------- rastreamento
 
   async touch(collection: SyncCollection, id: string, deleted: boolean) {
-    if (!this.state.linkedUid) return;
+    if (!this.state.linkedUid || !this.syncs(collection)) return;
     const key = recordKey(collection, id);
     const r = (this.state.records[key] ??= { baseRev: 0, base: null, dirty: false, seq: 0 });
     r.dirty = true;
@@ -239,8 +269,10 @@ export class SyncEngine implements ChangeTracker {
     await this.saveBackup('Antes de importar backup');
     if (!this.state.linkedUid) return;
     const present = new Set<string>();
-    for (const c of SYNC_COLLECTIONS) for (const e of data[c]) present.add(recordKey(c, e.id));
+    for (const c of SYNC_COLLECTIONS) if (this.syncs(c)) for (const e of data[c] ?? []) present.add(recordKey(c, e.id));
     for (const key of new Set([...present, ...Object.keys(this.state.records)])) {
+      // Selos são permanentes: um backup sem eles nunca gera exclusão na nuvem.
+      if (!present.has(key) && key.startsWith('sealAwards__')) continue;
       const r = (this.state.records[key] ??= { baseRev: 0, base: null, dirty: false, seq: 0 });
       r.dirty = true;
       r.deleted = !present.has(key);
@@ -297,7 +329,7 @@ export class SyncEngine implements ChangeTracker {
 
   /** Compara os dados deste aparelho com os da conta. Não altera nada. */
   async analyze(uid: string): Promise<LinkAnalysis> {
-    const pulled = await this.remote.pull(uid, 0);
+    const pulled = this.onlyEnabled(await this.remote.pull(uid, 0));
     const remoteData = remoteToData(pulled.records, pulled.meta, this.service.data.settings);
     const localHasData = hasContent(this.service.data);
     const remoteHasData = hasContent(remoteData);
@@ -322,7 +354,7 @@ export class SyncEngine implements ChangeTracker {
    */
   async link(uid: string, mode: LinkMode, email: string | null = null): Promise<void> {
     await this.saveBackup(mode === 'usarNuvem' ? 'Antes de usar os dados da nuvem' : 'Antes de conectar a conta');
-    const pulled = await this.remote.pull(uid, 0); // falha aqui = nada mudou
+    const pulled = this.onlyEnabled(await this.remote.pull(uid, 0)); // falha aqui = nada mudou
     await this.service.exclusive(async () => {
       const next = freshState(this.state.deviceId);
       next.linkedUid = uid;
@@ -337,7 +369,7 @@ export class SyncEngine implements ChangeTracker {
       } else {
         const d = this.service.data;
         for (const c of SYNC_COLLECTIONS)
-          for (const e of d[c] as unknown as Entity[]) if (!e.isDemo) next.records[recordKey(c, e.id)] = { baseRev: 0, base: null, dirty: true, seq: 1 };
+          if (this.syncs(c)) for (const e of d[c] as unknown as Entity[]) if (!e.isDemo) next.records[recordKey(c, e.id)] = { baseRev: 0, base: null, dirty: true, seq: 1 };
         next.meta = { baseRev: 0, base: null, dirty: !!d.profile, seq: 1 };
         this.state = next;
         await this.applyRemote(pulled.records, pulled.meta);
@@ -387,7 +419,7 @@ export class SyncEngine implements ChangeTracker {
     this.setStatus({ state: 'sincronizando' });
     try {
       if (!this.opts.isOnline()) throw Object.assign(new Error('offline'), { code: 'unavailable' });
-      const pulled = await this.remote.pull(uid, Math.max(0, this.state.cursor - OVERLAP_MS));
+      const pulled = this.onlyEnabled(await this.remote.pull(uid, Math.max(0, this.state.cursor - OVERLAP_MS)));
       // Perfil da conta sumiu da nuvem depois de já ter sido sincronizado: os dados
       // da conta foram excluídos em outro aparelho. Não recria nada; desassocia.
       if (!pulled.meta && this.state.meta.baseRev > 0) {
@@ -402,6 +434,8 @@ export class SyncEngine implements ChangeTracker {
         await this.applyRemote(pulled.records, pulled.meta);
         await this.save();
       });
+      // Registros novos vindos de outro aparelho podem completar um estágio de selo.
+      if (pulled.records.length) await this.service.reconcileSeals();
       for (let round = 0; round < 4 && this.pendingCount > 0; round++) await this.pushPending(uid);
       if (this.pendingCount === 0) {
         this.state.lastSyncedAt = this.opts.now().toISOString();

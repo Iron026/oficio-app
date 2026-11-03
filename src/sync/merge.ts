@@ -1,3 +1,5 @@
+import type { SealAward } from '../domain/types';
+import { mergeAward } from '../gamification/seals';
 import type { MetaData } from './types';
 import { FINANCIAL_COLLECTIONS, type Entity, type SyncCollection } from './types';
 
@@ -46,7 +48,10 @@ export function merge3(base: Entity | null, local: Entity, remote: Entity, prefe
  *   registrado para o usuário decidir (nunca "última gravação vence");
  * - clientes: conflito resolvido pela alteração mais recente (não financeiro);
  * - conquistas: mantém a data de desbloqueio mais antiga;
- * - eventos de XP: imutáveis.
+ * - eventos de XP: imutáveis;
+ * - selos (0.4): "só cresce" — maior estágio e, por estágio, a data mais antiga;
+ * - foto de perfil (0.4): o registro inteiro mais recente vence (nunca mistura
+ *   campos de duas imagens).
  */
 export function mergeRecord(collection: SyncCollection, base: Entity | null, local: Entity, remote: Entity): MergeOutcome & { needsUser: boolean } {
   if (collection === 'achievements') {
@@ -55,6 +60,16 @@ export function mergeRecord(collection: SyncCollection, base: Entity | null, loc
     return { value: lu && (!ru || lu < ru) ? local : remote, conflictFields: [], needsUser: false };
   }
   if (collection === 'xpEvents') return { value: remote, conflictFields: [], needsUser: false };
+  if (collection === 'sealAwards') {
+    return { value: mergeAward(local as unknown as SealAward, remote as unknown as SealAward) as unknown as Entity, conflictFields: [], needsUser: false };
+  }
+  if (collection === 'profileImages') {
+    const lu = String(local.updatedAt ?? '');
+    const ru = String(remote.updatedAt ?? '');
+    // Empate: o conteúdo (hash) decide, para que todos os aparelhos escolham a mesma imagem.
+    const pickLocal = lu > ru || (lu === ru && String(local.hash ?? '') > String(remote.hash ?? ''));
+    return { value: pickLocal ? local : remote, conflictFields: [], needsUser: false };
+  }
   if (FINANCIAL_COLLECTIONS.includes(collection)) {
     const r = merge3(base, local, remote, 'local');
     if (collection === 'appointments') resolveCompletionFields(r, local, remote);

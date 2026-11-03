@@ -14,6 +14,35 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // 0.4 — selo permanente: estágio 1..4 que nunca diminui e nunca é excluído
+    // individualmente (só some com a exclusão da conta inteira).
+    function validSealAward() {
+      let r = request.resource.data;
+      return r.deleted == false
+        && r.id in ['constancia', 'fidelizacao', 'metas', 'experiencia', 'carteira', 'saude']
+        && r.data.keys().hasOnly(['id', 'stage', 'reachedAt', 'createdAt', 'updatedAt'])
+        && r.data.stage is int && r.data.stage >= 1 && r.data.stage <= 4
+        && r.data.reachedAt is list && r.data.reachedAt.size() <= 4
+        && r.data.createdAt is string && r.data.updatedAt is string
+        && (resource == null || resource.data.deleted == true || r.data.stage >= resource.data.data.stage);
+    }
+
+    // 0.4 — foto de perfil: um único documento ("atual"), WebP ou JPEG, até 64 KiB
+    // (87 384 caracteres em base64), lado de 128 a 512 px. Pode ser removida (lápide).
+    function validProfileImage() {
+      let r = request.resource.data;
+      return r.id == 'atual'
+        && (r.deleted == true || (
+          r.data.keys().hasOnly(['id', 'mime', 'data', 'bytes', 'width', 'height', 'hash', 'createdAt', 'updatedAt'])
+          && r.data.mime in ['image/webp', 'image/jpeg']
+          && r.data.data is string && r.data.data.size() > 0 && r.data.data.size() <= 87384
+          && r.data.bytes is int && r.data.bytes > 0 && r.data.bytes <= 65536
+          && r.data.width is int && r.data.width >= 128 && r.data.width <= 512
+          && r.data.height is int && r.data.height >= 128 && r.data.height <= 512
+          && r.data.hash is string && r.data.hash.size() > 0 && r.data.hash.size() <= 128
+          && r.data.createdAt is string && r.data.updatedAt is string));
+    }
+
     // Revisão: criação começa em 1; atualização exige exatamente +1
     // (controle de concorrência: evita sobrescrever alterações de outro aparelho).
     function validRev() {
@@ -39,7 +68,7 @@ service cloud.firestore {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid)
           && request.resource.data.keys().hasOnly(['collection', 'id', 'data', 'deleted', 'rev', 'updatedAt', 'deviceId'])
-          && request.resource.data.collection in ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements']
+          && request.resource.data.collection in ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages']
           && request.resource.data.id is string
           && request.resource.data.id.size() <= 128
           && recordId == request.resource.data.collection + '__' + request.resource.data.id
@@ -50,7 +79,9 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time
           && request.resource.data.deviceId is string
           && request.resource.data.deviceId.size() <= 64
-          && validRev();
+          && validRev()
+          && (request.resource.data.collection != 'sealAwards' || validSealAward())
+          && (request.resource.data.collection != 'profileImages' || validProfileImage());
       }
 
       // Direitos Premium (futuro): somente leitura pelo app. A gravação será feita
