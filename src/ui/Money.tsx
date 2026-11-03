@@ -1,5 +1,6 @@
 import { formatMoney, formatMoneyShort } from '../lib/money';
 import { cx } from './cx';
+import { useHideValues } from './privacy';
 
 export type MoneyKind = 'income' | 'expense' | 'balance' | 'neutral';
 
@@ -12,12 +13,21 @@ export type MoneyKind = 'income' | 'expense' | 'balance' | 'neutral';
 export function Money({ cents, kind = 'neutral', short, signed = kind !== 'neutral', className }: {
   cents: number; kind?: MoneyKind; short?: boolean; signed?: boolean; className?: string;
 }) {
+  const hidden = useHideValues();
   const abs = Math.abs(cents);
   // Zero não tem sinal nem cor: não é ganho nem perda.
   const negative = abs > 0 && (kind === 'expense' || (kind === 'balance' && cents < 0));
   const positive = abs > 0 && (kind === 'income' || (kind === 'balance' && cents > 0));
   const text = short ? formatMoneyShort(abs) : formatMoney(abs);
   const sign = !signed ? '' : negative ? '−' : positive ? '+' : '';
+  if (hidden) {
+    return (
+      <span className={cx('num whitespace-nowrap tracking-widest text-muted', className)}>
+        <span aria-hidden="true">R$ •••••</span>
+        <span className="sr-only">valor oculto</span>
+      </span>
+    );
+  }
   return (
     <span className={cx('num whitespace-nowrap', positive && signed && 'text-income', negative && 'text-expense', className)}>
       {sign && <span aria-hidden="true">{sign}</span>}

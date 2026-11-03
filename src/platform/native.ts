@@ -1,4 +1,4 @@
-import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
+import { Capacitor, SystemBars, SystemBarsStyle, SystemBarType } from '@capacitor/core';
 
 /** true quando roda dentro do app Android (Capacitor), false no navegador. */
 export const isNative = (): boolean => Capacitor.isNativePlatform();
@@ -12,9 +12,10 @@ export async function hideSplash(): Promise<void> {
 }
 
 /** Ícones claros na barra de status/navegação no modo escuro e vice-versa. */
-export async function setSystemBarsDark(dark: boolean): Promise<void> {
+export async function setSystemBarsDark(dark: boolean, bar?: 'status' | 'navigation'): Promise<void> {
   if (!isNative()) return;
-  await SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => undefined);
+  const which = bar === 'status' ? SystemBarType.StatusBar : bar === 'navigation' ? SystemBarType.NavigationBar : undefined;
+  await SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light, ...(which ? { bar: which } : {}) }).catch(() => undefined);
 }
 
 /** Registra o botão Voltar do Android. Retorna função para remover. */

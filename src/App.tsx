@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useApp, useThemeEffect, AppProvider } from './state/AppContext';
+import { HideValuesContext } from './ui/privacy';
+import { useApp, useAppearanceEffect, usePrefs, useThemeEffect, AppProvider } from './state/AppContext';
 import { decideBack } from './platform/backStack';
 import { hideSplash, minimizeApp, onAndroidBack, setupKeyboard } from './platform/native';
 import { navigate, useRoute, type Route } from './state/router';
@@ -106,16 +107,20 @@ const TITLES: Record<Route, string> = {
 function Root() {
   const { data } = useApp();
   const route = useRoute();
-  useThemeEffect(data.settings.theme);
+  const prefs = usePrefs();
+  useThemeEffect(prefs.theme);
+  useAppearanceEffect(data.settings, prefs);
   useAndroidBack(route, !data.profile);
   if (!data.profile) return <Onboarding />;
   const screens: Record<Route, React.ReactNode> = {
     painel: <Dashboard />, agenda: <Agenda />, clientes: <Clients />, financas: <Finance />, evolucao: <Evolution />, ajustes: <Settings />,
   };
   return (
-    <Shell route={route} title={TITLES[route]}>
-      {screens[route]}
-    </Shell>
+    <HideValuesContext.Provider value={prefs.hideValues}>
+      <Shell route={route} title={TITLES[route]}>
+        {screens[route]}
+      </Shell>
+    </HideValuesContext.Provider>
   );
 }
 

@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { getProfession, type ProfessionModule } from '../domain/professions';
-import type { AppData } from '../domain/types';
+import type { DevicePrefs } from '../domain/preferences';
+import { accentOf } from '../domain/preferences';
+import type { AppData, Settings } from '../domain/types';
 import { useToast } from '../ui/Toast';
 import { friendlyError } from '../lib/errors';
 import { hapticSuccess, setSystemBarsDark } from '../platform/native';
@@ -22,6 +24,28 @@ export function useApp(): { service: AppService; data: AppData; profession: Prof
     () => ctx.service.data,
   );
   return { service: ctx.service, data, profession: getProfession(data.profile?.professionId), persistent: ctx.persistent };
+}
+
+/** Preferências deste aparelho (tema, densidade, ocultar valores, animações). */
+export function usePrefs(): DevicePrefs {
+  const ctx = useContext(AppCtx);
+  if (!ctx) throw new Error('usePrefs fora do AppProvider');
+  return useSyncExternalStore((cb) => ctx.service.subscribePrefs(cb), () => ctx.service.devicePrefs);
+}
+
+/**
+ * Aplica as preferências visuais no documento: cor de destaque (conta), densidade
+ * e redução de animações (aparelho). O tema é aplicado por `useThemeEffect`.
+ */
+export function useAppearanceEffect(settings: Settings, prefs: DevicePrefs) {
+  const accent = accentOf(settings);
+  useEffect(() => {
+    const el = document.documentElement;
+    el.dataset.accent = accent;
+    el.dataset.density = prefs.density;
+    if (prefs.motion === 'reduzir') el.dataset.motion = 'reduce';
+    else delete el.dataset.motion;
+  }, [accent, prefs.density, prefs.motion]);
 }
 
 /** Converte o resultado da gamificação em feedback visual (toasts). */
@@ -70,7 +94,7 @@ export function systemBarsShouldBeDark(appDark: boolean, systemDark: boolean, in
 }
 
 /** Aplica o tema (claro/escuro/sistema) ao documento. */
-export function useThemeEffect(theme: AppData['settings']['theme']) {
+export function useThemeEffect(theme: DevicePrefs['theme']) {
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-color-scheme: dark)');
     const apply = () => {
@@ -78,7 +102,15 @@ export function useThemeEffect(theme: AppData['settings']['theme']) {
       const dark = theme === 'dark' || (theme === 'system' && systemDark);
       document.documentElement.classList.toggle('dark', dark);
       const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-top')) || 0;
-      void setSystemBarsDark(systemBarsShouldBeDark(dark, systemDark, inset));
+      if (inset > 0) {
+        // Tela inteira (0.4): a barra de status fica sobre o cabeçalho em gradiente
+        // verde-petróleo (escuro nos dois temas) → ícones claros; a de navegação
+        // fica sobre a barra do app → segue o tema.
+        void setSystemBarsDark(true, 'status');
+        void setSystemBarsDark(dark, 'navigation');
+      } else {
+        void setSystemBarsDark(systemBarsShouldBeDark(dark, systemDark, inset));
+      }
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b1316' : '#0f7b71');
     };
     apply();

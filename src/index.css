@@ -60,6 +60,11 @@
   --animate-pop: pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-sheet: sheet-up 280ms var(--ease-emphasized) both;
   --animate-fade: fade 120ms var(--ease-standard) both;
+  --animate-screen: screen-in 200ms cubic-bezier(0, 0, 0, 1) both;
+  --animate-celebrate: celebrate 520ms cubic-bezier(0.34, 1.45, 0.64, 1);
+  --animate-halo: halo-out 520ms var(--ease-standard) both;
+  --animate-frame: frame-in 320ms cubic-bezier(0, 0, 0, 1) both;
+  --animate-seal: seal-pop 520ms cubic-bezier(0.34, 1.45, 0.64, 1) both;
 
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(8px); }
@@ -161,9 +166,108 @@ h1, h2, h3 {
 }
 input, select, textarea, button { font: inherit; }
 
+/* Reduzir animações: do sistema (Android "Remover animações") ou de Ajustes › Acessibilidade. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
   }
+}
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 1ms !important;
+  transition-delay: 0ms !important;
+}
+
+/* ---------------------------------------------------------------- 0.4: identidade global */
+
+/* Cores de destaque: só a marca muda. Receita, despesa, XP, logo e cabeçalho não mudam. */
+:root[data-accent="oceano"] {
+  --color-brand-50: #eff6ff; --color-brand-100: #dbeafe; --color-brand-200: #bfdbfe; --color-brand-300: #8cbcf2; --color-brand-400: #5b9ae6;
+  --color-brand-500: #2f78d0; --color-brand-600: #1d5fa8; --color-brand-700: #174d89; --color-brand-800: #163f6e; --color-brand-900: #15355b;
+}
+:root[data-accent="indigo"] {
+  --color-brand-50: #f0f0fd; --color-brand-100: #e0dffb; --color-brand-200: #c6c3f6; --color-brand-300: #aaa4f0; --color-brand-400: #8a82e6;
+  --color-brand-500: #6c63d6; --color-brand-600: #4f46b5; --color-brand-700: #3f3891; --color-brand-800: #342f74; --color-brand-900: #2c285e;
+}
+:root[data-accent="grafite"] {
+  --color-brand-50: #f3f6f7; --color-brand-100: #e3e9eb; --color-brand-200: #c9d3d6; --color-brand-300: #b7c6cc; --color-brand-400: #8fa1a8;
+  --color-brand-500: #64767e; --color-brand-600: #3d4d55; --color-brand-700: #2d3a40; --color-brand-800: #232e33; --color-brand-900: #1b2428;
+}
+
+/* Cabeçalho de identidade: sempre verde-petróleo (é a marca), com brilho suave no canto. */
+:root {
+  --hero-1: #0f7b71;
+  --hero-2: #0d4f4a;
+  --hero-glow: rgb(87 212 192 / 0.35);
+  /* Densidade (Ajustes › Aparência): só espaçamentos; áreas de toque continuam ≥ 44 px. */
+  --gap-list: 0.625rem;
+  --gap-section: 1.5rem;
+  --pad-card: 1rem;
+}
+.dark {
+  --hero-1: #0f5c55;
+  --hero-2: #0a2b29;
+  --hero-glow: rgb(87 212 192 / 0.18);
+}
+:root[data-density="compacta"] {
+  --gap-list: 0.375rem;
+  --gap-section: 1rem;
+  --pad-card: 0.75rem;
+}
+
+@utility hero {
+  color: #fff;
+  background:
+    radial-gradient(120% 90% at 100% 0%, var(--hero-glow), transparent 60%),
+    linear-gradient(160deg, var(--hero-1), var(--hero-2));
+}
+
+/* Retorno ao toque: 100 ms, encolhe levemente (a ação acontece no toque, sem esperar). */
+@utility press {
+  transition: transform 100ms var(--ease-standard), background-color 150ms var(--ease-standard), box-shadow 150ms var(--ease-standard);
+  -webkit-tap-highlight-color: transparent;
+  &:active { transform: scale(0.97); }
+}
+@utility press-soft {
+  transition: transform 100ms var(--ease-standard), background-color 150ms var(--ease-standard);
+  &:active { transform: scale(0.985); }
+}
+
+/* Entrada dos cartões ao abrir a tela: até 4 escalonados, o restante junto. */
+@utility enter-stagger {
+  & > * { animation: card-in 240ms cubic-bezier(0, 0, 0, 1) both; }
+  & > *:nth-child(2) { animation-delay: 36ms; }
+  & > *:nth-child(3) { animation-delay: 72ms; }
+  & > *:nth-child(4) { animation-delay: 108ms; }
+  & > *:nth-child(n + 5) { animation-delay: 144ms; }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes celebrate {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes halo-out {
+  0% { opacity: 0.9; transform: scale(0.94); }
+  100% { opacity: 0; transform: scale(1.28); }
+}
+@keyframes frame-in {
+  from { opacity: 0.2; transform: rotate(-12deg) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes seal-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.12); }
+  100% { transform: scale(1); }
 }

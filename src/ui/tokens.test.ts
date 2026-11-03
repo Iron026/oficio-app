@@ -91,3 +91,36 @@ describe('Design system — contraste dos tokens', () => {
     expect(new Set(all).size).toBe(all.length);
   });
 });
+
+describe('Design system — cores de destaque (0.4)', () => {
+  const accentBlock = (id: string): Record<string, string> => {
+    const m = css.match(new RegExp(`:root\\[data-accent="${id}"\\]\\s*\\{([^}]*)\\}`));
+    const out: Record<string, string> = {};
+    for (const t of (m?.[1] ?? '').matchAll(/--color-([\w-]+):\s*(#[0-9a-f]{6})/gi)) out[t[1] ?? ''] = t[2] ?? '';
+    return out;
+  };
+  const palettes: [string, Record<string, string>][] = [
+    ['petroleo', themeMap],
+    ['oceano', accentBlock('oceano')],
+    ['indigo', accentBlock('indigo')],
+    ['grafite', accentBlock('grafite')],
+  ];
+  it.each(palettes)('%s: botão, links e textos com contraste AA nos dois temas', (_id, p) => {
+    const c = (k: string) => get(p, k);
+    expect(ratio('#ffffff', c('brand-600'))).toBeGreaterThanOrEqual(4.5); // texto do botão principal
+    expect(ratio(c('brand-600'), L('surface'))).toBeGreaterThanOrEqual(4.5); // links
+    expect(ratio(c('brand-700'), L('surface-2'))).toBeGreaterThanOrEqual(4.5); // texto tonal
+    expect(ratio(c('brand-700'), c('brand-50'))).toBeGreaterThanOrEqual(4.5); // botão tonal
+    expect(ratio(c('brand-300'), D('surface'))).toBeGreaterThanOrEqual(4.5); // escuro: links
+    expect(ratio(c('brand-300'), D('surface-2'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(c('brand-500'), L('bg'))).toBeGreaterThanOrEqual(3); // anel de foco (não texto)
+  });
+
+  it('a cor de destaque não altera receita, despesa nem XP', () => {
+    for (const id of ['oceano', 'indigo', 'grafite']) {
+      const keys = Object.keys(accentBlock(id));
+      expect(keys.length).toBe(10);
+      expect(keys.every((k) => k.startsWith('brand-'))).toBe(true);
+    }
+  });
+});

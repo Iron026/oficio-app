@@ -6,7 +6,7 @@ import type { ProfessionId, ThemePreference } from '../domain/types';
 import { hasErrors, validateProfile, type Errors, type ProfileInput } from '../lib/validation';
 import { CATEGORY_LABEL, FEATURES } from '../monetization/catalog';
 import { canUse, freeEntitlements } from '../monetization/entitlements';
-import { useApp, useErrorHandler, useFeedback } from '../state/AppContext';
+import { usePrefs, useApp, useErrorHandler, useFeedback } from '../state/AppContext';
 import { navigate } from '../state/router';
 import { Button } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
@@ -27,6 +27,7 @@ export const PRIVACY_POLICY_URL = 'https://github.com/Iron026/oficio-app/blob/ma
 
 export function Settings() {
   const { data, service, profession, persistent } = useApp();
+  const prefs = usePrefs();
   const cloud = useCloud();
   const confirm = useConfirm();
   const toast = useToast();
@@ -103,14 +104,14 @@ export function Settings() {
       <SectionTitle>Aparência</SectionTitle>
       <div role="radiogroup" aria-label="Tema" className="grid grid-cols-3 gap-2">
         {themes.map(({ value, label, icon: Icon }) => {
-          const active = data.settings.theme === value;
+          const active = prefs.theme === value;
           return (
             <button
               key={value}
               type="button"
               role="radio"
               aria-checked={active}
-              onClick={() => service.updateSettings({ theme: value }).catch(onError)}
+              onClick={() => service.updateDevicePrefs({ theme: value }).catch(onError)}
               className={cx('flex flex-col items-center gap-1.5 rounded-2xl border-2 bg-surface py-3 text-sm font-medium transition-colors', active ? 'border-brand-500 text-brand-700 dark:text-brand-200' : 'border-line')}
             >
               <Icon size={20} aria-hidden="true" />

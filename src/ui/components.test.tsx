@@ -60,3 +60,14 @@ describe('Avatar', () => {
     expect(a).toBe(b);
   });
 });
+
+describe('Money — ocultar valores', () => {
+  it('mostra "R$ •••••" e anuncia "valor oculto", sem cor nem sinal', async () => {
+    const { HideValuesContext } = await import('./privacy');
+    const { container } = render(<HideValuesContext.Provider value><Money cents={12_540_00} kind="income" /></HideValuesContext.Provider>);
+    const el = container.firstElementChild as HTMLElement;
+    expect(el.textContent).toBe('R$ •••••valor oculto');
+    expect(el).not.toHaveClass('text-income');
+    expect(el.textContent).not.toMatch(/12/);
+  });
+});

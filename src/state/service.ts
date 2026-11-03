@@ -2,6 +2,7 @@ import { buildDemoData } from '../domain/demo';
 import { getProfession } from '../domain/professions';
 import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
 import { isValidProfileImage } from '../domain/profileImage';
+import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
 import { awardsToSave, mergeAward } from '../gamification/seals';
 import { DEFAULT_SETTINGS } from '../domain/types';
 import { actionAward, evaluate, totalXp, type ActionType } from '../gamification/engine';
@@ -39,6 +40,7 @@ export const emptyData = (): AppData => ({
 });
 
 type Listener = (data: AppData) => void;
+type PrefsListener = (prefs: DevicePrefs) => void;
 
 /**
  * Serviço de aplicação: concentra regras de negócio, persistência e gamificação.
@@ -46,7 +48,9 @@ type Listener = (data: AppData) => void;
  */
 export class AppService {
   private listeners = new Set<Listener>();
+  private prefsListeners = new Set<PrefsListener>();
   private queue: Promise<unknown> = Promise.resolve();
+  private _prefs: DevicePrefs = DEFAULT_DEVICE_PREFS;
 
   constructor(
     private storage: StorageAdapter,
@@ -55,7 +59,33 @@ export class AppService {
   ) {}
 
   static async load(storage: StorageAdapter, now?: () => Date): Promise<AppService> {
-    return new AppService(storage, await storage.loadAll(), now);
+    const data = await storage.loadAll();
+    const service = new AppService(storage, data, now);
+    // Preferências do aparelho; na primeira abertura da 0.4 o tema vem da escolha anterior.
+    const stored = await storage.kvGet<unknown>(DEVICE_PREFS_KEY);
+    service._prefs = readDevicePrefs(stored, data.settings.theme);
+    if (stored === undefined) await storage.kvSet(DEVICE_PREFS_KEY, service._prefs);
+    return service;
+  }
+
+  /** Preferências deste aparelho (tema, densidade, ocultar valores, animações). */
+  get devicePrefs(): DevicePrefs {
+    return this._prefs;
+  }
+
+  subscribePrefs(fn: PrefsListener): () => void {
+    this.prefsListeners.add(fn);
+    return () => this.prefsListeners.delete(fn);
+  }
+
+  /** Grava só neste aparelho (nunca sincroniza nem entra no backup). */
+  updateDevicePrefs(patch: Partial<Omit<DevicePrefs, 'version'>>): Promise<void> {
+    return this.run(async () => {
+      const next = readDevicePrefs({ ...this._prefs, ...patch }, undefined);
+      await this.storage.kvSet(DEVICE_PREFS_KEY, next);
+      this._prefs = next;
+      this.prefsListeners.forEach((l) => l(next));
+    });
   }
 
   get data(): AppData {
@@ -443,6 +473,10 @@ export class AppService {
   resetAll(): Promise<void> {
     return this.run(async () => {
       await this.storage.clearAll();
+      // "Apagar todos os dados" também volta as preferências do aparelho ao padrão.
+      await this.storage.kvDelete(DEVICE_PREFS_KEY);
+      this._prefs = { ...DEFAULT_DEVICE_PREFS };
+      this.prefsListeners.forEach((l) => l(this._prefs));
       this.set(emptyData());
     });
   }
