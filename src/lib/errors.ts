@@ -8,6 +8,13 @@ export function friendlyError(err: unknown): { title: string; description: strin
   if (name === 'QuotaExceededError') {
     return { title: 'Armazenamento cheio', description: 'Libere espaço no aparelho e tente novamente. Seus dados anteriores continuam salvos.' };
   }
+  const code = (err as { code?: unknown } | null)?.code;
+  if (code === 'WRITE_FAILED' || code === 'PERMISSION_DENIED' || code === 'UNAVAILABLE') {
+    return {
+      title: 'Não foi possível salvar o arquivo',
+      description: 'O local escolhido não aceitou o backup. Escolha outra pasta ou use “Compartilhar”. Seus dados não foram afetados.',
+    };
+  }
   if (name === 'AbortError' && /share/i.test(message)) return null; // usuário fechou o menu de compartilhar
   if (/share canceled|cancel/i.test(message)) return null;
   if (/permission|denied|not allowed/i.test(message)) {
