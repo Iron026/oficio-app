@@ -35,13 +35,22 @@ export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: bo
   const [open, setOpen] = useState(false);
   const client = data.clients.find((c) => c.id === a.clientId);
   const cancelled = a.status === 'cancelado';
+  // Retorno visual só na TRANSIÇÃO para concluído (não ao abrir a tela nem ao rolar a lista).
+  const [prevStatus, setPrevStatus] = useState(a.status);
+  const [justDone, setJustDone] = useState(false);
+  if (prevStatus !== a.status) {
+    setPrevStatus(a.status);
+    setJustDone(a.status === 'concluido');
+  }
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
+        onAnimationEnd={() => setJustDone(false)}
         className={cx(
-          'flex w-full items-stretch gap-3 rounded-2xl border bg-surface p-3 text-left transition-colors hover:bg-surface-2 active:scale-[0.99]',
+          'press-soft flex w-full items-stretch gap-3 rounded-2xl border bg-surface p-3 text-left transition-colors hover:bg-surface-2',
+          justDone && 'animate-celebrate',
           cancelled ? 'border-dashed border-line bg-surface-2' : 'border-line',
         )}
       >

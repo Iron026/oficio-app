@@ -4,6 +4,7 @@ import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, Se
 import { isValidProfileImage } from '../domain/profileImage';
 import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
 import { awardsToSave, mergeAward } from '../gamification/seals';
+import { tierForLevel, type Tier } from '../gamification/tiers';
 import { DEFAULT_SETTINGS } from '../domain/types';
 import { actionAward, evaluate, totalXp, type ActionType } from '../gamification/engine';
 import { levelInfo } from '../gamification/levels';
@@ -31,9 +32,11 @@ export interface Feedback {
   levelUp: number | null;
   /** Selos que subiram de estágio nesta operação (não dão XP). */
   seals: SealAward[];
+  /** Nova categoria visual alcançada nesta operação (derivada do nível). */
+  tierUp: Tier | null;
 }
 
-const emptyFeedback = (): Feedback => ({ xpGained: 0, events: [], achievements: [], levelUp: null, seals: [] });
+const emptyFeedback = (): Feedback => ({ xpGained: 0, events: [], achievements: [], levelUp: null, seals: [], tierUp: null });
 
 export const emptyData = (): AppData => ({
   profile: null, settings: { ...DEFAULT_SETTINGS }, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [],
@@ -157,6 +160,7 @@ export class AppService {
       achievements: result.achievements,
       levelUp: after > before ? after : null,
       seals,
+      tierUp: tierForLevel(after).id !== tierForLevel(before).id ? tierForLevel(after) : null,
     };
   }
 

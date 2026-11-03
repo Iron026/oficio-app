@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
-import { Check, Crown, Database, Download, ExternalLink, FlaskConical, Lock, Monitor, Moon, Pencil, ShieldCheck, Sun, Trash2, Upload } from 'lucide-react';
+import { Award, Camera, Check, Crown, Database, Download, ExternalLink, FlaskConical, Lock, Monitor, Moon, Pencil, ShieldCheck, Sun, Trash2, Type, Upload, UserRound } from 'lucide-react';
 import { isNative, platformName } from '../platform/native';
 import { PROFESSION_LIST } from '../domain/professions';
-import type { ProfessionId, ThemePreference } from '../domain/types';
+import { accentOf, avatarOf, featuredSealOf } from '../domain/preferences';
+import type { AccentId, ProfessionId, SealId, ThemePreference } from '../domain/types';
+import { ROMAN, type SealProgress } from '../gamification/seals';
 import { hasErrors, validateProfile, type Errors, type ProfileInput } from '../lib/validation';
 import { CATEGORY_LABEL, FEATURES } from '../monetization/catalog';
 import { canUse, freeEntitlements } from '../monetization/entitlements';
@@ -13,7 +15,13 @@ import { useConfirm } from '../ui/Confirm';
 import { cx } from '../ui/cx';
 import { TextField } from '../ui/Field';
 import { ProfessionIcon } from '../ui/icons';
-import { Card, SectionTitle } from '../ui/Misc';
+import { Card, SectionTitle, Segmented, Switch } from '../ui/Misc';
+import { getInternalAvatar } from '../ui/avatarCatalog';
+import { ProfileAvatar, TierChip } from '../ui/ProfileAvatar';
+import { SealMedal } from '../ui/SealMedal';
+import { useProfile } from '../state/useProfile';
+import { ProfileImageSheet } from './ProfileImageSheet';
+import { HeroSlot } from './Shell';
 import { Sheet } from '../ui/Sheet';
 import { AccountSection } from './Account';
 import { useBackupExport } from './BackupExport';
@@ -25,6 +33,14 @@ export const APP_VERSION = __APP_VERSION__;
 /** Política de privacidade pública (abre no navegador). */
 export const PRIVACY_POLICY_URL = 'https://github.com/Iron026/oficio-app/blob/main/docs/PRIVACIDADE.md';
 
+/** Amostras das cores de destaque (tons 500 e 700 de cada paleta em index.css). */
+const ACCENT_OPTIONS: { id: AccentId; label: string; c1: string; c2: string }[] = [
+  { id: 'petroleo', label: 'Petróleo', c1: '#15998a', c2: '#0d4f4a' },
+  { id: 'oceano', label: 'Oceano', c1: '#2f78d0', c2: '#174d89' },
+  { id: 'indigo', label: 'Índigo', c1: '#6c63d6', c2: '#3f3891' },
+  { id: 'grafite', label: 'Grafite', c1: '#64767e', c2: '#2d3a40' },
+];
+
 export function Settings() {
   const { data, service, profession, persistent } = useApp();
   const prefs = usePrefs();
@@ -32,7 +48,8 @@ export function Settings() {
   const confirm = useConfirm();
   const toast = useToast();
   const onError = useErrorHandler();
-  const [sheet, setSheet] = useState<null | 'perfil' | 'profissao' | 'planos'>(null);
+  const [sheet, setSheet] = useState<null | 'perfil' | 'profissao' | 'planos' | 'imagem' | 'selo'>(null);
+  const { tier, featured, seals } = useProfile();
   const fileRef = useRef<HTMLInputElement>(null);
   const profile = data.profile!;
   const ent = freeEntitlements();
@@ -91,35 +108,111 @@ export function Settings() {
     }
   }
 
+  const choice = avatarOf(data.settings);
+  const imageDetail = choice.kind === 'foto' && data.profileImages[0] ? 'Sua foto' : choice.kind === 'interno' ? `Avatar: ${getInternalAvatar(choice.id)?.name ?? 'do Ofício'}` : 'Iniciais';
+  const sealChoice = featuredSealOf(data.settings);
+  const sealDetail = featured ? `${sealChoice === 'auto' ? 'Automático · ' : ''}${featured.def.name} ${ROMAN[featured.stage]}` : 'Nenhum selo conquistado ainda';
+  const accent = accentOf(data.settings);
+
   return (
     <div>
-      <AccountSection />
+      <HeroSlot overlap>
+        <div className="flex items-center gap-4 pt-1">
+          <span className="relative shrink-0">
+            <ProfileAvatar data={data} tier={tier} size={76} seal={featured ? { id: featured.def.id, stage: featured.stage } : null} onHero />
+            <button type="button" onClick={() => setSheet('imagem')} aria-label="Alterar imagem de perfil" title="Alterar imagem de perfil" className="press absolute -bottom-1 -left-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--hero-1)] bg-white text-[#0d4f4a] shadow">
+              <Camera size={16} aria-hidden="true" />
+            </button>
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-title-2 font-extrabold leading-tight [overflow-wrap:anywhere]">{profile.name}</h2>
+            <p className="mt-0.5 text-sm text-white/85 [overflow-wrap:anywhere]">{[profile.businessName, profession.name].filter(Boolean).join(' · ')}</p>
+            <TierChip tier={tier} onHero className="mt-1.5" />
+          </div>
+        </div>
+      </HeroSlot>
 
-      <SectionTitle>Perfil</SectionTitle>
+      <Card className="!p-4 shadow-md">
+        <p className="mb-2 font-sans text-xs font-bold uppercase tracking-wider text-muted">Atalhos</p>
+        <div role="radiogroup" aria-label="Tema" className="grid grid-cols-3 gap-2">
+          {themes.map(({ value, label, icon: Icon }) => {
+            const active = prefs.theme === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => service.updateDevicePrefs({ theme: value }).catch(onError)}
+                className={cx('press flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border-2 bg-surface text-sm font-medium transition-colors', active ? 'border-brand-500 bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-100' : 'border-line')}
+              >
+                <Icon size={20} aria-hidden="true" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-2 border-t border-line pt-1">
+          <Switch checked={prefs.hideValues} onChange={(v) => service.updateDevicePrefs({ hideValues: v }).catch(onError)} label="Ocultar valores" description="Mostra R$ ••••• no lugar dos valores, só neste aparelho" />
+        </div>
+      </Card>
+
+      <SectionTitle>Perfil e identidade</SectionTitle>
       <Card className="!p-0">
-        <Row onClick={() => setSheet('perfil')} label={profile.name} detail={profile.businessName || 'Nome do negócio não informado'} icon={<Pencil size={18} />} />
+        <Row onClick={() => setSheet('perfil')} label="Nome e negócio" detail={[profile.name, profile.businessName].filter(Boolean).join(' · ')} icon={<Pencil size={18} />} />
+        <Row onClick={() => setSheet('imagem')} label="Imagem de perfil" detail={imageDetail} icon={<UserRound size={18} />} />
+        <Row onClick={() => setSheet('selo')} label="Selo em destaque" detail={sealDetail} icon={<Award size={18} />} />
         <Row onClick={() => setSheet('profissao')} label={profession.name} detail="Profissão · adapta termos e missões" icon={<ProfessionIcon icon={profession.icon} size={18} />} />
       </Card>
 
       <SectionTitle>Aparência</SectionTitle>
-      <div role="radiogroup" aria-label="Tema" className="grid grid-cols-3 gap-2">
-        {themes.map(({ value, label, icon: Icon }) => {
-          const active = prefs.theme === value;
-          return (
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => service.updateDevicePrefs({ theme: value }).catch(onError)}
-              className={cx('flex flex-col items-center gap-1.5 rounded-2xl border-2 bg-surface py-3 text-sm font-medium transition-colors', active ? 'border-brand-500 text-brand-700 dark:text-brand-200' : 'border-line')}
-            >
-              <Icon size={20} aria-hidden="true" />
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      <Card className="space-y-4">
+        <div>
+          <p className="mb-2 text-sm font-semibold" id="accent-label">Cor de destaque</p>
+          <div role="radiogroup" aria-labelledby="accent-label" className="grid grid-cols-2 gap-2 min-[480px]:grid-cols-4">
+            {ACCENT_OPTIONS.map((a) => {
+              const active = accent === a.id;
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => service.updateSettings({ accent: a.id }).catch(onError)}
+                  className={cx('press flex min-h-12 items-center gap-2.5 rounded-xl border-2 px-3 text-left text-sm font-medium', active ? 'border-brand-500' : 'border-line')}
+                >
+                  <span className="flex shrink-0 -space-x-1.5" aria-hidden="true">
+                    <span className="h-5 w-5 rounded-full border-2 border-surface" style={{ background: a.c1 }} />
+                    <span className="h-5 w-5 rounded-full border-2 border-surface" style={{ background: a.c2 }} />
+                  </span>
+                  <span className="min-w-0 flex-1">{a.label}</span>
+                  {active && <Check size={16} className="shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-muted">A cor de destaque acompanha sua conta. O topo das telas mantém o verde-petróleo do Ofício; receitas, despesas e XP não mudam de cor.</p>
+        </div>
+        <div>
+          <p className="mb-2 text-sm font-semibold">Densidade das listas</p>
+          <Segmented label="Densidade das listas" value={prefs.density} onChange={(v) => service.updateDevicePrefs({ density: v }).catch(onError)} options={[{ value: 'confortavel', label: 'Confortável' }, { value: 'compacta', label: 'Compacta' }]} />
+          <p className="mt-2 text-xs text-muted">Tema, densidade e ocultar valores valem só para este aparelho.</p>
+        </div>
+      </Card>
+
+      <SectionTitle>Acessibilidade</SectionTitle>
+      <Card className="space-y-3">
+        <div>
+          <p className="mb-2 text-sm font-semibold">Animações</p>
+          <Segmented label="Animações" value={prefs.motion} onChange={(v) => service.updateDevicePrefs({ motion: v }).catch(onError)} options={[{ value: 'sistema', label: 'Seguir o sistema' }, { value: 'reduzir', label: 'Reduzir' }]} />
+        </div>
+        <p className="text-sm text-muted">
+          <Type size={15} className="mr-1 inline align-[-2px]" aria-hidden="true" />
+          O tamanho do texto acompanha o ajuste de fonte do aparelho{isNative() ? ' (Configurações do Android › Tela › Tamanho da fonte)' : ''}.
+        </p>
+      </Card>
+
+      <AccountSection />
 
       <SectionTitle>Plano</SectionTitle>
       <Card>
@@ -164,6 +257,8 @@ export function Settings() {
       {backup.sheet}
       <ProfileSheet open={sheet === 'perfil'} onClose={() => setSheet(null)} />
       <ProfessionSheet open={sheet === 'profissao'} onClose={() => setSheet(null)} />
+      <ProfileImageSheet open={sheet === 'imagem'} onClose={() => setSheet(null)} />
+      <FeaturedSealSheet open={sheet === 'selo'} seals={seals} onClose={() => setSheet(null)} />
       <Sheet open={sheet === 'planos'} onClose={() => setSheet(null)} title="Recursos do Ofício">
         <p className="mb-4 rounded-xl bg-xp-100/60 p-3 text-sm text-xp-700 dark:bg-xp-500/10 dark:text-xp-400">
           Nenhuma compra ou assinatura está disponível nesta versão. Os itens “Em breve” estão em desenvolvimento e não podem ser adquiridos.
@@ -203,11 +298,11 @@ export function Settings() {
 
 function Row({ label, detail, icon, onClick, danger }: { label: string; detail: string; icon: React.ReactNode; onClick: () => void; danger?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-full items-center gap-3 border-b border-line p-3.5 text-left transition-colors last:border-0 hover:bg-surface-2">
+    <button type="button" onClick={onClick} className="press-soft flex w-full items-center gap-3 border-b border-line p-3.5 text-left transition-colors last:border-0 hover:bg-surface-2">
       <span className={cx('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-2', danger ? 'text-red-600 dark:text-red-400' : 'text-brand-600 dark:text-brand-300')} aria-hidden="true">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className={cx('block font-medium', danger && 'text-red-600 dark:text-red-400')}>{label}</span>
-        <span className="block truncate text-sm text-muted">{detail}</span>
+        <span className="line-clamp-2 block text-sm text-muted [overflow-wrap:anywhere]">{detail}</span>
       </span>
     </button>
   );
@@ -314,5 +409,51 @@ function PrivacyCard() {
         </a>
       </p>
     </Card>
+  );
+}
+
+function FeaturedSealSheet({ open, seals, onClose }: { open: boolean; seals: SealProgress[]; onClose: () => void }) {
+  const { data, service } = useApp();
+  const feedback = useFeedback();
+  const onError = useErrorHandler();
+  const current = featuredSealOf(data.settings);
+  async function choose(id: SealId | 'auto') {
+    try {
+      await service.updateSettings({ featuredSeal: id });
+      feedback(id === 'auto' ? 'Destaque automático' : 'Selo em destaque atualizado');
+      onClose();
+    } catch (err) {
+      onError(err);
+    }
+  }
+  const option = (active: boolean, disabled?: boolean) => cx('press-soft flex w-full items-center gap-3 rounded-2xl border-2 p-3 text-left', active ? 'border-brand-500' : 'border-line', disabled && 'opacity-60');
+  return (
+    <Sheet open={open} onClose={onClose} title="Selo em destaque">
+      <p className="mb-3 text-sm text-muted">O selo em destaque aparece no canto do seu avatar. Selos são permanentes e não dão XP.</p>
+      <div role="radiogroup" aria-label="Selo em destaque" className="space-y-2">
+        <button type="button" role="radio" aria-checked={current === 'auto'} onClick={() => choose('auto')} className={option(current === 'auto')}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-brand-600 dark:text-brand-300"><Award size={20} aria-hidden="true" /></span>
+          <span className="flex-1">
+            <span className="block font-semibold">Automático</span>
+            <span className="block text-sm text-muted">O de maior estágio; no empate, o mais recente</span>
+          </span>
+          {current === 'auto' && <Check size={20} className="text-brand-600" aria-hidden="true" />}
+        </button>
+        {seals.map((p) => {
+          const locked = p.stage === 0;
+          const active = current === p.def.id;
+          return (
+            <button key={p.def.id} type="button" role="radio" aria-checked={active} aria-disabled={locked} disabled={locked} onClick={() => choose(p.def.id)} className={option(active, locked)}>
+              <SealMedal id={p.def.id} stage={p.stage} size={40} />
+              <span className="flex-1">
+                <span className="block font-semibold">{p.def.name}</span>
+                <span className="block text-sm text-muted">{locked ? 'Ainda não conquistado' : `Estágio ${ROMAN[p.stage]} · ${p.def.unit(p.value)}`}</span>
+              </span>
+              {active && <Check size={20} className="text-brand-600" aria-hidden="true" />}
+            </button>
+          );
+        })}
+      </div>
+    </Sheet>
   );
 }

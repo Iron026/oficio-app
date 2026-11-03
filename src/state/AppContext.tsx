@@ -1,3 +1,4 @@
+import { getSeal, ROMAN } from '../gamification/seals';
 import { createContext, useCallback, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { getProfession, type ProfessionModule } from '../domain/professions';
 import type { DevicePrefs } from '../domain/preferences';
@@ -54,7 +55,7 @@ export function useFeedback() {
   return useCallback(
     (message: string, feedback?: Feedback, description?: string) => {
       toast({ title: message, description, tone: 'success', xp: feedback?.xpGained || undefined });
-      void hapticSuccess(!!feedback && (feedback.achievements.length > 0 || !!feedback.levelUp));
+      void hapticSuccess(!!feedback && (feedback.achievements.length > 0 || !!feedback.levelUp || (feedback.seals?.length ?? 0) > 0));
       if (!feedback) return;
       for (const e of feedback.events) {
         if (e.category === 'missao' || e.category === 'meta') toast({ title: e.label, tone: 'xp', xp: e.xp });
@@ -62,7 +63,15 @@ export function useFeedback() {
       for (const e of feedback.events.filter((x) => x.category === 'conquista')) {
         toast({ title: 'Conquista desbloqueada!', description: e.label.replace('Conquista: ', ''), tone: 'achievement', xp: e.xp });
       }
-      if (feedback.levelUp) toast({ title: `Você chegou ao nível ${feedback.levelUp}!`, description: 'Continue evoluindo no seu ofício.', tone: 'achievement' });
+      if (feedback.levelUp) {
+        const tier = feedback.tierUp;
+        if (tier) toast({ title: `Nova categoria: ${tier.name}`, description: `Nível ${feedback.levelUp} · ${tier.title}. Sua moldura de perfil mudou.`, tone: 'achievement' });
+        else toast({ title: `Você chegou ao nível ${feedback.levelUp}!`, description: 'Continue evoluindo no seu ofício.', tone: 'achievement' });
+      }
+      for (const a of feedback.seals ?? []) {
+        const def = getSeal(a.id);
+        if (def) toast({ title: `Selo ${def.name} · estágio ${ROMAN[a.stage]}`, description: def.unit(def.thresholds[a.stage - 1]!), tone: 'achievement' });
+      }
     },
     [toast],
   );

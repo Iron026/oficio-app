@@ -1,3 +1,5 @@
+import type { XpEvent } from '../domain/types';
+import { totalXpForLevel } from '../gamification/levels';
 import { createMemoryAdapter } from '../storage/memory';
 import { AppService, ValidationError } from './service';
 
@@ -99,5 +101,31 @@ describe('AppService', () => {
     await service.importBackup(json);
     expect(service.data.profile?.name).toBe('Ana');
     expect(service.data.clients).toHaveLength(1);
+  });
+});
+
+describe('AppService: avisos de selo e de categoria (0.4)', () => {
+  it('o 20º cliente concede Carteira I no feedback, sem XP extra; o 21º não repete', async () => {
+    const { service } = await setup();
+    let last: Awaited<ReturnType<typeof service.saveClient>>['feedback'] | undefined;
+    for (let i = 1; i <= 20; i++) last = (await service.saveClient({ ...clientInput, name: `Cliente ${i}` })).feedback;
+    expect(last!.seals.map((s) => [s.id, s.stage])).toEqual([['carteira', 1]]);
+    expect(last!.events.some((e) => e.key.includes('carteira'))).toBe(false);
+    const next = (await service.saveClient({ ...clientInput, name: 'Cliente 21' })).feedback;
+    expect(next.seals).toEqual([]);
+  });
+
+  it('informa a nova categoria quando o nível cruza a faixa (Inicial → Bronze)', async () => {
+    const storage = createMemoryAdapter();
+    const first = await AppService.load(storage, () => new Date(2026, 10, 4, 10));
+    await first.completeOnboarding({ name: 'Ana', businessName: '', professionId: 'beleza' });
+    const need = totalXpForLevel(3) - 5;
+    await storage.xpEvents.putMany([{ id: 'seed', key: 'seed', category: 'meta', xp: need, label: 'Histórico', createdAt: '2026-10-01T10:00:00.000Z' } as XpEvent]);
+    const service = await AppService.load(storage, () => new Date(2026, 10, 4, 10));
+    const { feedback } = await service.saveClient(clientInput);
+    expect(feedback.levelUp).toBe(3);
+    expect(feedback.tierUp?.id).toBe('bronze');
+    const again = (await service.saveClient({ ...clientInput, name: 'Outra' })).feedback;
+    expect(again.tierUp).toBeNull();
   });
 });

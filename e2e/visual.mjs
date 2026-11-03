@@ -164,6 +164,60 @@ async function seed(page) {
   }
   await settle(page);
 }
+/**
+ * Backup sintético de uma profissional com ~10 meses de uso (dados fictícios, sem
+ * marca de demonstração): ~4 000 XP (Ouro), selos em vários estágios.
+ */
+function veteranBackup(accent) {
+  const iso = (d, h = 10) => `${d}T${String(h).padStart(2, '0')}:00:00.000Z`;
+  const day = (m, d) => `2026-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const names = ['Maria', 'Juliana', 'Carla', 'Fernanda', 'Patrícia', 'Aline', 'Beatriz', 'Camila', 'Daniela', 'Elaine', 'Gabriela', 'Helena'];
+  const clients = Array.from({ length: 112 }, (_, i) => {
+    const d = day(1 + (i % 10), 1 + (i % 27));
+    return { id: `vc${i}`, name: `${names[i % names.length]} ${String.fromCharCode(65 + (i % 26))}. ${i + 1}`, phone: `119${String(10000000 + i).slice(0, 8)}`, email: '', address: '', notes: '', createdAt: iso(d), updatedAt: iso(d) };
+  });
+  const appointments = Array.from({ length: 262 }, (_, i) => {
+    const d = day(1 + (i % 10), 1 + ((i * 7) % 27));
+    const clientId = i < 60 ? `vc${i % 20}` : `vc${20 + (i % 92)}`; // 20 clientes com 3 ou mais atendimentos
+    return { id: `va${i}`, title: ['Corte e escova', 'Coloração', 'Manicure', 'Hidratação'][i % 4], clientId, date: d, time: '10:00', price: 9000, status: 'concluido', notes: '', completedAt: iso(d, 13), transactionId: null, createdAt: iso(d, 9), updatedAt: iso(d, 13) };
+  });
+  const transactions = [];
+  for (let m = 1; m <= 10; m++) {
+    transactions.push({ id: `vr${m}`, type: 'receita', amount: 520000 + m * 15000, description: 'Atendimentos do mês', category: 'Atendimento', date: day(m, 25), appointmentId: null, createdAt: iso(day(m, 25)), updatedAt: iso(day(m, 25)) });
+    transactions.push({ id: `vd${m}`, type: 'despesa', amount: m === 3 ? 900000 : 180000, description: 'Produtos e aluguel', category: 'Produtos', date: day(m, 26), appointmentId: null, createdAt: iso(day(m, 26)), updatedAt: iso(day(m, 26)) });
+  }
+  const xpEvents = [];
+  for (let w = 2; w <= 15; w++) xpEvents.push({ id: `vw${w}`, key: `goal_week:2026-W${String(w).padStart(2, '0')}`, category: 'meta', xp: 50, label: 'Meta semanal batida', createdAt: iso(day(1 + Math.floor((w - 1) / 4.4), 1 + ((w * 7) % 27))) });
+  for (const m of [2, 4, 6, 9]) xpEvents.push({ id: `vm${m}`, key: `goal_month:2026-${String(m).padStart(2, '0')}`, category: 'meta', xp: 100, label: 'Meta do mês batida', createdAt: iso(day(m, 27)) });
+  for (const a of appointments) xpEvents.push({ id: `vx${a.id}`, key: `appointment_completed:${a.id}`, category: 'conclusao', xp: 12, label: 'Atendimento concluído', createdAt: a.completedAt });
+  return JSON.stringify({
+    format: 'oficio-backup', version: 1, exportedAt: '2026-11-03T12:00:00.000Z',
+    data: {
+      profile: { name: 'Ana Souza', businessName: 'Studio Ana Beleza', professionId: 'beleza', createdAt: iso('2026-01-02'), weeklyGoalServices: 5, monthlyGoalRevenue: 600000 },
+      settings: { theme: 'system', accent, avatar: { kind: 'interno', id: 'retrato-criatividade' }, featuredSeal: 'auto' },
+      clients, appointments, transactions, xpEvents, achievements: [],
+    },
+  });
+}
+
+/** Foto de teste gerada no navegador (retrato estilizado 900×1200, sem pessoa real). */
+async function samplePhoto(page) {
+  const url = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 900; c.height = 1200;
+    const g = c.getContext('2d');
+    const bg = g.createLinearGradient(0, 0, 900, 1200);
+    bg.addColorStop(0, '#f2d7b6'); bg.addColorStop(1, '#8aa9b8');
+    g.fillStyle = bg; g.fillRect(0, 0, 900, 1200);
+    g.fillStyle = '#3b2a20'; g.beginPath(); g.ellipse(450, 470, 230, 260, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#e0b48f'; g.beginPath(); g.ellipse(450, 540, 180, 220, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#2f6f73'; g.beginPath(); g.ellipse(450, 1150, 380, 330, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#3b2a20'; g.beginPath(); g.arc(385, 520, 16, 0, Math.PI * 2); g.arc(515, 520, 16, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#9a5a46'; g.lineWidth = 10; g.beginPath(); g.arc(450, 610, 60, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+    return c.toDataURL('image/png');
+  });
+  return Buffer.from(url.split(',')[1], 'base64');
+}
 // Rótulo do campo de cliente na profissão Beleza (vem de profession.terms).
 const clientLabel = '^cliente';
 
@@ -268,6 +322,83 @@ try {
       await page.getByRole('button', { name: /^cliente$/i }).click();
       await page.getByRole('dialog').waitFor();
       await capture(page, vp, theme, 'formulario-cliente');
+      await page.keyboard.press('Escape');
+      await page.getByRole('dialog').waitFor({ state: 'detached' });
+
+      // Ajustes: imagem de perfil (avatares do pack), recorte de foto e selo em destaque.
+      if (vp.id === 'celular-360' || vp.id === 'computador-1280') {
+        await page.goto(BASE + '#/ajustes');
+        await page.getByRole('button', { name: /alterar imagem de perfil/i }).click();
+        await page.getByRole('dialog', { name: /imagem de perfil/i }).waitFor();
+        await capture(page, vp, theme, 'ajustes-imagem-de-perfil');
+        if (vp.id === 'celular-360') await capture(page, vp, theme, 'ajustes-imagem-de-perfil-inteira', { full: true, skipChecks: true });
+        await page.getByRole('radio', { name: /criatividade/i }).first().click();
+        await page.getByRole('dialog').waitFor({ state: 'detached' });
+        await capture(page, vp, theme, 'ajustes-com-avatar');
+        await page.getByRole('button', { name: /alterar imagem de perfil/i }).click();
+        const photo = await samplePhoto(page);
+        await page.locator('input[type=file][aria-label="Escolher foto"]').setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: photo });
+        await page.getByRole('dialog', { name: /ajustar foto/i }).waitFor();
+        await page.getByRole('button', { name: /aumentar zoom/i }).click();
+        await capture(page, vp, theme, 'ajustes-recorte-da-foto');
+        await page.getByRole('button', { name: /usar foto/i }).click();
+        await page.getByRole('dialog').waitFor({ state: 'detached' });
+        await capture(page, vp, theme, 'ajustes-com-foto');
+        // A foto gravada no aparelho precisa respeitar os limites (WebP/JPEG, ≤ 64 KiB, 320 px).
+        const saved = await page.evaluate(() => new Promise((resolve, reject) => {
+          const req = indexedDB.open('oficio');
+          req.onerror = () => reject(req.error);
+          req.onsuccess = () => {
+            const get = req.result.transaction('profileImages').objectStore('profileImages').getAll();
+            get.onsuccess = () => resolve(get.result.map((i) => ({ mime: i.mime, bytes: i.bytes, chars: i.data.length, width: i.width, height: i.height })));
+            get.onerror = () => reject(get.error);
+          };
+        }));
+        const img = saved[0];
+        if (saved.length !== 1 || !img || !['image/webp', 'image/jpeg'].includes(img.mime) || img.bytes > 65536 || img.chars > 87384 || img.width !== 320) fail(`${vp.id}/${theme}: foto gravada fora dos limites ${JSON.stringify(saved)}`);
+        else report.foto = report.foto ?? img;
+        await page.getByRole('button', { name: /selo em destaque/i }).click();
+        await page.getByRole('dialog', { name: /selo em destaque/i }).waitFor();
+        await capture(page, vp, theme, 'ajustes-selo-em-destaque');
+        await page.keyboard.press('Escape');
+        await page.getByRole('dialog').waitFor({ state: 'detached' });
+        await page.getByRole('switch', { name: /ocultar valores/i }).click();
+        await page.goto(BASE + '#/painel');
+        await capture(page, vp, theme, 'painel-valores-ocultos');
+      }
+      await ctx.close();
+    }
+  }
+  // Profissional experiente: categorias altas e selos em vários estágios (via importação de backup).
+  for (const vp of SELECTED.filter((v) => v.id === 'celular-360' || v.id === 'computador-1280')) {
+    for (const theme of THEMES) {
+      console.log(`• ${vp.id} · ${theme} · experiente`);
+      const { ctx, page } = await newPage(vp, theme);
+      await page.goto(BASE);
+      await page.getByRole('button', { name: /começar/i }).click();
+      await page.getByRole('radio', { name: /beleza/i }).click();
+      await page.getByRole('button', { name: /continuar/i }).click();
+      await page.getByLabel(/seu nome/i).fill('Ana Souza');
+      await page.getByRole('button', { name: /entrar no ofício/i }).click();
+      await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      await page.goto(BASE + '#/ajustes');
+      await page.getByText('Conta e sincronização').waitFor();
+      await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(veteranBackup(theme === 'escuro' ? 'oceano' : 'petroleo')) });
+      await page.getByRole('button', { name: /^importar$/i }).click();
+      await page.getByText(/backup importado/i).first().waitFor();
+      await page.goto(BASE + '#/painel');
+      await capture(page, vp, theme, 'experiente-painel');
+      await page.goto(BASE + '#/evolucao');
+      await capture(page, vp, theme, 'experiente-evolucao');
+      await page.getByRole('radio', { name: /^selos$/i }).click();
+      await capture(page, vp, theme, 'experiente-selos');
+      if (vp.id === 'celular-360') await capture(page, vp, theme, 'experiente-selos-inteira', { full: true, skipChecks: true });
+      await page.getByRole('button', { name: /experiência/i }).click();
+      await page.getByRole('dialog', { name: /selo experiência/i }).waitFor();
+      await capture(page, vp, theme, 'experiente-detalhe-do-selo');
+      await page.keyboard.press('Escape');
+      await page.goto(BASE + '#/ajustes');
+      await capture(page, vp, theme, 'experiente-ajustes');
       await ctx.close();
     }
   }

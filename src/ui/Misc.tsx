@@ -82,3 +82,18 @@ export function Chip({ children, onClick, active }: { children: ReactNode; onCli
     </button>
   );
 }
+
+/** Interruptor acessível (role="switch"); a linha inteira é tocável. */
+export function Switch({ checked, onChange, label, description }: { checked: boolean; onChange: (v: boolean) => void; label: string; description?: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className="press-soft flex w-full items-center gap-3 rounded-xl py-2 text-left">
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{label}</span>
+        {description && <span className="block text-sm text-muted">{description}</span>}
+      </span>
+      <span aria-hidden="true" className={cx('relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 transition-colors', checked ? 'border-brand-600 bg-brand-600' : 'border-line bg-surface-2')}>
+        <span className={cx('h-5 w-5 rounded-full bg-white shadow transition-transform duration-200', checked ? 'translate-x-[22px]' : 'translate-x-0.5')} />
+      </span>
+    </button>
+  );
+}
