@@ -112,6 +112,7 @@ export class SyncEngine implements ChangeTracker {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private retryDelay = 30_000;
+  private disposed = false;
 
   private constructor(
     private service: AppService,
@@ -139,6 +140,18 @@ export class SyncEngine implements ChangeTracker {
   // ------------------------------------------------------------- estado
 
   /** Conecta a nuvem (carregada sob demanda após a abertura do app). */
+  /**
+   * Encerra o motor: cancela a sincronização agendada e as novas tentativas e impede novos
+   * agendamentos. Usado quando o app é desmontado (ex.: fim de um teste); pendências continuam salvas.
+   */
+  dispose() {
+    this.disposed = true;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.timer = this.retryTimer = null;
+    this.listeners.clear();
+  }
+
   setRemote(remote: RemoteStore | null) {
     this.remoteStore = remote;
   }
@@ -249,7 +262,7 @@ export class SyncEngine implements ChangeTracker {
   }
 
   private schedule() {
-    if (!this.opts.autoSync || !this.uid || this.uid !== this.state.linkedUid) return;
+    if (this.disposed || !this.opts.autoSync || !this.uid || this.uid !== this.state.linkedUid) return;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.sync().catch(() => undefined), 1500);
   }
@@ -408,7 +421,7 @@ export class SyncEngine implements ChangeTracker {
 
   /** Nova tentativa automática com espera crescente (30 s → 5 min). */
   private scheduleRetry() {
-    if (!this.opts.autoSync) return;
+    if (this.disposed || !this.opts.autoSync) return;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = setTimeout(() => void this.sync().catch(() => undefined), this.retryDelay);
     this.retryDelay = Math.min(this.retryDelay * 2, 5 * 60_000);

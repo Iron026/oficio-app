@@ -208,3 +208,30 @@ describe('auditoria: proteção na troca de conta e desconexão (interface)', ()
     expect(within(confirm).getByText(/ainda não fo(i|ram) enviada/i)).toBeInTheDocument();
   });
 });
+
+describe('Ciclo de vida ao desmontar (regressão: setState após o fim do ambiente)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('desmontar o app com um aviso ainda visível não deixa temporizadores ativos', async () => {
+    // Só setTimeout/clearTimeout são simulados; o tempo real continua correndo para o IndexedDB e o Testing Library.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+    const errors = vi.spyOn(console, 'error');
+    const t = setup();
+    await seedLocal(t.dbName);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = await openSettings(t);
+
+    await user.click(await screen.findByRole('button', { name: /continuar com google/i }));
+    const sheet = await screen.findByRole('dialog', { name: /conectar seus dados/i });
+    await user.click(within(sheet).getByRole('button', { name: /enviar e conectar/i }));
+    expect(await screen.findByText('Conta conectada')).toBeInTheDocument(); // aviso de 3,2 s pendente
+
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+  });
+});
