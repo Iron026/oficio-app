@@ -28,7 +28,7 @@ function StatusPill({ a }: { a: Appointment }) {
     agendado: overdue ? ['bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', 'pendente'] : ['bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', 'agendado'],
   } as const;
   const [cls, label] = map[a.status];
-  return <span className={cx('rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide', cls)}>{label}</span>;
+  return <span className={cx('rounded-md px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide', cls)}>{label}</span>;
 }
 
 /** Item de agendamento clicável, com painel de ações. */
@@ -41,15 +41,15 @@ export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: bo
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={cx('flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 text-left transition-colors hover:bg-surface-2 active:scale-[0.99]', a.status === 'cancelado' && 'opacity-60')}
+        className={cx('flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 text-left transition-colors hover:bg-surface-2 active:scale-[0.99]', a.status === 'cancelado' && 'border-dashed bg-surface-2')}
       >
         <div className="flex w-14 shrink-0 flex-col items-center rounded-xl bg-surface-2 py-2">
           <Clock size={14} className="text-muted" aria-hidden="true" />
-          <span className="mt-0.5 text-sm font-bold tabular-nums">{a.time || '--:--'}</span>
+          <span className="mt-0.5 text-sm font-bold num">{a.time || '--:--'}</span>
         </div>
         <div className="min-w-0 flex-1">
           <p className={cx('truncate font-semibold', a.status === 'cancelado' && 'line-through')}>{a.title}</p>
-          <p className="truncate text-[13px] text-muted">
+          <p className="truncate text-sm text-muted">
             {showDate && `${relativeDayLabel(a.date)} · `}
             {client?.name ?? 'Sem cliente'}
           </p>
@@ -58,7 +58,7 @@ export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: bo
             {a.isDemo && <DemoBadge />}
           </div>
         </div>
-        {a.price > 0 && <span className="shrink-0 text-sm font-semibold tabular-nums">{formatMoney(a.price)}</span>}
+        {a.price > 0 && <span className="shrink-0 text-sm font-semibold num">{formatMoney(a.price)}</span>}
       </button>
       <AppointmentActions a={a} open={open} onClose={() => setOpen(false)} />
     </>
@@ -138,7 +138,7 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
             <User size={16} className="text-muted" aria-hidden="true" />
             <dd className="flex-1 font-semibold">{client?.name ?? 'Sem cliente vinculado'}</dd>
             {wa && (
-              <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2.5 py-1.5 text-[13px] font-semibold text-white">
+              <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2.5 py-1.5 text-sm font-semibold text-white">
                 <MessageCircle size={14} aria-hidden="true" /> WhatsApp
               </a>
             )}

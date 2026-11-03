@@ -96,7 +96,7 @@ export function useAccountFlow() {
 
 function Summary({ title, s }: { title: string; s: LinkAnalysis['local'] }) {
   return (
-    <div className="flex-1 rounded-xl bg-surface-2 p-3 text-[13px]">
+    <div className="flex-1 rounded-xl bg-surface-2 p-3 text-sm">
       <p className="mb-1 font-semibold">{title}</p>
       {s.profileName && <p className="truncate">Perfil: {s.profileName}</p>}
       <p>{s.clients} clientes</p>
@@ -153,7 +153,7 @@ function LinkSheet({ analysis, onDone }: { analysis: LinkAnalysis; onDone: () =>
         </div>
       }
     >
-      <div className="space-y-4 text-[14px] leading-relaxed">
+      <div className="space-y-4 text-sm leading-relaxed">
         {recovering ? (
           <p>Encontramos dados salvos nesta conta. Eles serão baixados para este aparelho e passarão a ser sincronizados.</p>
         ) : !analysis.localHasData && !analysis.remoteHasData ? (
@@ -185,18 +185,18 @@ function LinkSheet({ analysis, onDone }: { analysis: LinkAnalysis; onDone: () =>
                 className={cx('w-full rounded-xl border-2 p-3 text-left', mode === value ? 'border-brand-500' : 'border-line')}
               >
                 <span className="block font-semibold">{label}</span>
-                <span className="block text-[13px] text-muted">{hint}</span>
+                <span className="block text-sm text-muted">{hint}</span>
               </button>
             ))}
           </div>
         )}
         {analysis.previousAccountEmail && (
-          <p role="alert" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
+          <p role="alert" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             Os dados deste aparelho vieram de outra conta ({analysis.previousAccountEmail}). Ao juntar, eles serão copiados para a conta atual.
           </p>
         )}
-        <p className="flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-[13px] text-muted">
+        <p className="flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-sm text-muted">
           <ShieldCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
           Antes de qualquer mudança, o Ofício guarda uma cópia de segurança deste aparelho. Se cancelar, nada é alterado.
         </p>
@@ -277,10 +277,10 @@ export function AccountSection() {
 
   let body: ReactNode;
   if (!account) {
-    body = <p className="text-[14px] text-muted">Carregando…</p>;
+    body = <p className="text-sm text-muted">Carregando…</p>;
   } else if (!available) {
     body = (
-      <div className="text-[14px]">
+      <div className="text-sm">
         <p className="font-semibold">Conta Google em breve</p>
         <p className="text-muted">Esta versão ainda não foi conectada ao servidor. Seus dados ficam apenas neste aparelho — use o backup manual para guardá-los.</p>
       </div>
@@ -288,7 +288,7 @@ export function AccountSection() {
   } else if (!user && sync.linkedUid) {
     // Sessão encerrada, mas o aparelho continua associado: alterações ficam pendentes.
     body = (
-      <div className="space-y-3 text-[14px]">
+      <div className="space-y-3 text-sm">
         <p className="font-semibold">Associado a {sync.linkedEmail ?? 'uma conta Google'}</p>
         <p className="text-muted">
           A sessão foi encerrada. Entre novamente com a mesma conta para retomar a sincronização
@@ -300,7 +300,7 @@ export function AccountSection() {
     );
   } else if (!user) {
     body = (
-      <div className="space-y-3 text-[14px]">
+      <div className="space-y-3 text-sm">
         <p className="text-muted">
           Conecte sua conta Google para guardar uma cópia dos seus dados na nuvem e recuperá-los ao trocar de celular ou reinstalar o app. É opcional: sem conta, tudo
           continua funcionando apenas neste aparelho.
@@ -320,12 +320,12 @@ export function AccountSection() {
           )}
           <div className="min-w-0">
             <p className="truncate font-semibold">{user.name ?? 'Conta Google'}</p>
-            <p className="truncate text-[13px] text-muted">{user.email}</p>
+            <p className="truncate text-sm text-muted">{user.email}</p>
           </div>
         </div>
         {linked ? (
           <>
-            <div className="rounded-xl bg-surface-2 p-3 text-[13px]" aria-live="polite">
+            <div className="rounded-xl bg-surface-2 p-3 text-sm" aria-live="polite">
               <p className={cx('flex items-center gap-1.5 font-semibold', toneClass[tone])}><StatusIcon status={status} size={16} /> {text}</p>
               <p className="text-muted">
                 {sync.lastSyncedAt ? `Último backup confirmado na nuvem: ${fmtDateTime(sync.lastSyncedAt)}` : 'Ainda não há backup confirmado na nuvem.'}
@@ -334,7 +334,7 @@ export function AccountSection() {
               {status.state === 'erro' && <p className="mt-1 text-red-600 dark:text-red-400">{status.message}</p>}
             </div>
             {sync.conflicts.length > 0 && (
-              <button type="button" onClick={() => setConflictsOpen(true)} className="flex w-full items-center gap-2 rounded-xl bg-amber-50 p-3 text-left text-[13px] text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
+              <button type="button" onClick={() => setConflictsOpen(true)} className="flex w-full items-center gap-2 rounded-xl bg-amber-50 p-3 text-left text-sm text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
                 <AlertTriangle size={16} aria-hidden="true" />
                 {sync.conflicts.length} registro{sync.conflicts.length > 1 ? 's' : ''} financeiro{sync.conflicts.length > 1 ? 's' : ''} com versões diferentes. Toque para revisar.
               </button>
@@ -408,18 +408,18 @@ function ConflictsSheet({ open, onClose, serviceLabel }: { open: boolean; onClos
   const resolve = (key: string, choice: 'local' | 'remote') => sync.resolveConflict(key, choice).catch(onError);
   return (
     <Sheet open={open} onClose={onClose} title="Revisar versões diferentes">
-      <p className="mb-4 text-[14px] text-muted">
+      <p className="mb-4 text-sm text-muted">
         Estes registros financeiros foram alterados em aparelhos diferentes. Nenhum valor foi substituído automaticamente: escolha qual versão manter.
       </p>
-      {sync.conflicts.length === 0 && <p className="text-[14px]">Nada para revisar.</p>}
+      {sync.conflicts.length === 0 && <p className="text-sm">Nada para revisar.</p>}
       <ul className="space-y-3">
         {sync.conflicts.map((c) => {
           const d = describe(c, serviceLabel);
           return (
-            <li key={c.key} className="rounded-xl border border-line p-3 text-[14px]">
+            <li key={c.key} className="rounded-xl border border-line p-3 text-sm">
               <p className="font-semibold">{d.kind}: {d.name}</p>
               {c.kind === 'campos' ? (
-                <table className="mt-2 w-full text-[13px]">
+                <table className="mt-2 w-full text-sm">
                   <thead>
                     <tr className="text-muted"><th className="text-left font-normal">Campo</th><th className="text-left font-normal">Este aparelho</th><th className="text-left font-normal">Nuvem</th></tr>
                   </thead>
@@ -430,7 +430,7 @@ function ConflictsSheet({ open, onClose, serviceLabel }: { open: boolean; onClos
                   </tbody>
                 </table>
               ) : (
-                <p className="mt-1 text-[13px] text-muted">
+                <p className="mt-1 text-sm text-muted">
                   {c.kind === 'excluido_aqui' ? 'Excluído neste aparelho, mas alterado em outro. Ele foi mantido.' : 'Excluído em outro aparelho, mas alterado neste. Ele foi mantido.'}
                 </p>
               )}

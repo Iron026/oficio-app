@@ -126,7 +126,7 @@ export function Settings() {
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300"><Check size={20} aria-hidden="true" /></span>
           <div className="flex-1">
             <p className="font-semibold">Plano Gratuito</p>
-            <p className="text-[13px] text-muted">Todos os recursos desta versão estão liberados.</p>
+            <p className="text-sm text-muted">Todos os recursos desta versão estão liberados.</p>
           </div>
         </div>
         <Button variant="secondary" block className="mt-3" icon={<Crown size={18} className="text-xp-500" />} onClick={() => setSheet('planos')}>Conhecer o Premium (em breve)</Button>
@@ -156,7 +156,7 @@ export function Settings() {
       <SectionTitle>Privacidade</SectionTitle>
       <PrivacyCard />
 
-      <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-[12px] text-muted">
+      <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-xs text-muted">
         <Database size={12} aria-hidden="true" /> Ofício v{APP_VERSION} · {platformName() === 'android' ? 'Android' : 'Web'} · armazenamento {persistent ? 'local' : 'temporário'}
       </p>
 
@@ -164,7 +164,7 @@ export function Settings() {
       <ProfileSheet open={sheet === 'perfil'} onClose={() => setSheet(null)} />
       <ProfessionSheet open={sheet === 'profissao'} onClose={() => setSheet(null)} />
       <Sheet open={sheet === 'planos'} onClose={() => setSheet(null)} title="Recursos do Ofício">
-        <p className="mb-4 rounded-xl bg-xp-100/60 p-3 text-[13px] text-xp-700 dark:bg-xp-500/10 dark:text-xp-400">
+        <p className="mb-4 rounded-xl bg-xp-100/60 p-3 text-sm text-xp-700 dark:bg-xp-500/10 dark:text-xp-400">
           Nenhuma compra ou assinatura está disponível nesta versão. Os itens “Em breve” estão em desenvolvimento e não podem ser adquiridos.
         </p>
         {(Object.keys(CATEGORY_LABEL) as (keyof typeof CATEGORY_LABEL)[]).map((cat) => {
@@ -172,7 +172,7 @@ export function Settings() {
           if (!items.length) return null;
           return (
             <div key={cat} className="mb-4">
-              <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-muted">{CATEGORY_LABEL[cat]}</h3>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">{CATEGORY_LABEL[cat]}</h3>
               <ul className="space-y-2">
                 {items.map((f) => {
                   const on = canUse(f, ent);
@@ -183,9 +183,9 @@ export function Settings() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold">{f.name}</p>
-                        <p className="text-[13px] text-muted">{f.description}</p>
+                        <p className="text-sm text-muted">{f.description}</p>
                       </div>
-                      <span className={cx('shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold', on ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200' : 'bg-surface-2 text-muted')}>
+                      <span className={cx('shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold', on ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200' : 'bg-surface-2 text-muted')}>
                         {on ? 'Incluído' : f.unlock.kind === 'purchase' ? 'Em breve · compra única' : 'Em breve · Premium'}
                       </span>
                     </li>
@@ -206,7 +206,7 @@ function Row({ label, detail, icon, onClick, danger }: { label: string; detail: 
       <span className={cx('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-2', danger ? 'text-red-600 dark:text-red-400' : 'text-brand-600 dark:text-brand-300')} aria-hidden="true">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className={cx('block font-medium', danger && 'text-red-600 dark:text-red-400')}>{label}</span>
-        <span className="block truncate text-[13px] text-muted">{detail}</span>
+        <span className="block truncate text-sm text-muted">{detail}</span>
       </span>
     </button>
   );
@@ -271,7 +271,7 @@ function ProfessionSheet({ open, onClose }: { open: boolean; onClose: () => void
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-brand-600 dark:text-brand-300"><ProfessionIcon icon={p.icon} size={20} /></span>
               <span className="flex-1">
                 <span className="block font-semibold">{p.name}</span>
-                <span className="block text-[13px] text-muted">{p.tagline}</span>
+                <span className="block text-sm text-muted">{p.tagline}</span>
               </span>
               {active && <Check size={20} className="text-brand-600" aria-hidden="true" />}
             </button>
@@ -285,7 +285,7 @@ function ProfessionSheet({ open, onClose }: { open: boolean; onClose: () => void
 function PrivacyCard() {
   const { linked } = useCloud();
   return (
-    <Card className="space-y-2 text-[14px] leading-relaxed">
+    <Card className="space-y-2 text-sm leading-relaxed">
       <p className="flex items-center gap-2 font-semibold"><ShieldCheck size={18} className="text-brand-600 dark:text-brand-300" aria-hidden="true" /> Seus dados são seus</p>
       {linked ? (
         <>

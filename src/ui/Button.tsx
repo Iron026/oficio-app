@@ -9,12 +9,12 @@ const variants: Record<Variant, string> = {
   secondary: 'bg-surface-2 text-fg hover:brightness-95 dark:hover:brightness-125',
   ghost: 'bg-transparent text-fg hover:bg-surface-2',
   danger: 'bg-red-600 text-white hover:bg-red-700',
-  xp: 'bg-xp-500 text-white hover:bg-xp-600',
+  xp: 'bg-xp-400 text-xp-950 hover:bg-xp-500',
 };
 const sizes: Record<Size, string> = {
   // Altura mínima (não fixa): textos longos quebram sem transbordar o botão.
   sm: 'min-h-9 py-1.5 px-3 text-sm gap-1.5 rounded-lg',
-  md: 'min-h-11 py-2 px-4 text-[15px] gap-2 rounded-xl',
+  md: 'min-h-11 py-2 px-4 text-base gap-2 rounded-xl',
   lg: 'min-h-13 py-2.5 px-5 text-base gap-2 rounded-2xl',
 };
 

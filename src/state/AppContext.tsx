@@ -79,7 +79,7 @@ export function useThemeEffect(theme: AppData['settings']['theme']) {
       document.documentElement.classList.toggle('dark', dark);
       const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-top')) || 0;
       void setSystemBarsDark(systemBarsShouldBeDark(dark, systemDark, inset));
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0a1215' : '#0f7b71');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b1316' : '#0f7b71');
     };
     apply();
     // O Capacitor injeta as áreas seguras após o carregamento: reavalia depois.

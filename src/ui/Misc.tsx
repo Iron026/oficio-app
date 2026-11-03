@@ -10,7 +10,7 @@ export function ProgressBar({ value, label, tone = 'brand', className }: { value
   return (
     <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className={cx('h-2.5 w-full overflow-hidden rounded-full bg-surface-2', className)}>
       <div
-        className={cx('h-full rounded-full transition-[width] duration-700 ease-out', tone === 'xp' ? 'bg-gradient-to-r from-xp-400 to-xp-600' : 'bg-gradient-to-r from-brand-400 to-brand-600')}
+        className={cx('h-full rounded-full transition-[width] duration-500 ease-out', tone === 'xp' ? 'bg-gradient-to-r from-xp-400 to-xp-500' : 'bg-gradient-to-r from-brand-400 to-brand-600')}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -18,7 +18,7 @@ export function ProgressBar({ value, label, tone = 'brand', className }: { value
 }
 
 export function DemoBadge() {
-  return <span className="inline-flex shrink-0 items-center rounded-md bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">Demonstração</span>;
+  return <span className="inline-flex shrink-0 items-center rounded-md bg-violet-100 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">Demonstração</span>;
 }
 
 export function EmptyState({ icon, title, text, action }: { icon: ReactNode; title: string; text: string; action?: ReactNode }) {
@@ -35,7 +35,7 @@ export function EmptyState({ icon, title, text, action }: { icon: ReactNode; tit
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="mb-2.5 mt-6 flex items-center justify-between">
-      <h2 className="text-[13px] font-semibold uppercase tracking-wider text-muted">{children}</h2>
+      <h2 className="font-sans text-xs font-bold uppercase tracking-wider text-muted">{children}</h2>
       {action}
     </div>
   );
@@ -67,7 +67,7 @@ export function Chip({ children, onClick, active }: { children: ReactNode; onCli
       onClick={onClick}
       aria-pressed={active}
       className={cx(
-        'shrink-0 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
+        'shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
         active ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200' : 'border-line bg-surface text-fg hover:bg-surface-2',
       )}
     >

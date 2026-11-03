@@ -51,12 +51,12 @@ export function Dashboard() {
             <p className="text-sm text-white/75">Nível {lv.level}</p>
             <p className="text-xl font-bold">{lv.title}</p>
           </div>
-          <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">{lv.totalXp} XP</span>
+          <span className="num rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">{lv.totalXp} XP</span>
         </div>
         <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label="Progresso do nível" aria-valuenow={Math.round(lv.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
-          <div className="h-full rounded-full bg-xp-400 transition-[width] duration-700" style={{ width: `${Math.round(lv.progress * 100)}%` }} />
+          <div className="h-full rounded-full bg-xp-400 transition-[width] duration-500" style={{ width: `${Math.round(lv.progress * 100)}%` }} />
         </div>
-        <p className="mt-2 flex items-center justify-between text-[13px] text-white/80">
+        <p className="mt-2 flex items-center justify-between text-sm text-white/80">
           Faltam {lv.xpForNext - lv.xpIntoLevel} XP para o nível {lv.level + 1}
           <ChevronRight size={16} aria-hidden="true" />
         </p>
@@ -64,7 +64,7 @@ export function Dashboard() {
 
       <div className="mt-4 grid grid-cols-4 gap-2">
         {quick.map(({ id, label, icon: Icon }) => (
-          <button key={id} type="button" onClick={() => setSheet(id)} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-surface py-3 text-[13px] font-medium transition-colors hover:bg-surface-2 active:scale-95">
+          <button key={id} type="button" onClick={() => setSheet(id)} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-surface py-3 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-95">
             <Icon size={22} className="text-brand-600 dark:text-brand-300" aria-hidden="true" />
             {label}
           </button>
@@ -77,8 +77,8 @@ export function Dashboard() {
         <Kpi label="Despesas" value={formatMoneyShort(month.expense)} tone="expense" />
         <Kpi label="Saldo" value={formatMoneyShort(month.balance)} tone={month.balance >= 0 ? 'neutral' : 'expense'} icon={<Wallet size={16} aria-hidden="true" />} />
         <Card className="!p-3.5">
-          <p className="flex items-center gap-1.5 text-[13px] text-muted"><Target size={14} aria-hidden="true" /> {t.services} na semana</p>
-          <p className="mt-1 text-xl font-bold tabular-nums">{week.current}<span className="text-base font-medium text-muted">/{week.target}</span></p>
+          <p className="flex items-center gap-1.5 text-sm text-muted"><Target size={14} aria-hidden="true" /> {t.services} na semana</p>
+          <p className="mt-1 text-xl font-bold num">{week.current}<span className="text-base font-medium text-muted">/{week.target}</span></p>
           <ProgressBar value={week.progress} label="Meta semanal" className="mt-2 !h-1.5" />
         </Card>
       </div>
@@ -108,11 +108,11 @@ export function Dashboard() {
               <Card key={m.key} className="!p-3.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-semibold">{m.template.title}</p>
-                  <span className="shrink-0 text-[13px] font-semibold text-xp-600 dark:text-xp-400">+{m.template.xp} XP</span>
+                  <span className="shrink-0 text-sm font-semibold text-xp-600 dark:text-xp-400">+{m.template.xp} XP</span>
                 </div>
                 <div className="mt-2 flex items-center gap-3">
                   <ProgressBar value={m.current / m.template.target} label={m.template.title} tone="xp" />
-                  <span className="shrink-0 text-[13px] tabular-nums text-muted">{m.current}/{m.template.target}</span>
+                  <span className="shrink-0 text-sm num text-muted">{m.current}/{m.template.target}</span>
                 </div>
               </Card>
             ))}
@@ -124,8 +124,8 @@ export function Dashboard() {
         <Card className="mt-6 flex items-start gap-3 !bg-brand-50/60 dark:!bg-brand-500/10">
           <Lightbulb size={20} className="mt-0.5 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />
           <div>
-            <p className="text-[13px] font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">Dica para {profession.name.toLowerCase()}</p>
-            <p className="mt-0.5 text-[15px]">{tip}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-brand-700 dark:text-brand-300">Dica para {profession.name.toLowerCase()}</p>
+            <p className="mt-0.5 text-base">{tip}</p>
           </div>
         </Card>
       )}
@@ -140,11 +140,11 @@ export function Dashboard() {
 function Kpi({ label, value, tone, icon }: { label: string; value: string; tone: 'income' | 'expense' | 'neutral'; icon?: React.ReactNode }) {
   return (
     <Card className="!p-3.5">
-      <p className="flex items-center gap-1.5 text-[13px] text-muted">
+      <p className="flex items-center gap-1.5 text-sm text-muted">
         {icon ?? (tone === 'income' ? <ArrowUpRight size={14} aria-hidden="true" /> : <Receipt size={14} aria-hidden="true" />)}
         {label}
       </p>
-      <p className={cx('mt-1 truncate text-xl font-bold tabular-nums', tone === 'income' && 'text-income', tone === 'expense' && 'text-expense')} title={value}>{value}</p>
+      <p className={cx('mt-1 truncate text-xl font-bold num', tone === 'income' && 'text-income', tone === 'expense' && 'text-expense')} title={value}>{value}</p>
     </Card>
   );
 }

@@ -50,12 +50,12 @@ function Welcome({ onNext }: { onNext: () => void }) {
     <div className="flex flex-1 animate-fade-up flex-col">
       <div className="flex flex-1 flex-col justify-center">
         <Logo size={56} />
-        <h1 className="mt-6 text-[32px] font-extrabold leading-tight tracking-tight">
+        <h1 className="mt-6 text-display font-extrabold leading-tight tracking-tight">
           Seu trabalho.
           <br />
           <span className="text-brand-600 dark:text-brand-300">Sua evolução.</span>
         </h1>
-        <p className="mt-3 text-[17px] text-muted">O Ofício ajuda profissionais autônomos a organizar o negócio e acompanhar o próprio crescimento.</p>
+        <p className="mt-3 text-lg text-muted">O Ofício ajuda profissionais autônomos a organizar o negócio e acompanhar o próprio crescimento.</p>
         <ul className="mt-8 space-y-4">
           {items.map(({ icon: Icon, title, text }) => (
             <li key={title} className="flex items-center gap-4">
@@ -70,7 +70,7 @@ function Welcome({ onNext }: { onNext: () => void }) {
           ))}
         </ul>
       </div>
-      <p className="mb-4 mt-8 flex items-center gap-2 text-[13px] text-muted">
+      <p className="mb-4 mt-8 flex items-center gap-2 text-sm text-muted">
         <ShieldCheck size={16} aria-hidden="true" /> Seus dados ficam salvos apenas neste aparelho.
       </p>
       <Button size="lg" block onClick={onNext} icon={<ArrowRight size={20} />} className="flex-row-reverse">Começar</Button>

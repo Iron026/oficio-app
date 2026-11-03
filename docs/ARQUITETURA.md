@@ -48,6 +48,7 @@ src/
 11. **Dados de demonstração** têm `isDemo: true`, exibem o selo “Demonstração”, geram um aviso global, não contam para XP/conquistas e podem ser removidos de uma vez.
 12. **Monetização preparada, não ativa.** `monetization/catalog.ts` descreve recursos gratuitos, Premium (assinatura) e compras únicas; `entitlements.ts` responde “pode usar?”. A interface `BillingProvider` define o contrato para o futuro Google Play Billing. Itens futuros aparecem como “Em breve” e não podem ser adquiridos.
 13. **Acessibilidade.** Rótulos associados a campos, mensagens de erro com `role="alert"`, diálogos com `aria-modal` e foco preso, `role="progressbar"`, navegação com `aria-current`, alvos de toque ≥ 44 px, `prefers-reduced-motion` respeitado.
+14. **Design system (0.4).** Cores, tipografia (Manrope local em títulos e números; fonte do sistema no corpo), espaçamento e movimento ficam em tokens de `src/index.css`, documentados em [`docs/DESIGN.md`](DESIGN.md). Contrastes são testados (`src/ui/tokens.test.ts`) e a rede de segurança visual (`npm run visual`) gera capturas e verifica acessibilidade em celular, tablet e computador.
 
 ## Conta e sincronização (v0.3)
 

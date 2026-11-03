@@ -38,3 +38,26 @@ jobs:
           java-version: 21
       - run: npm ci
       - run: npm run test:emulator
+
+  visual:
+    name: Capturas visuais e acessibilidade
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Navegador para as capturas
+        run: npx playwright-core install --with-deps chromium
+      # Falha com transbordo horizontal, erro de JavaScript, violação de acessibilidade ou contraste abaixo de 4,5:1.
+      - run: npm run visual -- --strict
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: oficio-capturas-visuais
+          path: visual-results
+          retention-days: 14

@@ -58,7 +58,7 @@ function AppointmentForm({ appointment, defaultClientId, onDone }: { appointment
       <TextField label={`Descrição d${t.serviceArticle} ${t.service.toLowerCase()}`} value={v.title} onChange={set('title')} error={errors.title} maxLength={80} />
       {!appointment && (
         <div>
-          <p className="mb-2 text-[13px] text-muted">Sugestões para {profession.name.toLowerCase()}:</p>
+          <p className="mb-2 text-sm text-muted">Sugestões para {profession.name.toLowerCase()}:</p>
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             {profession.serviceTemplates.map((s) => (
               <Chip

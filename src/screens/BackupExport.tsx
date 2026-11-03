@@ -56,12 +56,12 @@ export function useBackupExport() {
 
   const sheet = (
     <Sheet open={open} onClose={() => setOpen(false)} title="Exportar backup">
-      <p className="mb-4 text-[14px] text-muted">O arquivo contém todos os seus dados. Guarde-o em local seguro e não o envie a pessoas desconhecidas.</p>
+      <p className="mb-4 text-sm text-muted">O arquivo contém todos os seus dados. Guarde-o em local seguro e não o envie a pessoas desconhecidas.</p>
       <div className="space-y-2">
         <Button block size="lg" icon={<Share2 size={20} />} disabled={busy} onClick={share}>Compartilhar (Drive, e-mail…)</Button>
         <Button block size="lg" variant="secondary" icon={<FolderDown size={20} />} disabled={busy} onClick={save}>Salvar no aparelho</Button>
       </div>
-      <p className="mt-3 text-[13px] text-muted">“Salvar no aparelho” abre a janela do Android para você escolher a pasta (Documentos, Downloads ou Drive).</p>
+      <p className="mt-3 text-sm text-muted">“Salvar no aparelho” abre a janela do Android para você escolher a pasta (Documentos, Downloads ou Drive).</p>
     </Sheet>
   );
 

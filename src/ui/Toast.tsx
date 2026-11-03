@@ -9,7 +9,7 @@ interface ToastItem extends ToastInput { id: number }
 const Ctx = createContext<(t: ToastInput) => void>(() => undefined);
 
 const icons: Record<ToastTone, ReactNode> = {
-  success: <CircleCheck size={22} className="animate-pop text-brand-500" />,
+  success: <CircleCheck size={22} className="text-brand-600 dark:text-brand-300" />,
   info: <Info size={22} className="text-sky-500" />,
   error: <TriangleAlert size={22} className="text-red-500" />,
   xp: <Sparkles size={22} className="animate-pop text-xp-500" />,
@@ -57,8 +57,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           >
             {icons[t.tone ?? 'success']}
             <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-semibold">{t.title}</p>
-              {t.description && <p className="text-[13px] text-muted">{t.description}</p>}
+              <p className="text-base font-semibold">{t.title}</p>
+              {t.description && <p className="text-sm text-muted">{t.description}</p>}
             </div>
             {!!t.xp && <span className="shrink-0 rounded-full bg-xp-100 px-2.5 py-1 text-sm font-bold text-xp-700">+{t.xp} XP</span>}
           </div>

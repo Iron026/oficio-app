@@ -47,7 +47,7 @@ export function Clients() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por nome ou telefone"
-            className="h-12 w-full rounded-xl border border-line bg-surface pl-10 pr-3 text-[15px] placeholder:text-muted/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
+            className="h-12 w-full rounded-xl border border-line bg-surface pl-10 pr-3 text-base placeholder:text-muted/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
           />
         </label>
       )}
@@ -62,7 +62,7 @@ export function Clients() {
         <p className="py-10 text-center text-muted">Nenhum cliente encontrado.</p>
       ) : (
         <>
-          <p className="mb-2 mt-4 text-[13px] text-muted">{list.length} {list.length === 1 ? t.client.toLowerCase() : t.clients.toLowerCase()}</p>
+          <p className="mb-2 mt-4 text-sm text-muted">{list.length} {list.length === 1 ? t.client.toLowerCase() : t.clients.toLowerCase()}</p>
           <ul className="space-y-2">
             {list.map((c) => {
               const n = countFor(c.id);
@@ -72,9 +72,9 @@ export function Clients() {
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200" aria-hidden="true">{initials(c.name)}</span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2"><span className="truncate font-semibold">{c.name}</span>{c.isDemo && <DemoBadge />}</span>
-                      <span className="block truncate text-[13px] text-muted">{c.phone || 'Sem telefone'}</span>
+                      <span className="block truncate text-sm text-muted">{c.phone || 'Sem telefone'}</span>
                     </span>
-                    <span className="shrink-0 text-right text-[13px] text-muted">{n} {n === 1 ? t.service.toLowerCase() : t.services.toLowerCase()}</span>
+                    <span className="shrink-0 text-right text-sm text-muted">{n} {n === 1 ? t.service.toLowerCase() : t.services.toLowerCase()}</span>
                   </button>
                 </li>
               );
@@ -126,8 +126,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
           )}
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-surface-2 p-3"><p className="text-[13px] text-muted">{t.services} {t.completedLabelPlural}</p><p className="text-lg font-bold">{completed.length}</p></div>
-          <div className="rounded-xl bg-surface-2 p-3"><p className="text-[13px] text-muted">Total faturado</p><p className="text-lg font-bold">{formatMoney(billed)}</p></div>
+          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">{t.services} {t.completedLabelPlural}</p><p className="text-lg font-bold">{completed.length}</p></div>
+          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">Total faturado</p><p className="text-lg font-bold">{formatMoney(billed)}</p></div>
         </div>
         <ul className="mb-4 space-y-2 text-sm">
           {client.email && <li className="flex items-center gap-2"><Mail size={16} className="text-muted" aria-hidden="true" />{client.email}</li>}
@@ -139,7 +139,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
           <Button variant="secondary" size="sm" icon={<Pencil size={16} />} onClick={() => setMode('edit')}>Editar</Button>
           <Button variant="secondary" size="sm" className="text-red-600 dark:text-red-400" icon={<Trash2 size={16} />} onClick={remove}>Excluir</Button>
         </div>
-        <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-muted">Histórico</h3>
+        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">Histórico</h3>
         {history.length ? (
           <div className="space-y-2">{history.map((a) => <AppointmentItem key={a.id} a={a} showDate />)}</div>
         ) : (

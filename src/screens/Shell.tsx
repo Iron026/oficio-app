@@ -44,7 +44,7 @@ export function Shell({ route, title, children, action }: { route: Route; title:
         </div>
       </header>
       {!persistent && (
-        <div role="alert" className="mx-4 mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
+        <div role="alert" className="mx-4 mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
           <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
           Este navegador bloqueou o armazenamento local. Os dados serão perdidos ao fechar a página.
         </div>
@@ -53,13 +53,13 @@ export function Shell({ route, title, children, action }: { route: Route; title:
         <button
           type="button"
           onClick={() => navigate('ajustes')}
-          className="mx-4 mt-3 flex w-[calc(100%-2rem)] items-center gap-2 rounded-xl bg-violet-50 p-3 text-left text-[13px] text-violet-800 dark:bg-violet-500/15 dark:text-violet-200"
+          className="mx-4 mt-3 flex w-[calc(100%-2rem)] items-center gap-2 rounded-xl bg-violet-50 p-3 text-left text-sm text-violet-800 dark:bg-violet-500/15 dark:text-violet-200"
         >
           <FlaskConical size={16} className="shrink-0" aria-hidden="true" />
           <span>Dados de demonstração ativos. Toque para removê-los em Ajustes.</span>
         </button>
       )}
-      <main key={route} className="animate-fade-up px-4 pb-[calc(6rem+var(--safe-bottom))] pt-4">{children}</main>
+      <main key={route} className="animate-fade-up px-4 pb-[calc(9.5rem+var(--safe-bottom))] pt-4">{children}</main>
       <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[var(--safe-bottom)] backdrop-blur-md">
         <ul className="mx-auto grid max-w-lg grid-cols-5">
           {TABS.map(({ route: r, label, icon: Icon }) => {
@@ -69,7 +69,7 @@ export function Shell({ route, title, children, action }: { route: Route; title:
                 <a
                   href={`#/${r}`}
                   aria-current={active ? 'page' : undefined}
-                  className={cx('flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors', active ? 'text-brand-600 dark:text-brand-300' : 'text-muted')}
+                  className={cx('flex h-16 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors', active ? 'text-brand-600 dark:text-brand-300' : 'text-muted')}
                 >
                   <span className={cx('flex h-7 w-12 items-center justify-center rounded-full transition-colors', active && 'bg-brand-50 dark:bg-brand-500/15')}>
                     <Icon size={20} aria-hidden="true" strokeWidth={active ? 2.4 : 2} />

@@ -2,8 +2,37 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Manrope (SIL Open Font License 1.1), empacotada no app: só o subconjunto latino (~25 KB),
+   que cobre o português. Usada em títulos, valores e XP; o corpo usa a fonte do sistema. */
+@font-face {
+  font-family: "Manrope Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url("../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Design system do Ofício (0.4) — ver docs/DESIGN.md. */
 @theme {
+  /* Corpo: fonte do sistema (Roboto/Samsung no Android), respeita o tamanho de fonte do aparelho. */
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Títulos, valores em dinheiro e XP. */
+  --font-display: "Manrope Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Escala tipográfica (além de xs 12 · sm 14 · base 16 · lg 18 do Tailwind). Nada abaixo de 12 px. */
+  --text-title-3: 1.125rem;
+  --text-title-3--line-height: 1.5rem;
+  --text-title-2: 1.375rem;
+  --text-title-2--line-height: 1.75rem;
+  --text-title-1: 1.75rem;
+  --text-title-1--line-height: 2.125rem;
+  --text-display: 2.125rem;
+  --text-display--line-height: 2.5rem;
+
+  /* Movimento: curto e sem "quique" (o salto fica só para nível e conquista). */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Cor da marca (verde-petróleo): transmite confiança e crescimento. */
   --color-brand-50: #effcf9;
@@ -17,17 +46,20 @@
   --color-brand-800: #114f4a;
   --color-brand-900: #12413e;
 
-  /* Cor da evolução (XP, níveis, conquistas). */
+  /* Cor da evolução (XP, níveis, conquistas).
+     400/500 são preenchimentos (barras, selos); 600/700 são texto sobre fundo claro (≥ 4,5:1);
+     950 é texto sobre o âmbar. */
   --color-xp-100: #fef3c7;
   --color-xp-400: #fbbf24;
   --color-xp-500: #f59e0b;
-  --color-xp-600: #d97706;
-  --color-xp-700: #b45309;
+  --color-xp-600: #995800;
+  --color-xp-700: #8a4f00;
+  --color-xp-950: #3b2500;
 
-  --animate-fade-up: fade-up 220ms ease-out both;
+  --animate-fade-up: fade-up 200ms var(--ease-standard) both;
   --animate-pop: pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  --animate-sheet: sheet-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  --animate-fade: fade 180ms ease-out both;
+  --animate-sheet: sheet-up 280ms var(--ease-emphasized) both;
+  --animate-fade: fade 120ms var(--ease-standard) both;
 
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(8px); }
@@ -57,27 +89,29 @@
   --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
 }
 
-/* Tokens semânticos: o modo escuro troca apenas estas variáveis. */
+/* Tokens semânticos: o modo escuro troca apenas estas variáveis.
+   Neutros com leve tom petróleo; cada cor tem um único significado
+   (marca, receita, despesa, evolução). Contrastes conferidos em src/ui/tokens.test.ts. */
 :root {
-  --bg: #f5f7f8;
+  --bg: #f4f7f7;
   --surface: #ffffff;
-  --surface-2: #eef2f3;
+  --surface-2: #eaf0f0;
   --fg: #0e1a1f;
-  --muted: #5b6b73;
-  --line: #e1e7ea;
-  --income: #0f7b4f;
-  --expense: #c2410c;
+  --muted: #56676e;
+  --line: #d8e1e3;
+  --income: #147a3a;
+  --expense: #b3401a;
   color-scheme: light;
 }
 .dark {
-  --bg: #0a1215;
-  --surface: #111c20;
-  --surface-2: #18262b;
+  --bg: #0b1316;
+  --surface: #121d21;
+  --surface-2: #1a282d;
   --fg: #e7eff1;
-  --muted: #93a6ad;
-  --line: #22343a;
+  --muted: #9aacb3;
+  --line: #2a3d43;
   --income: #4ade80;
-  --expense: #fb923c;
+  --expense: #f4846a;
   color-scheme: dark;
 }
 
@@ -111,6 +145,16 @@ button, a, [role='radio'] {
 body {
   @apply bg-bg text-fg font-sans antialiased;
   min-height: 100dvh;
+}
+h1, h2, h3 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+/* Números do negócio (dinheiro, horários, XP): fonte de títulos e algarismos de largura fixa. */
+@utility num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
 }
 :focus-visible {
   @apply outline-2 outline-offset-2 outline-brand-500;

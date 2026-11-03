@@ -39,9 +39,9 @@ export function Evolution() {
       <Card className="relative overflow-hidden !p-5">
         <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-xp-400/15" aria-hidden="true" />
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-xp-400 to-xp-600 text-white shadow-md shadow-xp-500/30">
-            <span className="text-[10px] font-semibold uppercase tracking-wider opacity-90">Nível</span>
-            <span className="text-2xl font-extrabold leading-none">{lv.level}</span>
+          <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl bg-xp-400 text-xp-950 shadow-md shadow-xp-500/30">
+            <span className="text-xs font-bold uppercase tracking-wider">Nível</span>
+            <span className="num text-2xl font-extrabold leading-none">{lv.level}</span>
           </div>
           <div className="min-w-0">
             <p className="text-xl font-bold">{lv.title}</p>
@@ -49,9 +49,9 @@ export function Evolution() {
           </div>
         </div>
         <ProgressBar value={lv.progress} label="Progresso para o próximo nível" tone="xp" className="mt-4" />
-        <p className="mt-2 text-[13px] text-muted">{lv.xpIntoLevel}/{lv.xpForNext} XP · nível {lv.level + 1} em {totalXpForLevel(lv.level + 1)} XP</p>
+        <p className="mt-2 text-sm text-muted">{lv.xpIntoLevel}/{lv.xpForNext} XP · nível {lv.level + 1} em {totalXpForLevel(lv.level + 1)} XP</p>
       </Card>
-      <p className="mt-3 text-[13px] leading-relaxed text-muted">
+      <p className="mt-3 text-sm leading-relaxed text-muted">
         Você ganha XP ao usar o app de verdade: cadastrar, agendar, concluir {t.services.toLowerCase()} e controlar o caixa. Cada ação vale XP uma única vez, há limite diário por tipo de ação e você nunca perde XP.
       </p>
 
@@ -70,7 +70,7 @@ export function Evolution() {
 
       <SectionTitle>Missões da semana</SectionTitle>
       <div className="space-y-2.5">{weekly.map((m) => <MissionCard key={m.key} m={m} />)}</div>
-      <p className="mt-2 text-[13px] text-muted">Novas missões toda segunda-feira, adaptadas para {profession.name.toLowerCase()}.</p>
+      <p className="mt-2 text-sm text-muted">Novas missões toda segunda-feira, adaptadas para {profession.name.toLowerCase()}.</p>
 
       <SectionTitle>Crescimento · {monthLabel(cur.month, true)} vs {monthLabel(prev.month, true)}</SectionTitle>
       <div className="grid grid-cols-3 gap-2">
@@ -88,11 +88,11 @@ export function Evolution() {
                 <div className="w-1/3 rounded-t bg-brand-500 transition-[height] duration-700" style={{ height: `${(h.income / maxBar) * 100}%`, minHeight: h.income ? 3 : 0 }} />
                 <div className="w-1/3 rounded-t bg-orange-400 transition-[height] duration-700" style={{ height: `${(h.expense / maxBar) * 100}%`, minHeight: h.expense ? 3 : 0 }} />
               </div>
-              <span className="text-[11px] capitalize text-muted">{monthLabel(h.month, true)}</span>
+              <span className="text-xs capitalize text-muted">{monthLabel(h.month, true)}</span>
             </div>
           ))}
         </div>
-        <div className="mt-3 flex gap-4 text-[12px] text-muted">
+        <div className="mt-3 flex gap-4 text-xs text-muted">
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-500" />Receitas</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-400" />Despesas</span>
         </div>
@@ -104,12 +104,12 @@ export function Evolution() {
           const at = unlocked.get(a.id);
           return (
             <li key={a.id} className={cx('rounded-2xl border p-3.5', at ? 'border-xp-400/60 bg-xp-100/40 dark:bg-xp-500/10' : 'border-line bg-surface')}>
-              <div className={cx('mb-2 flex h-10 w-10 items-center justify-center rounded-xl', at ? 'bg-xp-500 text-white' : 'bg-surface-2 text-muted')}>
+              <div className={cx('mb-2 flex h-10 w-10 items-center justify-center rounded-xl', at ? 'bg-xp-400 text-xp-950' : 'bg-surface-2 text-muted')}>
                 {at ? <AchievementIcon icon={a.icon} size={20} /> : <Lock size={18} aria-hidden="true" />}
               </div>
               <p className="text-sm font-semibold leading-snug">{a.title(t)}</p>
-              <p className="mt-0.5 text-[12px] leading-snug text-muted">{a.description(t)}</p>
-              <p className="mt-1.5 text-[12px] font-semibold text-xp-700 dark:text-xp-400">{at ? `Desbloqueada em ${new Date(at).toLocaleDateString('pt-BR')}` : `+${a.xp} XP`}</p>
+              <p className="mt-0.5 text-xs leading-snug text-muted">{a.description(t)}</p>
+              <p className="mt-1.5 text-xs font-semibold text-xp-700 dark:text-xp-400">{at ? `Desbloqueada em ${new Date(at).toLocaleDateString('pt-BR')}` : `+${a.xp} XP`}</p>
             </li>
           );
         })}
@@ -125,7 +125,7 @@ export function Evolution() {
                 <span>{e.label}</span>
                 <span className="shrink-0 font-semibold text-xp-700 dark:text-xp-400">+{e.xp} XP</span>
               </div>
-              <p className="text-[12px] text-muted">{new Date(e.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+              <p className="text-xs text-muted">{new Date(e.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
             </li>
           ))}
         </ol>
@@ -143,9 +143,9 @@ function GoalCard({ title, detail, progress, done }: { title: string; detail: st
     <Card className="!p-3.5">
       <div className="flex items-center justify-between">
         <p className="font-semibold">{title}</p>
-        {done ? <CircleCheck size={20} className="animate-pop text-brand-500" aria-label="Meta alcançada" /> : <span className="text-[13px] font-semibold tabular-nums text-muted">{Math.round(progress * 100)}%</span>}
+        {done ? <CircleCheck size={20} className="animate-pop text-brand-500" aria-label="Meta alcançada" /> : <span className="text-sm font-semibold num text-muted">{Math.round(progress * 100)}%</span>}
       </div>
-      <p className="mb-2 text-[13px] text-muted">{detail}</p>
+      <p className="mb-2 text-sm text-muted">{detail}</p>
       <ProgressBar value={progress} label={title} />
     </Card>
   );
@@ -153,7 +153,7 @@ function GoalCard({ title, detail, progress, done }: { title: string; detail: st
 
 function MissionCard({ m }: { m: MissionProgress }) {
   return (
-    <Card className={cx('!p-3.5', m.done && 'opacity-75')}>
+    <Card className={cx('!p-3.5', m.done && 'bg-surface-2')}>
       <div className="flex items-start gap-3">
         <span className={cx('mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2', m.done ? 'animate-pop border-brand-500 bg-brand-500 text-white' : 'border-line')}>
           {m.done && <CircleCheck size={16} aria-hidden="true" />}
@@ -161,13 +161,13 @@ function MissionCard({ m }: { m: MissionProgress }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <p className={cx('font-semibold', m.done && 'line-through decoration-brand-500/60')}>{m.template.title}</p>
-            <span className="shrink-0 text-[13px] font-semibold text-xp-600 dark:text-xp-400">+{m.template.xp} XP</span>
+            <span className="shrink-0 text-sm font-semibold text-xp-600 dark:text-xp-400">+{m.template.xp} XP</span>
           </div>
-          <p className="text-[13px] text-muted">{m.template.description}</p>
+          <p className="text-sm text-muted">{m.template.description}</p>
           {!m.done && (
             <div className="mt-2 flex items-center gap-3">
               <ProgressBar value={m.current / m.template.target} label={m.template.title} tone="xp" />
-              <span className="shrink-0 text-[13px] tabular-nums text-muted">{m.current}/{m.template.target}</span>
+              <span className="shrink-0 text-sm num text-muted">{m.current}/{m.template.target}</span>
             </div>
           )}
         </div>
@@ -181,9 +181,9 @@ function Growth({ label, value, pct }: { label: string; value: string; pct: numb
   const Icon = pct === null || pct === 0 ? Minus : pct > 0 ? ArrowUpRight : ArrowDownRight;
   return (
     <Card className="!p-3">
-      <p className="truncate text-[12px] text-muted">{label}</p>
-      <p className="truncate text-base font-bold tabular-nums">{value}</p>
-      <p className={cx('mt-0.5 flex items-center gap-0.5 text-[12px] font-semibold', pct === null || pct === 0 ? 'text-muted' : pct > 0 ? 'text-income' : 'text-expense')}>
+      <p className="truncate text-xs text-muted">{label}</p>
+      <p className="truncate text-base font-bold num">{value}</p>
+      <p className={cx('mt-0.5 flex items-center gap-0.5 text-xs font-semibold', pct === null || pct === 0 ? 'text-muted' : pct > 0 ? 'text-income' : 'text-expense')}>
         <Icon size={13} aria-hidden="true" />
         {pct === null ? 'novo' : `${pct > 0 ? '+' : ''}${pct}%`}
       </p>

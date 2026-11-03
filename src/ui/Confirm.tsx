@@ -34,7 +34,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           </div>
         }
       >
-        <p className="text-[15px] leading-relaxed text-muted">{opts?.message}</p>
+        <p className="text-base leading-relaxed text-muted">{opts?.message}</p>
       </Sheet>
     </Ctx.Provider>
   );

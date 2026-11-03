@@ -38,24 +38,24 @@ export function Finance() {
       </div>
 
       <Card className="mt-3">
-        <p className="text-[13px] text-muted">Saldo do mês</p>
-        <p className={cx('text-3xl font-bold tabular-nums tracking-tight', sum.balance < 0 && 'text-expense')}>{formatMoney(sum.balance)}</p>
+        <p className="text-sm text-muted">Saldo do mês</p>
+        <p className={cx('text-3xl font-bold num tracking-tight', sum.balance < 0 && 'text-expense')}>{formatMoney(sum.balance)}</p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-surface-2 p-3">
-            <p className="flex items-center gap-1 text-[13px] text-muted"><ArrowUpRight size={14} className="text-income" aria-hidden="true" /> Receitas</p>
-            <p className="font-semibold tabular-nums text-income">{formatMoney(sum.income)}</p>
+            <p className="flex items-center gap-1 text-sm text-muted"><ArrowUpRight size={14} className="text-income" aria-hidden="true" /> Receitas</p>
+            <p className="font-semibold num text-income">{formatMoney(sum.income)}</p>
           </div>
           <div className="rounded-xl bg-surface-2 p-3">
-            <p className="flex items-center gap-1 text-[13px] text-muted"><ArrowDownRight size={14} className="text-expense" aria-hidden="true" /> Despesas</p>
-            <p className="font-semibold tabular-nums text-expense">{formatMoney(sum.expense)}</p>
+            <p className="flex items-center gap-1 text-sm text-muted"><ArrowDownRight size={14} className="text-expense" aria-hidden="true" /> Despesas</p>
+            <p className="font-semibold num text-expense">{formatMoney(sum.expense)}</p>
           </div>
         </div>
         {topExpenses.length > 0 && (
           <div className="mt-4 space-y-2.5">
-            <p className="text-[13px] font-medium text-muted">Para onde foi o dinheiro</p>
+            <p className="text-sm font-medium text-muted">Para onde foi o dinheiro</p>
             {topExpenses.map((c) => (
               <div key={c.category}>
-                <div className="mb-1 flex justify-between text-[13px]"><span>{c.category}</span><span className="tabular-nums text-muted">{formatMoney(c.amount)}</span></div>
+                <div className="mb-1 flex justify-between text-sm"><span>{c.category}</span><span className="num text-muted">{formatMoney(c.amount)}</span></div>
                 <ProgressBar value={c.amount / sum.expense} label={`Despesas com ${c.category}`} />
               </div>
             ))}
@@ -88,14 +88,14 @@ export function Finance() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{t.description}</span>
-                        <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-muted">
+                        <span className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
                           {t.category}
                           {t.appointmentId && <Link2 size={12} aria-label="Gerado por serviço concluído" />}
                           {t.isDemo && <DemoBadge />}
                           <FutureServiceBadge date={futureServiceDateFor(t, data.appointments)} />
                         </span>
                       </span>
-                      <span className={cx('shrink-0 font-semibold tabular-nums', t.type === 'receita' ? 'text-income' : 'text-expense')}>
+                      <span className={cx('shrink-0 font-semibold num', t.type === 'receita' ? 'text-income' : 'text-expense')}>
                         {t.type === 'receita' ? '+' : '−'} {formatMoney(t.amount)}
                       </span>
                     </button>
@@ -119,7 +119,7 @@ function FutureServiceBadge({ date }: { date: string | null }) {
     <span
       data-testid="data-futura"
       title="Serviço concluído antes da data marcada"
-      className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-muted"
+      className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-xs font-medium text-muted"
     >
       <CalendarClock size={12} aria-hidden="true" />
       Data futura · {formatDateShort(date)}

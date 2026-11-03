@@ -16,9 +16,9 @@ function FieldWrap({ label, error, hint, children, optional }: Wrap) {
       </label>
       {children({ id, describedBy: error || hint ? msgId : undefined, invalid: !!error })}
       {error ? (
-        <p id={msgId} role="alert" className="text-[13px] text-red-600 dark:text-red-400">{error}</p>
+        <p id={msgId} role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>
       ) : hint ? (
-        <p id={msgId} className="text-[13px] text-muted">{hint}</p>
+        <p id={msgId} className="text-sm text-muted">{hint}</p>
       ) : null}
     </div>
   );
@@ -31,7 +31,7 @@ export function TextField({ label, error, hint, optional, className, prefix, ...
     <FieldWrap label={label} error={error} hint={hint} optional={optional}>
       {({ id, describedBy, invalid }) => (
         <div className="relative">
-          {prefix && <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-[15px] text-muted">{prefix}</span>}
+          {prefix && <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-base text-muted">{prefix}</span>}
           <input
             id={id}
             aria-invalid={invalid}
