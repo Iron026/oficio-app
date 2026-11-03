@@ -57,10 +57,49 @@ export function mergeRecord(collection: SyncCollection, base: Entity | null, loc
   if (collection === 'xpEvents') return { value: remote, conflictFields: [], needsUser: false };
   if (FINANCIAL_COLLECTIONS.includes(collection)) {
     const r = merge3(base, local, remote, 'local');
+    if (collection === 'appointments') resolveCompletionFields(r, local, remote);
     return { ...r, needsUser: r.conflictFields.length > 0 };
   }
   const newerLocal = String(local.updatedAt ?? '') >= String(remote.updatedAt ?? '');
   return { ...merge3(base, local, remote, newerLocal ? 'local' : 'remote'), needsUser: false };
+}
+
+/**
+ * Serviço concluído em dois aparelhos: data de conclusão e receita vinculada
+ * são resolvidas de forma determinística (iguais em todos os aparelhos), sem
+ * pedir decisão ao usuário. A receita duplicada é removida depois por
+ * `duplicateAutoIncomeIds`, que mantém a mais antiga.
+ */
+function resolveCompletionFields(r: MergeOutcome, local: Entity, remote: Entity) {
+  const pick = (a: unknown, b: unknown) => (a && b ? (String(a) < String(b) ? a : b) : (a ?? b ?? null));
+  for (const f of ['completedAt', 'transactionId'] as const) {
+    if (!r.conflictFields.includes(f)) continue;
+    r.value[f] = pick(local[f], remote[f]);
+    r.conflictFields = r.conflictFields.filter((x) => x !== f);
+  }
+}
+
+/**
+ * Receitas automáticas duplicadas: o mesmo serviço concluído offline em dois
+ * aparelhos gera duas receitas com o mesmo `appointmentId`. Mantém a mais
+ * antiga (desempate pelo id) — todos os aparelhos chegam ao mesmo resultado.
+ */
+export function duplicateAutoIncomeIds(transactions: { id: string; type?: unknown; appointmentId?: unknown; createdAt?: unknown }[]): { remove: string[]; keepByAppointment: Map<string, string> } {
+  const groups = new Map<string, { id: string; createdAt: string }[]>();
+  for (const t of transactions) {
+    if (t.type !== 'receita' || typeof t.appointmentId !== 'string' || !t.appointmentId) continue;
+    const g = groups.get(t.appointmentId) ?? [];
+    g.push({ id: t.id, createdAt: String(t.createdAt ?? '') });
+    groups.set(t.appointmentId, g);
+  }
+  const remove: string[] = [];
+  const keepByAppointment = new Map<string, string>();
+  for (const [apptId, g] of groups) {
+    g.sort((a, b) => (a.createdAt === b.createdAt ? (a.id < b.id ? -1 : 1) : a.createdAt < b.createdAt ? -1 : 1));
+    keepByAppointment.set(apptId, g[0]!.id);
+    remove.push(...g.slice(1).map((x) => x.id));
+  }
+  return { remove, keepByAppointment };
 }
 
 /** Perfil/preferências: mesclagem por campo; em conflito, prevalece a nuvem (perfil canônico da conta). */

@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, getDoc, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, type Firestore } from 'firebase/firestore';
 import { totals } from '../domain/finance';
 import { totalXp } from '../gamification/engine';
 import { AppService } from '../state/service';
@@ -81,6 +81,44 @@ describe('regras de segurança (isolamento entre contas)', () => {
   });
 });
 
+
+describe('regras: tentativas de acesso indevido (auditoria)', () => {
+  async function seedAlice() {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const f = ctx.firestore() as unknown as Firestore;
+      await setDoc(doc(f, 'users/alice'), { schemaVersion: 1, data: { profile: { name: 'Alice' } }, rev: 1, updatedAt: new Date(), deviceId: 'd' });
+      await setDoc(doc(f, 'users/alice/records/transactions__t1'), { collection: 'transactions', id: 't1', data: { id: 't1', amount: 1000 }, deleted: false, rev: 1, updatedAt: new Date(), deviceId: 'd' });
+    });
+  }
+
+  it('outra conta não altera, não exclui e não lista registros de terceiros', async () => {
+    await seedAlice();
+    const bob = db('bob');
+    await assertFails(updateDoc(doc(bob, 'users/alice/records/transactions__t1'), { rev: 2, updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(bob, 'users/alice/records/transactions__t1')));
+    await assertFails(deleteDoc(doc(bob, 'users/alice')));
+    await assertFails(getDocs(collection(bob, 'users/alice/records')));
+    await assertFails(getDocs(collection(bob, 'users')));
+  });
+
+  it('o dono não consegue mudar a coleção de um registro nem pular revisões do perfil', async () => {
+    await seedAlice();
+    const alice = db('alice');
+    await assertFails(setDoc(doc(alice, 'users/alice/records/transactions__t1'), { ...record({ collection: 'clients', id: 't1', data: { id: 't1' } }), rev: 2 }));
+    await assertFails(setDoc(doc(alice, 'users/alice'), { schemaVersion: 1, data: {}, rev: 3, updatedAt: serverTimestamp(), deviceId: 'd' }));
+    await assertSucceeds(setDoc(doc(alice, 'users/alice'), { schemaVersion: 1, data: {}, rev: 2, updatedAt: serverTimestamp(), deviceId: 'd' }));
+    await assertSucceeds(getDocs(collection(alice, 'users/alice/records')));
+  });
+
+  it('lápide (exclusão) exige data nula e revisão +1', async () => {
+    await seedAlice();
+    const alice = db('alice');
+    const ref = doc(alice, 'users/alice/records/transactions__t1');
+    await assertFails(setDoc(ref, { collection: 'transactions', id: 't1', data: { id: 't1' }, deleted: true, rev: 2, updatedAt: serverTimestamp(), deviceId: 'd' }));
+    await assertSucceeds(setDoc(ref, { collection: 'transactions', id: 't1', data: null, deleted: true, rev: 2, updatedAt: serverTimestamp(), deviceId: 'd' }));
+  });
+});
+
 describe('sincronização real com o Firestore (emulador)', () => {
   const NOW = new Date(2026, 10, 4, 10);
   async function device(uid: string) {
@@ -114,6 +152,21 @@ describe('sincronização real com o Firestore (emulador)', () => {
     await b.sync.sync();
     await a.sync.sync();
     expect(totals(a.service.data.transactions)).toEqual(totals(b.service.data.transactions));
+  });
+
+  it('volume: mais de 100 registros (envio em lotes) chegam completos', async () => {
+    const a = await device('alice');
+    await a.service.completeOnboarding({ name: 'Alice', businessName: '', professionId: 'outros' });
+    await a.service.loadDemoData(); // demonstração não sobe
+    for (let i = 0; i < 130; i++) await a.service.saveTransaction({ type: 'despesa', amount: `${i + 1},00`, description: `Item ${i}`, category: 'Outros', date: '2026-11-04' });
+    await a.sync.setUser('alice');
+    await a.sync.link('alice', 'mesclar');
+    expect(a.sync.pendingCount).toBe(0);
+    const b = await device('alice');
+    await b.sync.setUser('alice');
+    await b.sync.link('alice', 'usarNuvem');
+    expect(b.service.data.transactions.filter((t) => !t.isDemo)).toHaveLength(130);
+    expect(totals(b.service.data.transactions)).toEqual(totals(a.service.data.transactions.filter((t) => !t.isDemo)));
   });
 
   it('outra conta não consegue ler os dados (permissão negada)', async () => {

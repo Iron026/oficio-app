@@ -76,6 +76,12 @@ export function useAccountFlow() {
       const out = await account.signIn();
       if (out.status === 'cancelado') toast({ title: 'Login cancelado', description: 'Nada foi alterado.', tone: 'info' });
       else if (out.status === 'conectado') toast({ title: 'Conta conectada', description: out.user.email ?? undefined });
+      else if (out.status === 'outraConta')
+        toast({
+          title: 'Este aparelho está associado a outra conta',
+          description: `Para não misturar dados, entre com ${out.linkedEmail ?? 'a conta anterior'} ou desassocie o aparelho em Ajustes → Conta e sincronização.`,
+          tone: 'error',
+        });
       else setAnalysis(out.analysis);
     } catch (err) {
       onError(err);
@@ -184,6 +190,12 @@ function LinkSheet({ analysis, onDone }: { analysis: LinkAnalysis; onDone: () =>
             ))}
           </div>
         )}
+        {analysis.previousAccountEmail && (
+          <p role="alert" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+            Os dados deste aparelho vieram de outra conta ({analysis.previousAccountEmail}). Ao juntar, eles serão copiados para a conta atual.
+          </p>
+        )}
         <p className="flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-[13px] text-muted">
           <ShieldCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
           Antes de qualquer mudança, o Ofício guarda uma cópia de segurança deste aparelho. Se cancelar, nada é alterado.
@@ -217,15 +229,35 @@ export function AccountSection() {
   };
 
   const disconnect = run(async () => {
+    if (!account) return;
+    // Envia o que estiver pendente antes de desconectar.
+    const pending = await account.flushBeforeDisconnect();
     const ok = await confirm({
       title: 'Desconectar conta?',
       message:
+        (pending > 0
+          ? `Atenção: ${pending} alteraç${pending === 1 ? 'ão ainda não foi enviada' : 'ões ainda não foram enviadas'} para a nuvem (sem conexão). Elas continuarão apenas neste aparelho. `
+          : 'Todas as alterações já estão salvas na nuvem. ') +
         'Seus dados continuam neste aparelho e os já salvos na nuvem continuam na sua conta. Alterações feitas a partir de agora ficam só no aparelho até você conectar de novo.',
       confirmLabel: 'Desconectar',
+      danger: pending > 0,
     });
-    if (!ok || !account) return;
+    if (!ok) return;
     await account.disconnect();
     toast({ title: 'Conta desconectada', description: 'Os dados permanecem neste aparelho.', tone: 'info' });
+  });
+
+  const forget = run(async () => {
+    if (!account) return;
+    const ok = await confirm({
+      title: 'Desassociar este aparelho?',
+      message: `Os dados continuam neste aparelho, mas deixam de ser sincronizados com ${sync.linkedEmail ?? 'a conta anterior'}${sync.pendingCount > 0 ? `, e ${sync.pendingCount} alteração(ões) ainda não enviada(s) ficará(ão) só aqui` : ''}. Os dados já salvos na nuvem não são alterados. Depois você poderá conectar outra conta.`,
+      confirmLabel: 'Desassociar',
+      danger: true,
+    });
+    if (!ok) return;
+    await account.forgetLinkedAccount();
+    toast({ title: 'Aparelho desassociado', description: 'Os dados permanecem neste aparelho.', tone: 'info' });
   });
 
   const remove = run(async () => {
@@ -254,6 +286,19 @@ export function AccountSection() {
       <div className="text-[14px]">
         <p className="font-semibold">Conta Google em breve</p>
         <p className="text-muted">Esta versão ainda não foi conectada ao servidor. Seus dados ficam apenas neste aparelho — use o backup manual para guardá-los.</p>
+      </div>
+    );
+  } else if (!user && sync.linkedUid) {
+    // Sessão encerrada, mas o aparelho continua associado: alterações ficam pendentes.
+    body = (
+      <div className="space-y-3 text-[14px]">
+        <p className="font-semibold">Associado a {sync.linkedEmail ?? 'uma conta Google'}</p>
+        <p className="text-muted">
+          A sessão foi encerrada. Entre novamente com a mesma conta para retomar a sincronização
+          {sync.pendingCount > 0 ? ` (${sync.pendingCount} alteraç${sync.pendingCount === 1 ? 'ão pendente' : 'ões pendentes'})` : ''}.
+        </p>
+        <GoogleButton onClick={flow.start} busy={flow.busy} label="Entrar novamente com Google" />
+        <Button variant="ghost" size="sm" block onClick={forget} disabled={busy}>Desassociar este aparelho</Button>
       </div>
     );
   } else if (!user) {

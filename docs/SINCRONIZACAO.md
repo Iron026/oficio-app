@@ -60,7 +60,11 @@ users/{uid}/entitlements/{doc}    somente leitura (Premium futuro, gravado apena
 | Clientes e perfil | Mesclagem por campo; mesmo campo alterado dos dois lados → alteração mais recente (cliente) / versão da conta (perfil) |
 | Isolamento | Regras: só `request.auth.uid == uid`; formato e revisão validados no servidor |
 | Dados de demonstração | Fictícios: **nunca** são enviados à nuvem |
-| “Apagar todos os dados” | Desassocia a conta **sem** apagar a nuvem |
+| “Apagar todos os dados” | Desassocia a conta **sem** apagar a nuvem; apaga também as cópias de segurança locais |
+| Receita automática | No máximo **uma por serviço**, mesmo se concluído offline em duas instalações (mantém a mais antiga) |
+| Troca de conta | Aparelho associado à conta A recusa login de outra conta (sem misturar dados); é preciso entrar com A ou desassociar |
+| Importar backup conectado | Aviso de que nuvem e outros aparelhos serão substituídos; cópia de segurança automática antes |
+| Conta excluída em outro aparelho | Este aparelho para de sincronizar e se desassocia (não recria nada); dados locais mantidos |
 | Excluir conta | Apaga `users/{uid}` e `records`; depois exclui o usuário do Firebase Auth (pede para confirmar a conta se necessário) |
 
 ## Estados exibidos

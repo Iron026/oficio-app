@@ -24,6 +24,7 @@ export const APP_VERSION = __APP_VERSION__;
 
 export function Settings() {
   const { data, service, profession, persistent } = useApp();
+  const cloud = useCloud();
   const confirm = useConfirm();
   const toast = useToast();
   const onError = useErrorHandler();
@@ -73,7 +74,15 @@ export function Settings() {
   }
 
   async function importData(file: File) {
-    const ok = await confirm({ title: 'Importar backup?', message: 'Todos os dados atuais deste aparelho serão substituídos pelos dados do arquivo.', confirmLabel: 'Importar', danger: true });
+    const linked = cloud.linked;
+    const ok = await confirm({
+      title: 'Importar backup?',
+      message: linked
+        ? 'Todos os dados atuais serão substituídos pelos do arquivo — neste aparelho, na nuvem e nos outros aparelhos conectados. Registros criados depois desse backup serão excluídos. Uma cópia de segurança dos dados atuais é guardada neste aparelho antes.'
+        : 'Todos os dados atuais deste aparelho serão substituídos pelos dados do arquivo. Uma cópia de segurança dos dados atuais é guardada antes.',
+      confirmLabel: 'Importar',
+      danger: true,
+    });
     if (!ok) return;
     try {
       await service.importBackup(await file.text());

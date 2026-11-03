@@ -2,7 +2,7 @@ import type { AppData } from '../domain/types';
 import { newId } from '../lib/id';
 import { serializeBackup } from '../storage/backup';
 import type { AppService } from '../state/service';
-import { duplicateXpIds, mergeMeta, mergeRecord } from './merge';
+import { duplicateAutoIncomeIds, duplicateXpIds, mergeMeta, mergeRecord } from './merge';
 import type { ChangeTracker, TrackedStorage } from './tracked';
 import {
   FINANCIAL_COLLECTIONS,
@@ -51,6 +51,8 @@ export interface LinkAnalysis {
   suggested: LinkMode;
   /** true quando não há escolha a fazer (um dos lados está vazio). */
   automatic: boolean;
+  /** Os dados deste aparelho vieram de OUTRA conta (desconectada antes). */
+  previousAccountEmail: string | null;
 }
 
 export interface BackupEntry {
@@ -108,6 +110,8 @@ export class SyncEngine implements ChangeTracker {
   private running: Promise<void> | null = null;
   private rerun = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryDelay = 30_000;
 
   private constructor(
     private service: AppService,
@@ -151,6 +155,9 @@ export class SyncEngine implements ChangeTracker {
   }
   get linkedUid() {
     return this.state.linkedUid;
+  }
+  get linkedEmail() {
+    return this.state.linkedEmail ?? null;
   }
   get lastSyncedAt() {
     return this.state.lastSyncedAt;
@@ -215,6 +222,8 @@ export class SyncEngine implements ChangeTracker {
 
   /** Importação de backup com conta associada: tudo vira pendência; o que sumiu vira exclusão. */
   async beforeReplaceAll(data: AppData) {
+    // Cópia de segurança automática dos dados atuais antes de importar um backup.
+    await this.saveBackup('Antes de importar backup');
     if (!this.state.linkedUid) return;
     const present = new Set<string>();
     for (const c of SYNC_COLLECTIONS) for (const e of data[c]) present.add(recordKey(c, e.id));
@@ -232,6 +241,8 @@ export class SyncEngine implements ChangeTracker {
 
   /** "Apagar todos os dados" deste aparelho: desassocia a conta, sem tocar na nuvem. */
   async afterClearAll() {
+    // "Apagar todos os dados" também apaga as cópias de segurança locais.
+    for (const k of await this.storage.kvKeys(BACKUP_PREFIX)) await this.storage.kvDelete(k);
     this.state = freshState(this.state.deviceId);
     await this.save();
     this.setStatus({ state: 'desativado' });
@@ -247,7 +258,8 @@ export class SyncEngine implements ChangeTracker {
 
   async saveBackup(reason: string): Promise<string> {
     const createdAt = this.opts.now().toISOString();
-    const key = `${BACKUP_PREFIX}${createdAt}`;
+    // Sufixo único: duas cópias no mesmo milissegundo não se sobrescrevem.
+    const key = `${BACKUP_PREFIX}${createdAt}-${newId().slice(0, 8)}`;
     await this.storage.kvSet(key, { reason, createdAt, json: serializeBackup(this.service.data, this.opts.now()) });
     const keys = (await this.storage.kvKeys(BACKUP_PREFIX)).sort();
     for (const old of keys.slice(0, Math.max(0, keys.length - MAX_BACKUPS))) await this.storage.kvDelete(old);
@@ -283,6 +295,8 @@ export class SyncEngine implements ChangeTracker {
       remoteHasData,
       suggested: localHasData ? 'mesclar' : 'usarNuvem',
       automatic: !localHasData || !remoteHasData,
+      previousAccountEmail:
+        localHasData && this.state.previousAccount && this.state.previousAccount.uid !== uid ? (this.state.previousAccount.email ?? 'outra conta') : null,
     };
   }
 
@@ -293,12 +307,13 @@ export class SyncEngine implements ChangeTracker {
    * - "usarNuvem": substitui os dados deste aparelho pelos da conta (a cópia fica guardada).
    * Se a nuvem estiver indisponível, nada é alterado.
    */
-  async link(uid: string, mode: LinkMode): Promise<void> {
+  async link(uid: string, mode: LinkMode, email: string | null = null): Promise<void> {
     await this.saveBackup(mode === 'usarNuvem' ? 'Antes de usar os dados da nuvem' : 'Antes de conectar a conta');
     const pulled = await this.remote.pull(uid, 0); // falha aqui = nada mudou
     await this.service.exclusive(async () => {
       const next = freshState(this.state.deviceId);
       next.linkedUid = uid;
+      next.linkedEmail = email;
       if (mode === 'usarNuvem') {
         const data = remoteToData(pulled.records, pulled.meta, this.service.data.settings);
         for (const r of pulled.records) next.records[recordKey(r.collection, r.id)] = { baseRev: r.rev, base: r.data, dirty: false, seq: 0 };
@@ -322,7 +337,8 @@ export class SyncEngine implements ChangeTracker {
 
   /** Desconecta a conta deste aparelho. Os dados locais permanecem; a nuvem não é alterada. */
   async unlink() {
-    this.state = freshState(this.state.deviceId);
+    const previous = this.state.linkedUid ? { uid: this.state.linkedUid, email: this.state.linkedEmail ?? null } : (this.state.previousAccount ?? null);
+    this.state = { ...freshState(this.state.deviceId), previousAccount: previous };
     this.uid = null;
     await this.save();
     this.setStatus({ state: 'desativado' });
@@ -359,6 +375,16 @@ export class SyncEngine implements ChangeTracker {
     try {
       if (!this.opts.isOnline()) throw Object.assign(new Error('offline'), { code: 'unavailable' });
       const pulled = await this.remote.pull(uid, Math.max(0, this.state.cursor - OVERLAP_MS));
+      // Perfil da conta sumiu da nuvem depois de já ter sido sincronizado: os dados
+      // da conta foram excluídos em outro aparelho. Não recria nada; desassocia.
+      if (!pulled.meta && this.state.meta.baseRev > 0) {
+        await this.unlink();
+        this.setStatus({
+          state: 'erro',
+          message: 'Os dados desta conta foram excluídos da nuvem em outro aparelho. Este aparelho foi desassociado; seus dados continuam aqui.',
+        });
+        return;
+      }
       await this.service.exclusive(async () => {
         await this.applyRemote(pulled.records, pulled.meta);
         await this.save();
@@ -368,13 +394,24 @@ export class SyncEngine implements ChangeTracker {
         this.state.lastSyncedAt = this.opts.now().toISOString();
         await this.save();
         this.setStatus({ state: 'sincronizado', at: this.state.lastSyncedAt });
+        this.retryDelay = 30_000;
       } else {
         this.setStatus({ state: 'pendente' });
+        this.scheduleRetry();
       }
     } catch (err) {
       // Nenhum dado local é alterado em caso de falha: as pendências continuam guardadas.
       this.setStatus(isOfflineError(err) ? { state: 'offline' } : { state: 'erro', message: err instanceof Error ? err.message : 'Falha na sincronização' });
+      this.scheduleRetry();
     }
+  }
+
+  /** Nova tentativa automática com espera crescente (30 s → 5 min). */
+  private scheduleRetry() {
+    if (!this.opts.autoSync) return;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(() => void this.sync().catch(() => undefined), this.retryDelay);
+    this.retryDelay = Math.min(this.retryDelay * 2, 5 * 60_000);
   }
 
   private localEntity(collection: SyncCollection, id: string): Entity | null {
@@ -521,6 +558,35 @@ export class SyncEngine implements ChangeTracker {
         r.deleted = true;
         r.seq++;
       } else delete this.state.records[key];
+      changed = true;
+    }
+
+    // Receita automática: no máximo uma por serviço (conclusão offline em dois aparelhos).
+    const markDeleted = (collection: SyncCollection, id: string) => {
+      const key = recordKey(collection, id);
+      const r = (this.state.records[key] ??= { baseRev: 0, base: null, dirty: false, seq: 0 });
+      if (r.baseRev > 0) {
+        r.dirty = true;
+        r.deleted = true;
+        r.seq++;
+      } else delete this.state.records[key];
+    };
+    const income = duplicateAutoIncomeIds([...maps.transactions.values()] as unknown as Parameters<typeof duplicateAutoIncomeIds>[0]);
+    for (const id of income.remove) {
+      maps.transactions.delete(id);
+      markDeleted('transactions', id);
+      changed = true;
+    }
+    for (const [apptId, keepId] of income.keepByAppointment) {
+      const ap = maps.appointments.get(apptId);
+      if (!ap || ap.status !== 'concluido' || ap.transactionId === keepId) continue;
+      if (ap.transactionId && maps.transactions.has(String(ap.transactionId))) continue; // aponta para receita existente válida
+      ap.transactionId = keepId;
+      const key = recordKey('appointments', apptId);
+      const r = (this.state.records[key] ??= { baseRev: 0, base: null, dirty: false, seq: 0 });
+      r.dirty = true;
+      r.deleted = false;
+      r.seq++;
       changed = true;
     }
 

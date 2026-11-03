@@ -87,6 +87,10 @@ export interface SyncState {
   version: 1;
   deviceId: string;
   linkedUid: string | null;
+  /** E-mail da conta associada (para avisar o usuário em troca de conta). */
+  linkedEmail?: string | null;
+  /** Última conta desassociada deste aparelho (os dados locais vieram dela). */
+  previousAccount?: { uid: string; email: string | null } | null;
   cursor: number;
   lastSyncedAt: string | null; // somente após confirmação do servidor
   records: Record<string, RecordSyncState>;

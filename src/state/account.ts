@@ -4,7 +4,9 @@ import type { LinkAnalysis, LinkMode, SyncEngine } from '../sync/engine';
 export type SignInOutcome =
   | { status: 'cancelado' }
   | { status: 'conectado'; user: CloudUser }
-  | { status: 'escolher'; user: CloudUser; analysis: LinkAnalysis };
+  | { status: 'escolher'; user: CloudUser; analysis: LinkAnalysis }
+  /** O aparelho já está associado a OUTRA conta: nada é misturado. */
+  | { status: 'outraConta'; linkedEmail: string | null };
 
 /**
  * Orquestra conta Google + sincronização. Nada é enviado à nuvem antes de o
@@ -28,6 +30,14 @@ export class AccountController {
   }
 
   async afterSignIn(user: CloudUser): Promise<SignInOutcome> {
+    const linked = this.sync.linkedUid;
+    if (linked && linked !== user.uid) {
+      // Proteção contra mistura de contas: os dados deste aparelho pertencem a
+      // outra conta (possivelmente com alterações ainda não enviadas).
+      await this.auth.signOut();
+      await this.sync.setUser(null);
+      return { status: 'outraConta', linkedEmail: this.sync.linkedEmail };
+    }
     await this.sync.setUser(user.uid);
     if (this.sync.linkedUid === user.uid) return { status: 'conectado', user };
     return { status: 'escolher', user, analysis: await this.sync.analyze(user.uid) };
@@ -37,7 +47,18 @@ export class AccountController {
   async link(mode: LinkMode) {
     const user = this.auth.current();
     if (!user) throw new Error('Conta não conectada.');
-    await this.sync.link(user.uid, mode);
+    await this.sync.link(user.uid, mode, user.email);
+  }
+
+  /** Antes de desconectar: tenta enviar as pendências. Retorna quantas ficaram sem envio. */
+  async flushBeforeDisconnect(): Promise<number> {
+    await this.sync.sync();
+    return this.sync.pendingCount;
+  }
+
+  /** Desassocia o aparelho sem estar conectado (ex.: sem acesso à conta antiga). Dados locais mantidos. */
+  async forgetLinkedAccount() {
+    await this.sync.unlink();
   }
 
   /** Cancela a associação: sai da conta; nenhum dado local ou da nuvem é alterado. */

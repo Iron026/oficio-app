@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { FakeAuth, type CloudUser } from '../cloud/auth';
@@ -166,5 +166,45 @@ describe('Conta Google e sincronização (interface)', () => {
     render(<App storageFactory={async () => ({ storage: await createIndexedDbAdapter(dbName), persistent: true })} />);
     expect(await screen.findByText(/conta google em breve/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /continuar com google/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('auditoria: proteção na troca de conta e desconexão (interface)', () => {
+  async function connected(t: ReturnType<typeof setup>) {
+    await seedLocal(t.dbName);
+    const user = userEvent.setup();
+    const view = await openSettings(t);
+    await user.click(await screen.findByRole('button', { name: /continuar com google/i }));
+    await user.click(within(await screen.findByRole('dialog', { name: /conectar seus dados/i })).getByRole('button', { name: /enviar e conectar/i }));
+    await screen.findByText('Sincronizado');
+    return { user, view };
+  }
+
+  it('sessão encerrada: mostra a conta associada; outra conta é recusada sem misturar dados', async () => {
+    const t = setup();
+    const { user } = await connected(t);
+    await act(() => t.auth.signOut()); // sessão expira
+    expect(await screen.findByText(/associado a ana@example.com/i)).toBeInTheDocument();
+    t.auth.next = { uid: 'uid-bruno', name: 'Bruno', email: 'bruno@example.com', photoURL: null };
+    await user.click(screen.getByRole('button', { name: /entrar novamente com google/i }));
+    expect(await screen.findByText(/associado a outra conta/i)).toBeInTheDocument();
+    expect(t.auth.current()).toBeNull();
+    expect(await t.remote.hasData('uid-bruno')).toBe(false);
+  });
+
+  it('desconectar sem internet avisa sobre alterações não enviadas', async () => {
+    const t = setup();
+    const { user } = await connected(t);
+    t.remote.offline = true;
+    window.location.hash = '#/clientes';
+    await user.click(await screen.findByRole('button', { name: /^cliente$/i }));
+    const form = await screen.findByRole('dialog', { name: /novo cliente/i });
+    await user.type(within(form).getByLabelText(/^nome/i), 'Sem rede');
+    await user.click(within(form).getByRole('button', { name: /cadastrar cliente/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /novo cliente/i })).not.toBeInTheDocument());
+    window.location.hash = '#/ajustes';
+    await user.click(await screen.findByRole('button', { name: /^desconectar$/i }));
+    const confirm = await screen.findByRole('dialog', { name: /desconectar conta/i });
+    expect(within(confirm).getByText(/ainda não fo(i|ram) enviada/i)).toBeInTheDocument();
   });
 });
