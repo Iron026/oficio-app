@@ -59,6 +59,21 @@ Nada abaixo de 12 px. Não use tamanhos avulsos (`text-[13px]`).
 - Barras de progresso: 500 ms. Animar apenas `transform`/`opacity`/largura de barras.
 - "Reduzir movimento" do sistema desliga as animações.
 
+## Componentes (etapa 2)
+
+| Componente | Arquivo | Regras |
+| --- | --- | --- |
+| Botão | `ui/Button.tsx` | `primary` (uma ação principal por contexto), `tonal`, `secondary` (contornado), `ghost`, `danger`, `xp`; alturas 40/48/56 px |
+| Valor em dinheiro | `ui/Money.tsx` | receita `+` verde, despesa `−` terracota, saldo com sinal conforme o valor, zero neutro; leitor de tela ouve "mais"/"menos" |
+| Status | `ui/Badge.tsx` | ponto colorido + texto (Agendado, Pendente, Concluído, Cancelado) |
+| Avatar | `ui/Avatar.tsx` | iniciais com cor estável por nome, em tons discretos |
+| Demonstração | `ui/Misc.tsx` (`DemoBadge`) | contorno tracejado violeta, sem preenchimento |
+| Avisos | `ui/Toast.tsx` | na base, acima da navegação; até 3 visíveis; toque fecha |
+| Controle segmentado | `ui/Misc.tsx` | opções com 40 px de altura |
+
+Cartões de lista (serviços, clientes, lançamentos): título e nomes em até 2–3 linhas, sem reticências
+na primeira linha; valores alinhados e sem quebra; ações diretas (WhatsApp) como alvo separado de 44 px.
+
 ## Rede de segurança visual
 
 `npm run build && npm run visual` gera capturas em `visual-results/` (360, 412, 820 e 1280 px,

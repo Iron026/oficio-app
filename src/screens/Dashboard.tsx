@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, CalendarPlus, ChevronRight, Lightbulb, Receipt, Target, TriangleAlert, UserPlus, Wallet } from 'lucide-react';
+import { CalendarPlus, ChevronRight, CircleMinus, CirclePlus, Lightbulb, Target, TriangleAlert, UserPlus } from 'lucide-react';
 import { monthTotals } from '../domain/finance';
 import { overdue, upcoming } from '../domain/insights';
 import { missionProgress, totalXp, weeklyGoal } from '../gamification/engine';
 import { levelInfo } from '../gamification/levels';
-import { monthKey } from '../lib/dates';
-import { formatMoneyShort } from '../lib/money';
+import { monthKey, monthLabel } from '../lib/dates';
 import { useApp } from '../state/AppContext';
-import { cx } from '../ui/cx';
+import { Button } from '../ui/Button';
 import { Card, EmptyState, ProgressBar, SectionTitle } from '../ui/Misc';
+import { Money } from '../ui/Money';
 import { AppointmentItem } from './AppointmentItem';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
 import { ClientFormSheet } from './forms/ClientForm';
@@ -34,54 +34,74 @@ export function Dashboard() {
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
   const quick = [
-    { id: 'agendar' as const, label: 'Agendar', icon: CalendarPlus },
-    { id: 'cliente' as const, label: 'Cliente', icon: UserPlus },
-    { id: 'receita' as const, label: 'Receita', icon: ArrowUpRight },
-    { id: 'despesa' as const, label: 'Despesa', icon: ArrowDownRight },
+    { id: 'agendar' as const, label: 'Agendar', icon: CalendarPlus, tone: '' },
+    { id: 'cliente' as const, label: 'Cliente', icon: UserPlus, tone: 'text-brand-600 dark:text-brand-300' },
+    { id: 'receita' as const, label: 'Receita', icon: CirclePlus, tone: 'text-income' },
+    { id: 'despesa' as const, label: 'Despesa', icon: CircleMinus, tone: 'text-expense' },
   ];
 
   return (
     <div>
       <p className="text-muted">{greeting},</p>
-      <h2 className="text-2xl font-bold tracking-tight">{firstName}</h2>
+      <h2 className="text-title-1 font-extrabold tracking-tight [overflow-wrap:anywhere]">{firstName}</h2>
 
-      <a href="#/evolucao" className="mt-4 block rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white shadow-lg shadow-brand-700/20 transition-transform active:scale-[0.99]">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-white/75">Nível {lv.level}</p>
-            <p className="text-xl font-bold">{lv.title}</p>
-          </div>
-          <span className="num rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">{lv.totalXp} XP</span>
+      <Card className="mt-4 !p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-sans text-xs font-bold uppercase tracking-wider text-muted">{monthLabel(monthKey(now))}</p>
+          <a href="#/financas" className="-my-2 inline-flex min-h-10 items-center gap-0.5 text-sm font-semibold text-brand-700 dark:text-brand-300">
+            Finanças <ChevronRight size={16} aria-hidden="true" />
+          </a>
         </div>
-        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label="Progresso do nível" aria-valuenow={Math.round(lv.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+        <p className="mt-1 text-sm text-muted">Saldo do mês</p>
+        <p className="text-title-1 font-extrabold tracking-tight sm:text-display"><Money cents={month.balance} kind="balance" /></p>
+        <dl className="mt-4 divide-y divide-line rounded-xl bg-surface-2 dark:divide-line/70">
+          <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+            <dt className="flex items-center gap-2 text-sm text-muted"><CirclePlus size={18} className="text-income" aria-hidden="true" /> Receitas</dt>
+            <dd className="text-base font-bold"><Money cents={month.income} kind="income" /></dd>
+          </div>
+          <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+            <dt className="flex items-center gap-2 text-sm text-muted"><CircleMinus size={18} className="text-expense" aria-hidden="true" /> Despesas</dt>
+            <dd className="text-base font-bold"><Money cents={month.expense} kind="expense" /></dd>
+          </div>
+        </dl>
+      </Card>
+
+      <a
+        href="#/evolucao"
+        className="mt-3 block rounded-3xl bg-gradient-to-br from-brand-600 to-brand-900 p-4 text-white shadow-lg shadow-brand-900/20 transition-transform active:scale-[0.99]"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-xp-400 text-xp-950 shadow-md shadow-black/20">
+            <span className="text-xs font-bold uppercase leading-none tracking-wide">Nível</span>
+            <span className="num text-2xl font-extrabold leading-none">{lv.level}</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-lg font-bold leading-tight">{lv.title}</p>
+            <p className="num text-sm text-white/85">{lv.totalXp} XP</p>
+          </div>
+          <ChevronRight size={20} className="shrink-0 text-white/80" aria-hidden="true" />
+        </div>
+        <div className="mt-3.5 h-2.5 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label="Progresso do nível" aria-valuenow={Math.round(lv.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
           <div className="h-full rounded-full bg-xp-400 transition-[width] duration-500" style={{ width: `${Math.round(lv.progress * 100)}%` }} />
         </div>
-        <p className="mt-2 flex items-center justify-between text-sm text-white/80">
-          Faltam {lv.xpForNext - lv.xpIntoLevel} XP para o nível {lv.level + 1}
-          <ChevronRight size={16} aria-hidden="true" />
-        </p>
+        <p className="mt-2 text-sm text-white/85">Faltam <span className="num font-semibold text-white">{lv.xpForNext - lv.xpIntoLevel} XP</span> para o nível {lv.level + 1}</p>
       </a>
 
-      <div className="mt-4 grid grid-cols-4 gap-2">
-        {quick.map(({ id, label, icon: Icon }) => (
-          <button key={id} type="button" onClick={() => setSheet(id)} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-surface py-3 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-95">
-            <Icon size={22} className="text-brand-600 dark:text-brand-300" aria-hidden="true" />
+      <div className="mt-4 grid grid-cols-2 gap-2.5">
+        {quick.map(({ id, label, icon: Icon, tone }) => (
+          <Button key={id} variant={id === 'agendar' ? 'primary' : 'secondary'} className="!justify-start" icon={<Icon size={20} className={tone} aria-hidden="true" />} onClick={() => setSheet(id)}>
             {label}
-          </button>
+          </Button>
         ))}
       </div>
 
-      <SectionTitle action={<a href="#/financas" className="text-sm font-semibold text-brand-600 dark:text-brand-300">Ver tudo</a>}>Este mês</SectionTitle>
-      <div className="grid grid-cols-2 gap-3">
-        <Kpi label="Receitas" value={formatMoneyShort(month.income)} tone="income" />
-        <Kpi label="Despesas" value={formatMoneyShort(month.expense)} tone="expense" />
-        <Kpi label="Saldo" value={formatMoneyShort(month.balance)} tone={month.balance >= 0 ? 'neutral' : 'expense'} icon={<Wallet size={16} aria-hidden="true" />} />
-        <Card className="!p-3.5">
-          <p className="flex items-center gap-1.5 text-sm text-muted"><Target size={14} aria-hidden="true" /> {t.services} na semana</p>
-          <p className="mt-1 text-xl font-bold num">{week.current}<span className="text-base font-medium text-muted">/{week.target}</span></p>
-          <ProgressBar value={week.progress} label="Meta semanal" className="mt-2 !h-1.5" />
-        </Card>
-      </div>
+      <Card className="mt-3 !p-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="flex items-center gap-2 text-sm text-muted"><Target size={16} className="shrink-0" aria-hidden="true" /> {t.services} na semana</p>
+          <p className="num shrink-0 text-lg font-bold">{week.current}<span className="text-sm font-medium text-muted"> de {week.target}</span></p>
+        </div>
+        <ProgressBar value={week.progress} label="Meta semanal" className="mt-2 !h-2" />
+      </Card>
 
       {late.length > 0 && (
         <a href="#/agenda" className="mt-4 flex items-center gap-3 rounded-2xl bg-amber-50 p-3.5 text-sm text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
@@ -91,7 +111,7 @@ export function Dashboard() {
         </a>
       )}
 
-      <SectionTitle action={<a href="#/agenda" className="text-sm font-semibold text-brand-600 dark:text-brand-300">Agenda</a>}>Próxim{t.serviceArticle}s {t.services.toLowerCase()}</SectionTitle>
+      <SectionTitle action={<a href="#/agenda" className="-my-2 inline-flex min-h-10 items-center text-sm font-semibold text-brand-700 dark:text-brand-300">Agenda</a>}>Próxim{t.serviceArticle}s {t.services.toLowerCase()}</SectionTitle>
       {next.length ? (
         <div className="space-y-2.5">{next.map((a) => <AppointmentItem key={a.id} a={a} showDate />)}</div>
       ) : (
@@ -102,7 +122,7 @@ export function Dashboard() {
 
       {missions.length > 0 && (
         <>
-          <SectionTitle action={<a href="#/evolucao" className="text-sm font-semibold text-brand-600 dark:text-brand-300">Evolução</a>}>Missões</SectionTitle>
+          <SectionTitle action={<a href="#/evolucao" className="-my-2 inline-flex min-h-10 items-center text-sm font-semibold text-brand-700 dark:text-brand-300">Evolução</a>}>Missões</SectionTitle>
           <div className="space-y-2.5">
             {missions.map((m) => (
               <Card key={m.key} className="!p-3.5">
@@ -136,16 +156,3 @@ export function Dashboard() {
     </div>
   );
 }
-
-function Kpi({ label, value, tone, icon }: { label: string; value: string; tone: 'income' | 'expense' | 'neutral'; icon?: React.ReactNode }) {
-  return (
-    <Card className="!p-3.5">
-      <p className="flex items-center gap-1.5 text-sm text-muted">
-        {icon ?? (tone === 'income' ? <ArrowUpRight size={14} aria-hidden="true" /> : <Receipt size={14} aria-hidden="true" />)}
-        {label}
-      </p>
-      <p className={cx('mt-1 truncate text-xl font-bold num', tone === 'income' && 'text-income', tone === 'expense' && 'text-expense')} title={value}>{value}</p>
-    </Card>
-  );
-}
-

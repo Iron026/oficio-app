@@ -1,21 +1,18 @@
 import { useMemo, useState } from 'react';
 import { CalendarPlus, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Search, Trash2, UserPlus } from 'lucide-react';
 import type { Client } from '../domain/types';
-import { formatMoney } from '../lib/money';
 import { useApp, useErrorHandler } from '../state/AppContext';
 import { Button } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
+import { Avatar } from '../ui/Avatar';
 import { DemoBadge, EmptyState } from '../ui/Misc';
+import { Money } from '../ui/Money';
 import { Sheet } from '../ui/Sheet';
 import { useToast } from '../ui/Toast';
 import { AppointmentItem, whatsappLink } from './AppointmentItem';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
 import { ClientFormSheet } from './forms/ClientForm';
 import { Fab } from './Shell';
-
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
-}
 
 const normalize = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -33,6 +30,7 @@ export function Clients() {
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   }, [data.clients, query]);
 
+  const wa = whatsappLink;
   const countFor = (id: string) => data.appointments.filter((a) => a.clientId === id && a.status === 'concluido').length;
   const selectedClient = data.clients.find((c) => c.id === selected);
 
@@ -63,19 +61,34 @@ export function Clients() {
       ) : (
         <>
           <p className="mb-2 mt-4 text-sm text-muted">{list.length} {list.length === 1 ? t.client.toLowerCase() : t.clients.toLowerCase()}</p>
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {list.map((c) => {
               const n = countFor(c.id);
               return (
-                <li key={c.id}>
-                  <button type="button" onClick={() => setSelected(c.id)} className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-3 text-left transition-colors hover:bg-surface-2 active:scale-[0.99]">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200" aria-hidden="true">{initials(c.name)}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2"><span className="truncate font-semibold">{c.name}</span>{c.isDemo && <DemoBadge />}</span>
-                      <span className="block truncate text-sm text-muted">{c.phone || 'Sem telefone'}</span>
+                <li key={c.id} className="flex items-stretch gap-1 rounded-2xl border border-line bg-surface">
+                  <button type="button" onClick={() => setSelected(c.id)} className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-surface-2 active:scale-[0.99]">
+                    <Avatar name={c.name} />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="line-clamp-3 font-display font-semibold leading-snug [overflow-wrap:anywhere]">{c.name}</span>
+                      <span className="num text-sm text-muted">{c.phone || 'Sem telefone'}</span>
+                      <span className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted">
+                        {n} {n === 1 ? t.service.toLowerCase() : t.services.toLowerCase()} {n === 1 ? t.completedLabel : t.completedLabelPlural}
+                        {c.isDemo && <DemoBadge />}
+                      </span>
                     </span>
-                    <span className="shrink-0 text-right text-sm text-muted">{n} {n === 1 ? t.service.toLowerCase() : t.services.toLowerCase()}</span>
                   </button>
+                  {wa(c.phone) && (
+                    <a
+                      href={wa(c.phone)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`WhatsApp de ${c.name}`}
+                      title="WhatsApp"
+                      className="my-auto mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-green-700 transition-colors hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-500/10"
+                    >
+                      <MessageCircle size={22} aria-hidden="true" />
+                    </a>
+                  )}
                 </li>
               );
             })}
@@ -116,18 +129,24 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   return (
     <>
       <Sheet open={mode === 'view'} onClose={onClose} title={client.name}>
-        {client.isDemo && <div className="mb-3"><DemoBadge /></div>}
+        <div className="mb-4 flex items-center gap-3">
+          <Avatar name={client.name} size="lg" />
+          <div className="min-w-0 text-sm text-muted">
+            <p className="num">{client.phone || 'Sem telefone'}</p>
+            {client.isDemo && <p className="mt-1"><DemoBadge /></p>}
+          </div>
+        </div>
         <div className="mb-4 flex gap-2">
           {client.phone && (
-            <a href={`tel:${client.phone.replace(/\D/g, '')}`} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-surface-2 text-sm font-semibold"><Phone size={16} aria-hidden="true" /> Ligar</a>
+            <a href={`tel:${client.phone.replace(/\D/g, '')}`} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-line bg-surface text-sm font-semibold hover:bg-surface-2"><Phone size={16} aria-hidden="true" /> Ligar</a>
           )}
           {wa && (
-            <a href={wa} target="_blank" rel="noopener noreferrer" className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white"><MessageCircle size={16} aria-hidden="true" /> WhatsApp</a>
+            <a href={wa} target="_blank" rel="noopener noreferrer" className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-green-700 text-sm font-semibold text-white hover:bg-green-800"><MessageCircle size={16} aria-hidden="true" /> WhatsApp</a>
           )}
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">{t.services} {t.completedLabelPlural}</p><p className="text-lg font-bold">{completed.length}</p></div>
-          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">Total faturado</p><p className="text-lg font-bold">{formatMoney(billed)}</p></div>
+          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">{t.services} {t.completedLabelPlural}</p><p className="num text-lg font-bold">{completed.length}</p></div>
+          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">Total faturado</p><p className="text-lg font-bold"><Money cents={billed} /></p></div>
         </div>
         <ul className="mb-4 space-y-2 text-sm">
           {client.email && <li className="flex items-center gap-2"><Mail size={16} className="text-muted" aria-hidden="true" />{client.email}</li>}
@@ -137,9 +156,9 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
         <div className="mb-5 grid grid-cols-3 gap-2">
           <Button variant="secondary" size="sm" icon={<CalendarPlus size={16} />} onClick={() => setMode('schedule')}>Agendar</Button>
           <Button variant="secondary" size="sm" icon={<Pencil size={16} />} onClick={() => setMode('edit')}>Editar</Button>
-          <Button variant="secondary" size="sm" className="text-red-600 dark:text-red-400" icon={<Trash2 size={16} />} onClick={remove}>Excluir</Button>
+          <Button variant="secondary" size="sm" className="text-red-700 dark:text-red-300" icon={<Trash2 size={16} />} onClick={remove}>Excluir</Button>
         </div>
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">Histórico</h3>
+        <h3 className="mb-2 font-sans text-xs font-bold uppercase tracking-wider text-muted">Histórico</h3>
         {history.length ? (
           <div className="space-y-2">{history.map((a) => <AppointmentItem key={a.id} a={a} showDate />)}</div>
         ) : (

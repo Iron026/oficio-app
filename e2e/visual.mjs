@@ -105,6 +105,7 @@ async function seed(page) {
     ['Juliana Ramos de Albuquerque', '11912340002'],
     ['Carla Mendes', '11912340003'],
     ['Fernanda Lima', '11912340004'],
+    ['Maria Aparecida dos Santos Figueiredo de Albuquerque', '11912340005'], // nome longo
   ];
   for (const [name, phone] of clients) {
     await page.getByRole('button', { name: /^cliente$/i }).click();
@@ -121,6 +122,10 @@ async function seed(page) {
     ['Coloração completa com hidratação profunda', 'Juliana Ramos de Albuquerque', '2026-11-04', '16:30', '280,00', false],
     ['Manicure e pedicure', 'Carla Mendes', '2026-11-05', '09:30', '45,00', false],
     ['Penteado para casamento', 'Maria Oliveira', '2026-11-07', '08:00', '180,00', false],
+    // valor alto e título longo, concluído (gera receita alta no mês)
+    ['Pacote noiva completo com maquiagem, penteado e prova', 'Maria Aparecida dos Santos Figueiredo de Albuquerque', '2026-11-04', '07:30', '12.480,00', true],
+    // data passada ainda não concluída: aparece como "Pendente"
+    ['Hidratação capilar', 'Carla Mendes', '2026-11-03', '15:00', '75,00', false],
   ];
   for (const [title, client, date, time, price, done] of appts) {
     await page.getByRole('button', { name: /^agendar$/i }).first().click();
@@ -141,13 +146,21 @@ async function seed(page) {
     }
   }
 
-  await page.getByRole('button', { name: /^despesa$/i }).click();
-  const tx = page.getByRole('dialog');
-  await tx.getByLabel(/valor/i).fill('85,00');
-  await tx.getByLabel(/descrição/i).fill('Produtos de coloração');
-  await tx.getByLabel(/categoria/i).selectOption({ index: 1 });
-  await tx.getByRole('button', { name: /registrar/i }).click();
-  await tx.waitFor({ state: 'detached' });
+  const expenses = [
+    ['85,00', 'Produtos de coloração', '2026-11-04'],
+    ['3.250,00', 'Equipamentos e mobiliário para a nova bancada de atendimento', '2026-11-02'], // valor alto
+    ['450,00', 'Aluguel da cadeira', '2026-10-20'], // mês anterior com saldo negativo
+  ];
+  for (const [amount, description, date] of expenses) {
+    await page.getByRole('button', { name: /^despesa$/i }).click();
+    const tx = page.getByRole('dialog');
+    await tx.getByLabel(/valor/i).fill(amount);
+    await tx.getByLabel(/descrição/i).fill(description);
+    await tx.getByLabel(/categoria/i).selectOption({ index: 1 });
+    await tx.getByLabel(/^data/i).fill(date);
+    await tx.getByRole('button', { name: /registrar/i }).click();
+    await tx.waitFor({ state: 'detached' });
+  }
   await settle(page);
 }
 // Rótulo do campo de cliente na profissão Beleza (vem de profession.terms).
@@ -213,6 +226,16 @@ try {
       await capture(fresh.page, vp, theme, 'boas-vindas');
       await fresh.page.getByRole('button', { name: /começar/i }).click();
       await capture(fresh.page, vp, theme, 'profissao');
+      // Estados vazios: cadastro concluído, sem nenhum registro.
+      await fresh.page.getByRole('radio', { name: /beleza/i }).click();
+      await fresh.page.getByRole('button', { name: /continuar/i }).click();
+      await fresh.page.getByLabel(/seu nome/i).fill('Ana Souza');
+      await fresh.page.getByRole('button', { name: /entrar no ofício/i }).click();
+      for (const s of SCREENS.filter((x) => ['painel', 'agenda', 'clientes', 'financas'].includes(x.id))) {
+        await fresh.page.goto(BASE + s.hash);
+        await fresh.page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+        await capture(fresh.page, vp, theme, `vazio-${s.id}`);
+      }
       await fresh.ctx.close();
 
       const { ctx, page } = await newPage(vp, theme);
@@ -224,6 +247,15 @@ try {
         if (vp.id === 'celular-360' && ['painel', 'evolucao', 'agenda'].includes(s.id)) {
           await capture(page, vp, theme, `${s.id}-inteira`, { full: true, skipChecks: true });
         }
+      }
+      await page.goto(BASE + '#/financas');
+      await page.getByRole('button', { name: /mês anterior/i }).click();
+      await capture(page, vp, theme, 'financas-mes-anterior');
+      if (vp.id === 'celular-360') {
+        await page.goto(BASE + '#/clientes');
+        await capture(page, vp, theme, 'clientes-inteira', { full: true, skipChecks: true });
+        await page.goto(BASE + '#/financas');
+        await capture(page, vp, theme, 'financas-inteira', { full: true, skipChecks: true });
       }
       await page.goto(BASE + '#/clientes');
       await page.getByRole('button', { name: /^cliente$/i }).click();

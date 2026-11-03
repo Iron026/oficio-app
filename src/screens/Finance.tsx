@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, CalendarClock, ChevronLeft, ChevronRight, Link2, Receipt } from 'lucide-react';
+import { CalendarClock, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, Link2, Receipt } from 'lucide-react';
 import { byCategory, futureServiceDateFor, sortByDateDesc, totals, transactionsInMonth } from '../domain/finance';
 import type { Transaction, TransactionType } from '../domain/types';
 import { addMonths, formatDateShort, monthKey, monthLabel, parseDateKey, relativeDayLabel } from '../lib/dates';
-import { formatMoney } from '../lib/money';
 import { useApp } from '../state/AppContext';
 import { Button, IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { Card, DemoBadge, EmptyState, ProgressBar, Segmented } from '../ui/Misc';
+import { Money } from '../ui/Money';
 import { TransactionFormSheet } from './forms/TransactionForm';
 
 type Filter = 'todos' | TransactionType;
@@ -37,26 +37,32 @@ export function Finance() {
         <IconButton label="Próximo mês" onClick={() => shift(1)} disabled={isCurrent} className="disabled:opacity-30"><ChevronRight size={22} /></IconButton>
       </div>
 
-      <Card className="mt-3">
+      <Card className="mt-3 !p-5 shadow-sm">
         <p className="text-sm text-muted">Saldo do mês</p>
-        <p className={cx('text-3xl font-bold num tracking-tight', sum.balance < 0 && 'text-expense')}>{formatMoney(sum.balance)}</p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-surface-2 p-3">
-            <p className="flex items-center gap-1 text-sm text-muted"><ArrowUpRight size={14} className="text-income" aria-hidden="true" /> Receitas</p>
-            <p className="font-semibold num text-income">{formatMoney(sum.income)}</p>
+        <p className="mt-1 text-title-1 font-extrabold tracking-tight sm:text-display">
+          <Money cents={sum.balance} kind="balance" />
+        </p>
+        <p className="mt-1 text-sm text-muted">{sum.balance > 0 ? 'Saldo positivo' : sum.balance < 0 ? 'Saldo negativo: as despesas superaram as receitas' : 'Sem saldo neste mês'}</p>
+        <dl className="mt-4 divide-y divide-line rounded-xl bg-surface-2 dark:divide-line/70">
+          <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+            <dt className="flex items-center gap-2 text-sm text-muted"><CirclePlus size={18} className="text-income" aria-hidden="true" /> Receitas</dt>
+            <dd className="text-lg font-bold"><Money cents={sum.income} kind="income" /></dd>
           </div>
-          <div className="rounded-xl bg-surface-2 p-3">
-            <p className="flex items-center gap-1 text-sm text-muted"><ArrowDownRight size={14} className="text-expense" aria-hidden="true" /> Despesas</p>
-            <p className="font-semibold num text-expense">{formatMoney(sum.expense)}</p>
+          <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+            <dt className="flex items-center gap-2 text-sm text-muted"><CircleMinus size={18} className="text-expense" aria-hidden="true" /> Despesas</dt>
+            <dd className="text-lg font-bold"><Money cents={sum.expense} kind="expense" /></dd>
           </div>
-        </div>
+        </dl>
         {topExpenses.length > 0 && (
-          <div className="mt-4 space-y-2.5">
-            <p className="text-sm font-medium text-muted">Para onde foi o dinheiro</p>
+          <div className="mt-5 space-y-3">
+            <p className="font-sans text-xs font-bold uppercase tracking-wider text-muted">Para onde foi o dinheiro</p>
             {topExpenses.map((c) => (
               <div key={c.category}>
-                <div className="mb-1 flex justify-between text-sm"><span>{c.category}</span><span className="num text-muted">{formatMoney(c.amount)}</span></div>
-                <ProgressBar value={c.amount / sum.expense} label={`Despesas com ${c.category}`} />
+                <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{c.category}</span>
+                  <span className="shrink-0 text-muted"><Money cents={c.amount} /> · <span className="num">{Math.round((c.amount / sum.expense) * 100)}%</span></span>
+                </div>
+                <ProgressBar value={c.amount / sum.expense} label={`Despesas com ${c.category}`} tone="expense" className="!h-2" />
               </div>
             ))}
           </div>
@@ -64,8 +70,8 @@ export function Finance() {
       </Card>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <Button variant="secondary" icon={<ArrowUpRight size={18} className="text-income" />} onClick={() => setCreating('receita')}>Receita</Button>
-        <Button variant="secondary" icon={<ArrowDownRight size={18} className="text-expense" />} onClick={() => setCreating('despesa')}>Despesa</Button>
+        <Button variant="secondary" icon={<CirclePlus size={20} className="text-income" />} onClick={() => setCreating('receita')}>Receita</Button>
+        <Button variant="secondary" icon={<CircleMinus size={20} className="text-expense" />} onClick={() => setCreating('despesa')}>Despesa</Button>
       </div>
 
       <div className="mt-5">
@@ -83,20 +89,21 @@ export function Finance() {
                 {items.map((t) => (
                   <li key={t.id}>
                     <button type="button" onClick={() => setEditing(t)} className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-surface-2">
-                      <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', t.type === 'receita' ? 'bg-green-50 text-income dark:bg-green-500/10' : 'bg-orange-50 text-expense dark:bg-orange-500/10')}>
-                        {t.type === 'receita' ? <ArrowUpRight size={20} aria-hidden="true" /> : <ArrowDownRight size={20} aria-hidden="true" />}
+                      <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-full', t.type === 'receita' ? 'bg-green-50 text-income dark:bg-green-500/10' : 'bg-orange-50 text-expense dark:bg-orange-500/10')}>
+                        {t.type === 'receita' ? <CirclePlus size={20} aria-hidden="true" /> : <CircleMinus size={20} aria-hidden="true" />}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{t.description}</span>
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="line-clamp-2 font-medium leading-snug [overflow-wrap:anywhere]">{t.description}</span>
                         <span className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
+                          <span className="sr-only">{t.type === 'receita' ? 'Receita,' : 'Despesa,'}</span>
                           {t.category}
                           {t.appointmentId && <Link2 size={12} aria-label="Gerado por serviço concluído" />}
                           {t.isDemo && <DemoBadge />}
                           <FutureServiceBadge date={futureServiceDateFor(t, data.appointments)} />
                         </span>
                       </span>
-                      <span className={cx('shrink-0 font-semibold num', t.type === 'receita' ? 'text-income' : 'text-expense')}>
-                        {t.type === 'receita' ? '+' : '−'} {formatMoney(t.amount)}
+                      <span className="shrink-0 self-start pt-0.5 font-bold">
+                        <Money cents={t.amount} kind={t.type === 'receita' ? 'income' : 'expense'} />
                       </span>
                     </button>
                   </li>
