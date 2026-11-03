@@ -56,6 +56,10 @@ class Drbg:
         return int.from_bytes(self.bytes((bits + 7) // 8), "big") >> (((bits + 7) // 8) * 8 - bits)
 
 
+# A derivação não depende do tamanho mínimo: a mesma semente gera sempre a mesma chave.
+MIN_SEED = 8
+RECOMMENDED_SEED = 16
+
 SMALL_PRIMES = [p for p in range(3, 2000) if all(p % d for d in range(2, int(p**0.5) + 1))]
 
 
@@ -91,9 +95,19 @@ def gen_prime(bits: int, rng: Drbg, e: int) -> int:
 
 
 def main():
+    # Nunca imprime o segredo nem o seu tamanho exato.
     seed = os.environ.get("OFICIO_DEBUG_SEED", "")
-    if len(seed) < 16:
-        sys.exit("OFICIO_DEBUG_SEED ausente ou curto demais (mínimo 16 caracteres).")
+    if not seed:
+        print("ERRO: segredo OFICIO_DEBUG_SEED ausente.", file=sys.stderr)
+        sys.exit(2)
+    if len(seed) < MIN_SEED:
+        print(f"ERRO: segredo OFICIO_DEBUG_SEED curto demais (mínimo {MIN_SEED} caracteres).", file=sys.stderr)
+        sys.exit(3)
+    if len(seed) < RECOMMENDED_SEED:
+        print(f"AVISO: OFICIO_DEBUG_SEED tem menos de {RECOMMENDED_SEED} caracteres; recomenda-se um texto aleatório mais longo.", file=sys.stderr)
+    if len(sys.argv) != 2:
+        print("Uso: python3 ci/debug_keystore.py <arquivo-saida.p12>", file=sys.stderr)
+        sys.exit(4)
     out = sys.argv[1]
     rng = Drbg(hashlib.sha256(b"oficio-debug-keystore-v1|" + seed.encode()).digest())
     e = 65537
@@ -132,6 +146,7 @@ def main():
     )
     with open(out, "wb") as f:
         f.write(p12)
+    os.chmod(out, 0o600)
     fmt = lambda h: ":".join(h[i:i + 2] for i in range(0, len(h), 2)).upper()
     print("SHA-1:  ", fmt(hashlib.sha1(der).hexdigest()))
     print("SHA-256:", fmt(hashlib.sha256(der).hexdigest()))

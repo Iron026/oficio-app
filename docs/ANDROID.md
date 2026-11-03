@@ -18,7 +18,7 @@ Repita os passos e toque em **Atualizar**. Os dados são mantidos quando o novo 
 A partir da v0.3, a chave de depuração é **derivada de um segredo** do repositório (`ci/debug_keystore.py`):
 mesma chave em todos os builds e branches, sem nenhuma chave privada no código.
 
-1. Gere um texto aleatório longo (30+ caracteres) — ex.: *Gerenciador de senhas do Google → Gerar senha*.
+1. Gere um texto aleatório (mínimo **8** caracteres; recomendado **16 ou mais**) — ex.: *Gerenciador de senhas do Google → Gerar senha*.
 2. Abra **https://github.com/Iron026/oficio-app/settings/secrets/actions** → **New repository secret**.
 3. Name: `OFICIO_DEBUG_SEED` · Secret: o texto gerado → **Add secret**.
 4. Guarde esse texto em local seguro. Se perdê-lo, uma nova chave será gerada (será preciso reinstalar o app e cadastrar o novo SHA-1 no Firebase).

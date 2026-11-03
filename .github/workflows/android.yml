@@ -86,22 +86,41 @@ jobs:
       # Nenhuma chave privada fica no repositório. Não é a chave de produção.
       - name: Preparar chave de depuração
         id: keystore
+        shell: bash
         env:
           OFICIO_DEBUG_SEED: ${{ secrets.OFICIO_DEBUG_SEED }}
         run: |
-          if [ -n "$OFICIO_DEBUG_SEED" ]; then
-            python3 -m pip install --quiet --disable-pip-version-check cryptography
-            python3 ci/debug_keystore.py "$RUNNER_TEMP/oficio-debug.p12" | tee "$RUNNER_TEMP/fingerprints.txt"
-            echo "OFICIO_DEBUG_KEYSTORE=$RUNNER_TEMP/oficio-debug.p12" >> "$GITHUB_ENV"
-            echo "sha1=$(grep 'SHA-1' "$RUNNER_TEMP/fingerprints.txt" | awk '{print $NF}')" >> "$GITHUB_OUTPUT"
-            echo "stable=true" >> "$GITHUB_OUTPUT"
-          else
+          set -euo pipefail
+          KS="$RUNNER_TEMP/oficio-debug.p12"
+          if [ -z "${OFICIO_DEBUG_SEED:-}" ]; then
             echo "stable=false" >> "$GITHUB_OUTPUT"
             echo "::warning::Segredo OFICIO_DEBUG_SEED ausente: a assinatura deste APK pode mudar a cada build (atualizar por cima pode falhar e o SHA-1 do Firebase deixa de valer). Ver docs/ANDROID.md."
+            exit 0
           fi
+          python3 -m pip install --quiet --disable-pip-version-check cryptography
+          # Sem pipe: qualquer falha do gerador interrompe este passo.
+          python3 ci/debug_keystore.py "$KS" > "$RUNNER_TEMP/fingerprints.txt"
+          if [ ! -s "$KS" ]; then echo "::error::Arquivo de assinatura não foi criado."; exit 1; fi
+          keytool -list -keystore "$KS" -storetype PKCS12 -storepass android -alias oficio > /dev/null
+          cat "$RUNNER_TEMP/fingerprints.txt"
+          echo "OFICIO_DEBUG_KEYSTORE=$KS" >> "$GITHUB_ENV"
+          echo "sha1=$(grep 'SHA-1' "$RUNNER_TEMP/fingerprints.txt" | awk '{print $NF}')" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(grep 'SHA-256' "$RUNNER_TEMP/fingerprints.txt" | awk '{print $NF}')" >> "$GITHUB_OUTPUT"
+          echo "stable=true" >> "$GITHUB_OUTPUT"
 
       - name: Sincronizar Capacitor
         run: npx cap sync android
+
+      # Conferência imediatamente antes do Gradle (mesmo job, mesmo caminho).
+      - name: Validar arquivo de assinatura
+        if: steps.keystore.outputs.stable == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Arquivo: $OFICIO_DEBUG_KEYSTORE"
+          test -s "$OFICIO_DEBUG_KEYSTORE" || { echo "::error::Arquivo de assinatura ausente antes do Gradle."; exit 1; }
+          keytool -list -keystore "$OFICIO_DEBUG_KEYSTORE" -storetype PKCS12 -storepass android -alias oficio > /dev/null
+          echo "Arquivo de assinatura presente e legível."
 
       - name: Compilar APK
         working-directory: android
@@ -112,7 +131,9 @@ jobs:
 
       - name: Verificar assinatura e nomear APK
         id: apk
+        shell: bash
         run: |
+          set -euo pipefail
           NAME="oficio-${APP_VERSION}-build.${{ github.run_number }}-debug.apk"
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk "out/$NAME"
@@ -121,10 +142,13 @@ jobs:
           sha256sum "out/$NAME" | tee -a out/assinatura.txt
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           SHA1=$(grep -m1 'SHA-1 digest' out/assinatura.txt | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
-          if [ "${{ steps.keystore.outputs.stable }}" = "true" ] && [ "$SHA1" != "${{ steps.keystore.outputs.sha1 }}" ]; then
-            echo "::error::O APK não foi assinado com a chave estável (esperado ${{ steps.keystore.outputs.sha1 }}, obtido $SHA1)."; exit 1
-          fi
           SHA256=$(grep -m1 'SHA-256 digest' out/assinatura.txt | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
+          if [ "${{ steps.keystore.outputs.stable }}" = "true" ]; then
+            if [ "$SHA1" != "${{ steps.keystore.outputs.sha1 }}" ] || [ "$SHA256" != "${{ steps.keystore.outputs.sha256 }}" ]; then
+              echo "::error::O APK não foi assinado com a chave estável (esperado SHA-1 ${{ steps.keystore.outputs.sha1 }}, obtido $SHA1)."; exit 1
+            fi
+            echo "Assinatura conferida: igual à chave derivada do segredo."
+          fi
           {
             echo "### APK de teste pronto"
             echo "- Arquivo: \`$NAME\`"
@@ -173,15 +197,21 @@ jobs:
       # Semente PÚBLICA de teste (somente para este APK descartável): valida que o
       # Gradle assina com a chave derivada e que a impressão digital é a esperada.
       - name: Chave de depuração de teste
+        shell: bash
         run: |
+          set -euo pipefail
           python3 -m pip install --quiet --disable-pip-version-check cryptography
-          OFICIO_DEBUG_SEED=ci-teste-publico-nao-usar-em-producao python3 ci/debug_keystore.py "$RUNNER_TEMP/teste.p12" | tee "$RUNNER_TEMP/fp.txt"
+          OFICIO_DEBUG_SEED=ci-teste-publico-nao-usar-em-producao python3 ci/debug_keystore.py "$RUNNER_TEMP/teste.p12" > "$RUNNER_TEMP/fp.txt"
+          test -s "$RUNNER_TEMP/teste.p12"
+          cat "$RUNNER_TEMP/fp.txt"
           echo "OFICIO_DEBUG_KEYSTORE=$RUNNER_TEMP/teste.p12" >> "$GITHUB_ENV"
       - name: Compilar
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
       - name: Conferir assinatura determinística
+        shell: bash
         run: |
+          set -euo pipefail
           APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
           GOT=$($APKSIGNER verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA-1 digest' | awk '{print $NF}' | sed 's/../&:/g;s/:$//' | tr a-f A-F)
           WANT=$(grep 'SHA-1' "$RUNNER_TEMP/fp.txt" | awk '{print $NF}')
