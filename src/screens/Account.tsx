@@ -41,20 +41,22 @@ const toneClass = {
   off: 'text-muted',
 };
 
-function StatusIcon({ status, size = 18 }: { status: SyncStatus; size?: number }) {
+export function StatusIcon({ status, size = 18, onHero }: { status: SyncStatus; size?: number; onHero?: boolean }) {
   const { tone } = statusLabel(status);
   const Icon = tone === 'error' ? AlertTriangle : tone === 'wait' || tone === 'off' ? CloudOff : tone === 'busy' ? RefreshCw : Cloud;
-  return <Icon size={size} aria-hidden="true" className={cx(toneClass[tone], tone === 'busy' && 'animate-spin')} />;
+  // Girar só enquanto a sincronização está de fato em andamento (única animação contínua permitida).
+  return <Icon size={size} aria-hidden="true" className={cx(onHero ? 'text-white' : toneClass[tone], tone === 'busy' && 'animate-spin')} />;
 }
 
 /** Indicador discreto no topo (somente com conta conectada). */
-export function SyncIndicator() {
+export function SyncIndicator({ onHero }: { onHero?: boolean }) {
   const { linked, status } = useCloud();
   if (!linked) return null;
-  const { text } = statusLabel(status);
+  const { text, tone } = statusLabel(status);
   return (
-    <IconButton label={`Sincronização: ${text}`} onClick={() => navigate('ajustes')}>
-      <StatusIcon status={status} size={20} />
+    <IconButton label={`Sincronização: ${text}`} onClick={() => navigate('ajustes')} className={cx(onHero && 'relative text-white hover:bg-white/15 hover:text-white')}>
+      <StatusIcon status={status} size={20} onHero={onHero} />
+      {onHero && tone !== 'ok' && <span className={cx('absolute right-2 top-2 h-2.5 w-2.5 rounded-full ring-2 ring-[var(--hero-1)]', tone === 'error' ? 'bg-red-400' : tone === 'busy' ? 'bg-sky-300' : 'bg-amber-300')} aria-hidden="true" />}
     </IconButton>
   );
 }

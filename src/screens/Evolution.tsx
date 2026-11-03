@@ -2,61 +2,125 @@ import { useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, CircleCheck, Lock, Minus, Pencil } from 'lucide-react';
 import { growthPercent } from '../domain/finance';
 import { monthlyHistory } from '../domain/insights';
+import { featuredSealOf } from '../domain/preferences';
+import type { SealId } from '../domain/types';
 import { ACHIEVEMENTS } from '../gamification/achievements';
-import { missionProgress, monthlyGoal, realData, totalXp, weeklyGoal, type MissionProgress } from '../gamification/engine';
-import { levelInfo, totalXpForLevel } from '../gamification/levels';
+import { missionProgress, monthlyGoal, realData, weeklyGoal, type MissionProgress } from '../gamification/engine';
+import { totalXpForLevel } from '../gamification/levels';
+import { ROMAN, type SealProgress } from '../gamification/seals';
+import { TIERS, tierLabel, type Tier } from '../gamification/tiers';
 import { monthLabel } from '../lib/dates';
 import { centsToInput, formatMoney, formatMoneyShort, parseMoney } from '../lib/money';
 import { useApp, useErrorHandler, useFeedback } from '../state/AppContext';
+import { useProfile } from '../state/useProfile';
 import { Button, IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { TextField } from '../ui/Field';
 import { AchievementIcon } from '../ui/icons';
-import { Card, ProgressBar, SectionTitle } from '../ui/Misc';
+import { Card, ProgressBar, SectionTitle, Segmented } from '../ui/Misc';
+import { ProfileAvatar, TIER_COLORS, TierChip, tierGlyph } from '../ui/ProfileAvatar';
+import { SealMedal, StagePips } from '../ui/SealMedal';
 import { Sheet } from '../ui/Sheet';
+import { HeroSlot } from './Shell';
+type Tab = 'missoes' | 'selos' | 'conquistas' | 'historico';
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'missoes', label: 'Missões' },
+  { value: 'selos', label: 'Selos' },
+  { value: 'conquistas', label: 'Conquistas' },
+  { value: 'historico', label: 'Histórico' },
+];
 
 export function Evolution() {
+  const { data } = useApp();
+  const { lv, tier, next, seals, featured } = useProfile();
+  const [tab, setTab] = useState<Tab>('missoes');
+  const owned = seals.filter((p) => p.stage > 0).length;
+
+  return (
+    <div>
+      <HeroSlot overlap>
+        <div className="flex items-center gap-4 pt-1">
+          <ProfileAvatar data={data} tier={tier} size={84} seal={featured ? { id: featured.def.id, stage: featured.stage } : null} onHero />
+          <div className="min-w-0">
+            <h2 className="font-display text-title-2 font-extrabold leading-tight">Nível <span className="num">{lv.level}</span> · {lv.title}</h2>
+            <TierChip tier={tier} onHero className="mt-1.5" />
+            <p className="mt-1.5 text-sm text-white/85"><span className="num">{lv.totalXp}</span> XP acumulados</p>
+          </div>
+        </div>
+      </HeroSlot>
+
+      <Card className="!p-5 shadow-md">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm font-semibold">Próximo nível</p>
+          <p className="num text-sm text-muted">{lv.xpIntoLevel}/{lv.xpForNext} XP</p>
+        </div>
+        <ProgressBar value={lv.progress} label="Progresso para o próximo nível" tone="xp" className="mt-2" />
+        <p className="mt-2 text-sm text-muted">
+          {next
+            ? <>Nível <span className="num">{lv.level + 1}</span> em <span className="num">{totalXpForLevel(lv.level + 1)}</span> XP · {next.tier.name} no nível <span className="num">{next.tier.minLevel}</span>, faltam <span className="num">{next.xpNeeded}</span> XP</>
+            : <>Nível <span className="num">{lv.level + 1}</span> em <span className="num">{totalXpForLevel(lv.level + 1)}</span> XP · você está na categoria máxima</>}
+        </p>
+        <TierPath current={tier} />
+      </Card>
+
+      <div className="mt-[var(--gap-section)]">
+        <Segmented label="Seções da evolução" value={tab} onChange={setTab} options={TABS} />
+      </div>
+
+      <div key={tab} className="animate-screen">
+        {tab === 'missoes' && <MissionsTab />}
+        {tab === 'selos' && <SealsTab seals={seals} featuredId={featured?.def.id ?? null} owned={owned} />}
+        {tab === 'conquistas' && <AchievementsTab />}
+        {tab === 'historico' && <HistoryTab />}
+      </div>
+    </div>
+  );
+}
+
+/** Caminho das 6 categorias; a atual em destaque. Símbolo + nome (não depende só de cor). */
+function TierPath({ current }: { current: Tier }) {
+  const idx = TIERS.findIndex((t) => t.id === current.id);
+  return (
+    <ol aria-label={`Categorias: ${tierLabel(current)}`} className="mt-4 grid grid-cols-3 gap-x-1 gap-y-3 min-[420px]:grid-cols-6">
+      {TIERS.map((t, i) => {
+        const c = TIER_COLORS[t.id];
+        const reached = i <= idx;
+        return (
+          <li key={t.id} aria-current={i === idx ? 'step' : undefined} className="flex min-w-0 flex-col items-center gap-1 text-center">
+            <span
+              className={cx('flex h-7 w-12 items-center justify-center rounded-full border-2 text-xs font-bold', i === idx && 'ring-2 ring-offset-2 ring-offset-surface', !reached && 'border-line')}
+              style={reached ? { background: `linear-gradient(135deg, ${c.c1}, ${c.c2})`, borderColor: c.c3, color: c.chipFg, '--tw-ring-color': c.c2 } as React.CSSProperties : undefined}
+            >
+              <span aria-hidden="true" className={cx('tracking-[-1px]', !reached && 'text-muted')}>{tierGlyph(t)}</span>
+            </span>
+            <span className={cx('w-full text-xs', i === idx ? 'font-bold' : 'text-muted')}>{t.name}</span>
+            <span className="sr-only">{reached ? (i === idx ? ', atual' : ', alcançada') : `, a partir do nível ${t.minLevel}`}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function MissionsTab() {
   const { data, profession } = useApp();
   const [editingGoals, setEditingGoals] = useState(false);
   const now = new Date();
   const profile = data.profile!;
   const t = profession.terms;
-  const lv = levelInfo(totalXp(data.xpEvents));
   const week = weeklyGoal(profile, data, now);
   const month = monthlyGoal(profile, data, now);
   const missions = missionProgress(profession, data, now);
   const starters = missions.filter((m) => m.kind === 'inicial');
   const weekly = missions.filter((m) => m.kind === 'semanal');
-  const history = monthlyHistory(realData(data), now, 6);
-  const cur = history[history.length - 1]!;
-  const prev = history[history.length - 2]!;
-  const unlocked = new Map(data.achievements.map((a) => [a.id, a.unlockedAt]));
-  const maxBar = Math.max(1, ...history.map((h) => Math.max(h.income, h.expense)));
-  const recentXp = [...data.xpEvents].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12);
-
   return (
-    <div>
-      <Card className="relative overflow-hidden !p-5">
-        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-xp-400/15" aria-hidden="true" />
-        <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl bg-xp-400 text-xp-950 shadow-md shadow-xp-500/30">
-            <span className="text-xs font-bold uppercase tracking-wider">Nível</span>
-            <span className="num text-2xl font-extrabold leading-none">{lv.level}</span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-xl font-bold">{lv.title}</p>
-            <p className="text-sm text-muted">{lv.totalXp} XP acumulados</p>
-          </div>
-        </div>
-        <ProgressBar value={lv.progress} label="Progresso para o próximo nível" tone="xp" className="mt-4" />
-        <p className="mt-2 text-sm text-muted">{lv.xpIntoLevel}/{lv.xpForNext} XP · nível {lv.level + 1} em {totalXpForLevel(lv.level + 1)} XP</p>
-      </Card>
-      <p className="mt-3 text-sm leading-relaxed text-muted">
+    <>
+      <p className="mt-4 text-sm leading-relaxed text-muted">
         Você ganha XP ao usar o app de verdade: cadastrar, agendar, concluir {t.services.toLowerCase()} e controlar o caixa. Cada ação vale XP uma única vez, há limite diário por tipo de ação e você nunca perde XP.
       </p>
 
-      <SectionTitle action={<IconButton label="Editar metas" onClick={() => setEditingGoals(true)} className="-my-2 h-9 w-9"><Pencil size={16} /></IconButton>}>Metas</SectionTitle>
-      <div className="grid gap-3">
+      <SectionTitle action={<IconButton label="Editar metas" onClick={() => setEditingGoals(true)} className="-my-2 h-11 w-11"><Pencil size={16} /></IconButton>}>Metas</SectionTitle>
+      <div className="enter-stagger grid gap-[var(--gap-list)]">
         <GoalCard title="Meta semanal" detail={`${week.current} de ${week.target} ${t.services.toLowerCase()} ${t.completedLabelPlural}`} progress={week.progress} done={week.done} />
         <GoalCard title="Meta do mês" detail={`${formatMoney(month.current)} de ${formatMoney(month.target)} em receitas`} progress={month.progress} done={month.done} />
       </div>
@@ -64,42 +128,123 @@ export function Evolution() {
       {starters.some((m) => !m.done) && (
         <>
           <SectionTitle>Primeiros passos</SectionTitle>
-          <div className="space-y-2.5">{starters.map((m) => <MissionCard key={m.key} m={m} />)}</div>
+          <div className="enter-stagger grid gap-[var(--gap-list)]">{starters.map((m) => <MissionCard key={m.key} m={m} />)}</div>
         </>
       )}
 
       <SectionTitle>Missões da semana</SectionTitle>
-      <div className="space-y-2.5">{weekly.map((m) => <MissionCard key={m.key} m={m} />)}</div>
+      <div className="enter-stagger grid gap-[var(--gap-list)]">{weekly.map((m) => <MissionCard key={m.key} m={m} />)}</div>
       <p className="mt-2 text-sm text-muted">Novas missões toda segunda-feira, adaptadas para {profession.name.toLowerCase()}.</p>
+      <GoalsSheet open={editingGoals} onClose={() => setEditingGoals(false)} />
+    </>
+  );
+}
 
-      <SectionTitle>Crescimento · {monthLabel(cur.month, true)} vs {monthLabel(prev.month, true)}</SectionTitle>
-      <div className="grid grid-cols-3 gap-2">
-        <Growth label="Receitas" value={formatMoneyShort(cur.income)} pct={growthPercent(cur.income, prev.income)} />
-        <Growth label={t.services} value={String(cur.servicesCompleted)} pct={growthPercent(cur.servicesCompleted, prev.servicesCompleted)} />
-        <Growth label="Novos clientes" value={String(cur.newClients)} pct={growthPercent(cur.newClients, prev.newClients)} />
-      </div>
+function SealsTab({ seals, featuredId, owned }: { seals: SealProgress[]; featuredId: SealId | null; owned: number }) {
+  const [open, setOpen] = useState<SealId | null>(null);
+  const selected = seals.find((p) => p.def.id === open) ?? null;
+  return (
+    <>
+      <p className="mt-4 text-sm leading-relaxed text-muted">
+        Selos reconhecem hábitos mantidos ao longo do tempo. São permanentes: um estágio conquistado nunca é perdido, mesmo que registros sejam excluídos. Selos não dão XP.
+      </p>
+      <SectionTitle>Seus selos · <span className="num">{owned}/{seals.length}</span></SectionTitle>
+      <ul className="enter-stagger grid grid-cols-1 gap-[var(--gap-list)] min-[400px]:grid-cols-2 lg:grid-cols-3">
+        {seals.map((p) => {
+          const target = p.next ?? p.def.thresholds[3];
+          const prevT = p.stage > 0 ? p.def.thresholds[p.stage - 1]! : 0;
+          const frac = p.next === null ? 1 : (p.value - prevT) / (p.next - prevT);
+          return (
+            <li key={p.def.id}>
+              <button type="button" onClick={() => setOpen(p.def.id)} className="press-soft flex h-full w-full items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 text-left shadow-sm hover:bg-surface-2">
+                <SealMedal id={p.def.id} stage={p.stage} size={56} />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="font-display font-bold leading-snug">{p.def.name}</span>
+                    {featuredId === p.def.id && <span className="rounded-full bg-brand-100 px-2 py-px text-xs font-semibold text-brand-800 dark:bg-brand-500/20 dark:text-brand-100">Em destaque</span>}
+                  </span>
+                  <span className="flex items-center gap-2 text-sm text-muted">
+                    <StagePips stage={p.stage} />
+                    {p.stage > 0 ? `Estágio ${ROMAN[p.stage]}` : 'Ainda não conquistado'}
+                  </span>
+                  <ProgressBar value={Math.max(0, Math.min(1, frac))} label={`${p.def.name}: progresso para o ${p.next === null ? 'último estágio' : `estágio ${ROMAN[p.stage + 1]}`}`} className="!h-2" />
+                  <span className="text-xs text-muted">{p.next === null ? `Estágio máximo · ${p.def.unit(p.value)}` : `${p.def.unit(p.value)} · próximo: ${target}`}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <SealSheet seal={selected} featuredId={featuredId} onClose={() => setOpen(null)} />
+    </>
+  );
+}
 
-      <SectionTitle>Histórico de 6 meses</SectionTitle>
-      <Card>
-        <div className="flex h-36 items-end justify-between gap-2" role="img" aria-label={`Receitas e despesas dos últimos 6 meses. ${history.map((h) => `${monthLabel(h.month)}: receitas ${formatMoney(h.income)}, despesas ${formatMoney(h.expense)}`).join('; ')}`}>
-          {history.map((h) => (
-            <div key={h.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-              <div className="flex h-full w-full items-end justify-center gap-0.5">
-                <div className="w-1/3 rounded-t bg-brand-500 transition-[height] duration-700" style={{ height: `${(h.income / maxBar) * 100}%`, minHeight: h.income ? 3 : 0 }} />
-                <div className="w-1/3 rounded-t bg-orange-400 transition-[height] duration-700" style={{ height: `${(h.expense / maxBar) * 100}%`, minHeight: h.expense ? 3 : 0 }} />
-              </div>
-              <span className="text-xs capitalize text-muted">{monthLabel(h.month, true)}</span>
+function SealSheet({ seal, featuredId, onClose }: { seal: SealProgress | null; featuredId: SealId | null; onClose: () => void }) {
+  const { data, service } = useApp();
+  const feedback = useFeedback();
+  const onError = useErrorHandler();
+  const choice = featuredSealOf(data.settings);
+  async function feature(id: SealId | 'auto') {
+    try {
+      await service.updateSettings({ featuredSeal: id });
+      feedback(id === 'auto' ? 'Destaque automático' : 'Selo em destaque no perfil');
+      onClose();
+    } catch (err) {
+      onError(err);
+    }
+  }
+  const p = seal;
+  return (
+    <Sheet open={!!p} onClose={onClose} title={p ? `Selo ${p.def.name}` : ''}>
+      {p && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <SealMedal id={p.def.id} stage={p.stage} size={72} />
+            <div className="min-w-0">
+              <p className="font-display text-lg font-bold">{p.stage > 0 ? `Estágio ${ROMAN[p.stage]} de IV` : 'Ainda não conquistado'}</p>
+              <p className="text-sm text-muted">Hoje: {p.def.unit(p.value)}</p>
             </div>
-          ))}
+          </div>
+          <ol className="divide-y divide-line rounded-xl border border-line">
+            {p.def.thresholds.map((th, i) => {
+              const at = p.reachedAt[i];
+              const done = i < p.stage;
+              return (
+                <li key={i} className="flex items-center justify-between gap-3 px-3.5 py-3">
+                  <span className="flex items-center gap-2.5">
+                    <span className={cx('flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold', done ? 'bg-brand-600 text-white' : 'bg-surface-2 text-muted')}>{ROMAN[i + 1]}</span>
+                    <span className="text-sm">{p.def.unit(th)}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-muted">{done ? (at ? `em ${new Date(at).toLocaleDateString('pt-BR')}` : 'conquistado') : 'a conquistar'}</span>
+                </li>
+              );
+            })}
+          </ol>
+          {p.stage > 0 ? (
+            featuredId === p.def.id && choice === p.def.id ? (
+              <Button variant="secondary" block onClick={() => feature('auto')}>Voltar ao destaque automático</Button>
+            ) : (
+              <Button block onClick={() => feature(p.def.id)}>{featuredId === p.def.id ? 'Fixar este selo no perfil' : 'Destacar no perfil'}</Button>
+            )
+          ) : (
+            <p className="text-sm text-muted">Conquiste o estágio I para poder destacar este selo no seu perfil.</p>
+          )}
+          <p className="text-xs text-muted">No destaque automático, o perfil mostra o selo de maior estágio (no empate, o mais recente).</p>
         </div>
-        <div className="mt-3 flex gap-4 text-xs text-muted">
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-500" />Receitas</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-400" />Despesas</span>
-        </div>
-      </Card>
+      )}
+    </Sheet>
+  );
+}
 
-      <SectionTitle>Conquistas · {unlocked.size}/{ACHIEVEMENTS.length}</SectionTitle>
-      <ul className="grid grid-cols-2 gap-2.5">
+function AchievementsTab() {
+  const { data, profession } = useApp();
+  const t = profession.terms;
+  const unlocked = new Map(data.achievements.map((a) => [a.id, a.unlockedAt]));
+  return (
+    <>
+      <SectionTitle>Conquistas · <span className="num">{unlocked.size}/{ACHIEVEMENTS.length}</span></SectionTitle>
+      <ul className="enter-stagger grid grid-cols-2 gap-[var(--gap-list)] sm:grid-cols-3">
         {ACHIEVEMENTS.map((a) => {
           const at = unlocked.get(a.id);
           return (
@@ -114,6 +259,49 @@ export function Evolution() {
           );
         })}
       </ul>
+    </>
+  );
+}
+
+/** Escala da barra; valores pequenos (mas não zero) continuam visíveis. */
+const barScale = (v: number, max: number) => (v > 0 ? Math.max(0.025, v / max) : 0);
+
+function HistoryTab() {
+  const { data, profession } = useApp();
+  const t = profession.terms;
+  const now = new Date();
+  const history = monthlyHistory(realData(data), now, 6);
+  const cur = history[history.length - 1]!;
+  const prev = history[history.length - 2]!;
+  const maxBar = Math.max(1, ...history.map((h) => Math.max(h.income, h.expense)));
+  const recentXp = [...data.xpEvents].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12);
+  return (
+    <>
+      <SectionTitle>Crescimento · {monthLabel(cur.month, true)} vs {monthLabel(prev.month, true)}</SectionTitle>
+      <div className="grid gap-2 min-[480px]:grid-cols-3">
+        <Growth label="Receitas" value={formatMoneyShort(cur.income)} pct={growthPercent(cur.income, prev.income)} />
+        <Growth label={t.services} value={String(cur.servicesCompleted)} pct={growthPercent(cur.servicesCompleted, prev.servicesCompleted)} />
+        <Growth label="Novos clientes" value={String(cur.newClients)} pct={growthPercent(cur.newClients, prev.newClients)} />
+      </div>
+
+      <SectionTitle>Histórico de 6 meses</SectionTitle>
+      <Card>
+        <div className="flex h-36 items-end justify-between gap-2" role="img" aria-label={`Receitas e despesas dos últimos 6 meses. ${history.map((h) => `${monthLabel(h.month)}: receitas ${formatMoney(h.income)}, despesas ${formatMoney(h.expense)}`).join('; ')}`}>
+          {history.map((h) => (
+            <div key={h.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+              <div className="flex h-full w-full items-end justify-center gap-0.5">
+                <div className="bar-rise h-full w-1/3 rounded-t bg-brand-500" style={{ transform: `scaleY(${barScale(h.income, maxBar)})` }} />
+                <div className="bar-rise h-full w-1/3 rounded-t bg-orange-400" style={{ transform: `scaleY(${barScale(h.expense, maxBar)})` }} />
+              </div>
+              <span className="text-xs capitalize text-muted">{monthLabel(h.month, true)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex gap-4 text-xs text-muted">
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-500" />Receitas</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-400" />Despesas</span>
+        </div>
+      </Card>
 
       <SectionTitle>Linha do tempo</SectionTitle>
       {recentXp.length ? (
@@ -132,9 +320,7 @@ export function Evolution() {
       ) : (
         <p className="text-sm text-muted">Sua evolução aparecerá aqui conforme você usar o app.</p>
       )}
-
-      <GoalsSheet open={editingGoals} onClose={() => setEditingGoals(false)} />
-    </div>
+    </>
   );
 }
 
@@ -180,13 +366,15 @@ function MissionCard({ m }: { m: MissionProgress }) {
 function Growth({ label, value, pct }: { label: string; value: string; pct: number | null }) {
   const Icon = pct === null || pct === 0 ? Minus : pct > 0 ? ArrowUpRight : ArrowDownRight;
   return (
-    <Card className="!p-3">
-      <p className="truncate text-xs text-muted">{label}</p>
-      <p className="truncate text-base font-bold num">{value}</p>
-      <p className={cx('mt-0.5 flex items-center gap-0.5 text-xs font-semibold', pct === null || pct === 0 ? 'text-muted' : pct > 0 ? 'text-income' : 'text-expense')}>
-        <Icon size={13} aria-hidden="true" />
-        {pct === null ? 'novo' : `${pct > 0 ? '+' : ''}${pct}%`}
-      </p>
+    <Card className="flex items-center justify-between gap-3 !p-3 min-[480px]:block">
+      <p className="text-sm text-muted min-[480px]:text-xs">{label}</p>
+      <div className="flex items-baseline gap-2 min-[480px]:block">
+        <p className="text-base font-bold num [overflow-wrap:anywhere]">{value}</p>
+        <p className={cx('mt-0.5 flex items-center gap-0.5 text-xs font-semibold', pct === null || pct === 0 ? 'text-muted' : pct > 0 ? 'text-income' : 'text-expense')}>
+          <Icon size={13} aria-hidden="true" />
+          {pct === null ? 'novo' : `${pct > 0 ? '+' : ''}${pct}%`}
+        </p>
+      </div>
     </Card>
   );
 }

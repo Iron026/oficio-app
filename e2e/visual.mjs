@@ -86,6 +86,7 @@ async function newPage(vp, theme) {
 async function settle(page) {
   await page.waitForFunction(() => !document.querySelector('[role="status"] > *'), null, { timeout: 8000 }).catch(() => undefined);
   await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(150);
 }
 
@@ -247,6 +248,12 @@ try {
         if (vp.id === 'celular-360' && ['painel', 'evolucao', 'agenda'].includes(s.id)) {
           await capture(page, vp, theme, `${s.id}-inteira`, { full: true, skipChecks: true });
         }
+      }
+      // Abas da Evolução (missões já foi capturada acima).
+      await page.goto(BASE + '#/evolucao');
+      for (const [tab, id] of [[/^selos$/i, 'selos'], [/^conquistas$/i, 'conquistas'], [/^histórico$/i, 'historico']]) {
+        await page.getByRole('radio', { name: tab }).click();
+        await capture(page, vp, theme, `evolucao-${id}`);
       }
       await page.goto(BASE + '#/financas');
       await page.getByRole('button', { name: /mês anterior/i }).click();

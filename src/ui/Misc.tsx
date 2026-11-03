@@ -6,12 +6,14 @@ export function Card({ className, children, as: As = 'section' }: { className?: 
 }
 
 export function ProgressBar({ value, label, tone = 'brand', className }: { value: number; label: string; tone?: 'brand' | 'xp' | 'expense'; className?: string }) {
-  const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
+  const v = Math.min(1, Math.max(0, value));
+  const pct = Math.round(v * 100);
   return (
     <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className={cx('h-2.5 w-full overflow-hidden rounded-full bg-surface-2', className)}>
+      {/* Preenche com transform (sem recalcular o layout) e anima ao aparecer (@starting-style). */}
       <div
-        className={cx('h-full rounded-full transition-[width] duration-500 ease-out', tone === 'xp' ? 'bg-gradient-to-r from-xp-400 to-xp-500' : tone === 'expense' ? 'bg-expense' : 'bg-gradient-to-r from-brand-400 to-brand-600')}
-        style={{ width: `${pct}%` }}
+        className={cx('bar-fill h-full w-full rounded-full', tone === 'xp' ? 'bg-gradient-to-r from-xp-400 to-xp-500' : tone === 'expense' ? 'bg-expense' : 'bg-gradient-to-r from-brand-400 to-brand-600')}
+        style={{ transform: `scaleX(${v})` }}
       />
     </div>
   );
@@ -34,16 +36,16 @@ export function EmptyState({ icon, title, text, action }: { icon: ReactNode; tit
 
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mb-2.5 mt-6 flex items-center justify-between">
+    <div className="mb-2.5 mt-[var(--gap-section)] flex items-center justify-between">
       <h2 className="font-sans text-xs font-bold uppercase tracking-wider text-muted">{children}</h2>
       {action}
     </div>
   );
 }
 
-export function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string }) {
+export function Segmented<T extends string>({ value, onChange, options, label, onHero }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string; onHero?: boolean }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex rounded-xl bg-surface-2 p-1">
+    <div role="radiogroup" aria-label={label} className={cx('flex rounded-xl p-1', onHero ? 'border border-white/20 bg-white/12' : 'bg-surface-2')}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -51,7 +53,12 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={cx('min-h-10 flex-1 rounded-lg px-2 text-sm font-semibold transition-colors', value === o.value ? 'bg-surface text-fg shadow-sm' : 'text-muted hover:text-fg')}
+          className={cx(
+            'press min-h-10 flex-1 rounded-lg px-2 text-sm font-semibold transition-colors',
+            onHero
+              ? value === o.value ? 'bg-white text-[#0d4f4a] shadow-sm' : 'text-white/85 hover:text-white'
+              : value === o.value ? 'bg-surface text-fg shadow-sm' : 'text-muted hover:text-fg',
+          )}
         >
           {o.label}
         </button>

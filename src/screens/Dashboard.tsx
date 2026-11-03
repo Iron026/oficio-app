@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { CalendarPlus, ChevronRight, CircleMinus, CirclePlus, Lightbulb, Target, TriangleAlert, UserPlus } from 'lucide-react';
 import { monthTotals } from '../domain/finance';
 import { overdue, upcoming } from '../domain/insights';
-import { missionProgress, totalXp, weeklyGoal } from '../gamification/engine';
-import { levelInfo } from '../gamification/levels';
+import { missionProgress, weeklyGoal } from '../gamification/engine';
 import { monthKey, monthLabel } from '../lib/dates';
 import { useApp } from '../state/AppContext';
 import { Button } from '../ui/Button';
 import { Card, EmptyState, ProgressBar, SectionTitle } from '../ui/Misc';
 import { Money } from '../ui/Money';
+import { ProfileAvatar, TierChip } from '../ui/ProfileAvatar';
+import { useProfile } from '../state/useProfile';
+import { HeroSlot } from './Shell';
 import { AppointmentItem } from './AppointmentItem';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
 import { ClientFormSheet } from './forms/ClientForm';
@@ -22,7 +24,6 @@ export function Dashboard() {
   const now = new Date();
   const profile = data.profile!;
   const t = profession.terms;
-  const lv = levelInfo(totalXp(data.xpEvents));
   const month = monthTotals(data.transactions, monthKey(now));
   const week = weeklyGoal(profile, data, now);
   const next = upcoming(data.appointments, now, 3);
@@ -30,6 +31,8 @@ export function Dashboard() {
   const missions = missionProgress(profession, data, now).filter((m) => !m.done).slice(0, 2);
   const tip = profession.tips[now.getDate() % profession.tips.length];
   const firstName = profile.name.split(' ')[0];
+  const { lv, tier } = useProfile();
+  const dateLine = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
@@ -41,11 +44,14 @@ export function Dashboard() {
   ];
 
   return (
-    <div>
-      <p className="text-muted">{greeting},</p>
-      <h2 className="text-title-1 font-extrabold tracking-tight [overflow-wrap:anywhere]">{firstName}</h2>
+    <div className="enter-stagger grid gap-[var(--gap-list)]">
+      <HeroSlot overlap>
+        <p className="pt-1 text-sm text-white/85">{greeting},</p>
+        <h2 className="font-display text-title-1 font-extrabold leading-tight [overflow-wrap:anywhere]">{firstName}</h2>
+        <p className="mt-0.5 text-sm text-white/80">{[profile.businessName, dateLine].filter(Boolean).join(' · ')}</p>
+      </HeroSlot>
 
-      <Card className="mt-4 !p-5 shadow-sm">
+      <Card className="!p-5 shadow-md">
         <div className="flex items-center justify-between gap-3">
           <p className="font-sans text-xs font-bold uppercase tracking-wider text-muted">{monthLabel(monthKey(now))}</p>
           <a href="#/financas" className="-my-2 inline-flex min-h-10 items-center gap-0.5 text-sm font-semibold text-brand-700 dark:text-brand-300">
@@ -68,26 +74,21 @@ export function Dashboard() {
 
       <a
         href="#/evolucao"
-        className="mt-3 block rounded-3xl bg-gradient-to-br from-brand-600 to-brand-900 p-4 text-white shadow-lg shadow-brand-900/20 transition-transform active:scale-[0.99]"
+        className="press-soft block rounded-2xl border border-xp-400/50 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-xp-400)_16%,var(--surface)),var(--surface)_70%)] p-4 shadow-sm"
       >
         <div className="flex items-center gap-3.5">
-          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-xp-400 text-xp-950 shadow-md shadow-black/20">
-            <span className="text-xs font-bold uppercase leading-none tracking-wide">Nível</span>
-            <span className="num text-2xl font-extrabold leading-none">{lv.level}</span>
-          </div>
+          <ProfileAvatar data={data} tier={tier} size={56} />
           <div className="min-w-0 flex-1">
-            <p className="font-display text-lg font-bold leading-tight">{lv.title}</p>
-            <p className="num text-sm text-white/85">{lv.totalXp} XP</p>
+            <p className="font-display text-base font-bold leading-tight">Nível {lv.level} · {lv.title}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2"><TierChip tier={tier} /><span className="num text-sm text-muted">{lv.totalXp} XP</span></div>
           </div>
-          <ChevronRight size={20} className="shrink-0 text-white/80" aria-hidden="true" />
+          <ChevronRight size={20} className="shrink-0 text-muted" aria-hidden="true" />
         </div>
-        <div className="mt-3.5 h-2.5 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label="Progresso do nível" aria-valuenow={Math.round(lv.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
-          <div className="h-full rounded-full bg-xp-400 transition-[width] duration-500" style={{ width: `${Math.round(lv.progress * 100)}%` }} />
-        </div>
-        <p className="mt-2 text-sm text-white/85">Faltam <span className="num font-semibold text-white">{lv.xpForNext - lv.xpIntoLevel} XP</span> para o nível {lv.level + 1}</p>
+        <ProgressBar value={lv.progress} label="Progresso do nível" tone="xp" className="mt-3" />
+        <p className="mt-2 text-sm text-muted">Faltam <span className="num font-semibold text-fg">{lv.xpForNext - lv.xpIntoLevel} XP</span> para o nível {lv.level + 1}</p>
       </a>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
         {quick.map(({ id, label, icon: Icon, tone }) => (
           <Button key={id} variant={id === 'agendar' ? 'primary' : 'secondary'} className="!justify-start" icon={<Icon size={20} className={tone} aria-hidden="true" />} onClick={() => setSheet(id)}>
             {label}
@@ -95,7 +96,7 @@ export function Dashboard() {
         ))}
       </div>
 
-      <Card className="mt-3 !p-3.5">
+      <Card className="!p-3.5">
         <div className="flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm text-muted"><Target size={16} className="shrink-0" aria-hidden="true" /> {t.services} na semana</p>
           <p className="num shrink-0 text-lg font-bold">{week.current}<span className="text-sm font-medium text-muted"> de {week.target}</span></p>
@@ -104,7 +105,7 @@ export function Dashboard() {
       </Card>
 
       {late.length > 0 && (
-        <a href="#/agenda" className="mt-4 flex items-center gap-3 rounded-2xl bg-amber-50 p-3.5 text-sm text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
+        <a href="#/agenda" className="press-soft flex items-center gap-3 rounded-2xl bg-amber-50 p-3.5 text-sm text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
           <TriangleAlert size={20} className="shrink-0" aria-hidden="true" />
           <span className="flex-1">{late.length === 1 ? `1 ${t.service.toLowerCase()} passad${t.serviceArticle} aguarda` : `${late.length} ${t.services.toLowerCase()} passad${t.serviceArticle}s aguardam`} conclusão.</span>
           <ChevronRight size={18} aria-hidden="true" />
@@ -141,7 +142,7 @@ export function Dashboard() {
       )}
 
       {tip && (
-        <Card className="mt-6 flex items-start gap-3 !bg-brand-50/60 dark:!bg-brand-500/10">
+        <Card className="mt-2 flex items-start gap-3 !bg-brand-50/60 dark:!bg-brand-500/10">
           <Lightbulb size={20} className="mt-0.5 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-brand-700 dark:text-brand-300">Dica para {profession.name.toLowerCase()}</p>

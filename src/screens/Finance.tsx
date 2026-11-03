@@ -9,6 +9,7 @@ import { cx } from '../ui/cx';
 import { Card, DemoBadge, EmptyState, ProgressBar, Segmented } from '../ui/Misc';
 import { Money } from '../ui/Money';
 import { TransactionFormSheet } from './forms/TransactionForm';
+import { HeroSlot } from './Shell';
 
 type Filter = 'todos' | TransactionType;
 
@@ -31,13 +32,15 @@ export function Finance() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <IconButton label="Mês anterior" onClick={() => shift(-1)}><ChevronLeft size={22} /></IconButton>
-        <h2 className="text-base font-semibold" aria-live="polite">{monthLabel(month)}</h2>
-        <IconButton label="Próximo mês" onClick={() => shift(1)} disabled={isCurrent} className="disabled:opacity-30"><ChevronRight size={22} /></IconButton>
-      </div>
+      <HeroSlot overlap>
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <IconButton label="Mês anterior" onClick={() => shift(-1)} className="!text-white hover:!bg-white/15"><ChevronLeft size={22} /></IconButton>
+          <h2 className="text-center font-display text-lg font-bold first-letter:uppercase" aria-live="polite">{monthLabel(month)}</h2>
+          <IconButton label="Próximo mês" onClick={() => shift(1)} disabled={isCurrent} className="!text-white hover:!bg-white/15 disabled:opacity-30"><ChevronRight size={22} /></IconButton>
+        </div>
+      </HeroSlot>
 
-      <Card className="mt-3 !p-5 shadow-sm">
+      <Card className="!p-5 shadow-md">
         <p className="text-sm text-muted">Saldo do mês</p>
         <p className="mt-1 text-title-1 font-extrabold tracking-tight sm:text-display">
           <Money cents={sum.balance} kind="balance" />
@@ -81,14 +84,14 @@ export function Finance() {
       {list.length === 0 ? (
         <EmptyState icon={<Receipt size={28} />} title="Sem lançamentos neste mês" text="Registre receitas e despesas para conhecer seu lucro real." />
       ) : (
-        <div className="mt-4 space-y-4">
+        <div className="enter-stagger mt-4 grid gap-4">
           {[...grouped.entries()].map(([date, items]) => (
             <section key={date}>
               <h3 className="mb-2 text-sm font-semibold text-muted">{relativeDayLabel(date)}</h3>
               <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
                 {items.map((t) => (
                   <li key={t.id}>
-                    <button type="button" onClick={() => setEditing(t)} className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-surface-2">
+                    <button type="button" onClick={() => setEditing(t)} className="press-soft flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-surface-2">
                       <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-full', t.type === 'receita' ? 'bg-green-50 text-income dark:bg-green-500/10' : 'bg-orange-50 text-expense dark:bg-orange-500/10')}>
                         {t.type === 'receita' ? <CirclePlus size={20} aria-hidden="true" /> : <CircleMinus size={20} aria-hidden="true" />}
                       </span>

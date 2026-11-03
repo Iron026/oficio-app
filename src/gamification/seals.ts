@@ -146,3 +146,17 @@ export function awardsToSave(data: Data, awards: readonly SealAward[], now: Date
   }
   return out;
 }
+
+/**
+ * Selo exibido no perfil. 'auto' (padrão): o de maior estágio; no empate, o mais
+ * recente. Um selo escolhido só vale se já foi conquistado (estágio ≥ I).
+ */
+export function featuredSeal(progress: readonly SealProgress[], pref: SealId | 'auto'): SealProgress | null {
+  const owned = progress.filter((p) => p.stage > 0);
+  if (pref !== 'auto') {
+    const chosen = owned.find((p) => p.def.id === pref);
+    if (chosen) return chosen;
+  }
+  const last = (p: SealProgress) => p.reachedAt[p.stage - 1] ?? '';
+  return [...owned].sort((a, b) => b.stage - a.stage || last(b).localeCompare(last(a)))[0] ?? null;
+}

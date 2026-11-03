@@ -12,7 +12,7 @@ import { useToast } from '../ui/Toast';
 import { AppointmentItem, whatsappLink } from './AppointmentItem';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
 import { ClientFormSheet } from './forms/ClientForm';
-import { Fab } from './Shell';
+import { Fab, HeroSlot } from './Shell';
 
 const normalize = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -36,19 +36,22 @@ export function Clients() {
 
   return (
     <div>
-      {data.clients.length > 0 && (
-        <label className="relative block">
-          <span className="sr-only">Buscar cliente</span>
-          <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por nome ou telefone"
-            className="h-12 w-full rounded-xl border border-line bg-surface pl-10 pr-3 text-base placeholder:text-muted/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
-          />
-        </label>
-      )}
+      <HeroSlot>
+        <p className="pt-1 text-sm text-white/85">{data.clients.length} {data.clients.length === 1 ? t.client.toLowerCase() : t.clients.toLowerCase()} na carteira</p>
+        {data.clients.length > 0 && (
+          <label className="relative mt-3 block">
+            <span className="sr-only">Buscar cliente</span>
+            <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/80" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por nome ou telefone"
+              className="h-12 w-full rounded-xl border border-white/25 bg-white/12 pl-10 pr-3 text-base text-white placeholder:text-white/75 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/40"
+            />
+          </label>
+        )}
+      </HeroSlot>
       {data.clients.length === 0 ? (
         <EmptyState
           icon={<UserPlus size={28} />}
@@ -60,13 +63,13 @@ export function Clients() {
         <p className="py-10 text-center text-muted">Nenhum cliente encontrado.</p>
       ) : (
         <>
-          <p className="mb-2 mt-4 text-sm text-muted">{list.length} {list.length === 1 ? t.client.toLowerCase() : t.clients.toLowerCase()}</p>
-          <ul className="space-y-2.5">
+          {query.trim() && <p className="mb-2 mt-4 text-sm text-muted" aria-live="polite">{list.length} {list.length === 1 ? 'resultado' : 'resultados'} para “{query.trim()}”</p>}
+          <ul className="enter-stagger grid gap-[var(--gap-list)]">
             {list.map((c) => {
               const n = countFor(c.id);
               return (
-                <li key={c.id} className="flex items-stretch gap-1 rounded-2xl border border-line bg-surface">
-                  <button type="button" onClick={() => setSelected(c.id)} className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-surface-2 active:scale-[0.99]">
+                <li key={c.id} className="flex items-stretch gap-1 rounded-2xl border border-line bg-surface shadow-sm">
+                  <button type="button" onClick={() => setSelected(c.id)} className="press-soft flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left hover:bg-surface-2">
                     <Avatar name={c.name} />
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="line-clamp-3 font-display font-semibold leading-snug [overflow-wrap:anywhere]">{c.name}</span>

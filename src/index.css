@@ -226,6 +226,22 @@ input, select, textarea, button { font: inherit; }
     linear-gradient(160deg, var(--hero-1), var(--hero-2));
 }
 
+/* Barras de progresso: preenchimento por transform (600 ms) e animação ao aparecer. */
+.bar-fill {
+  transform-origin: left center;
+  transition: transform 600ms var(--ease-standard);
+}
+@starting-style {
+  .bar-fill { transform: scaleX(0) !important; }
+}
+.bar-rise {
+  transform-origin: bottom center;
+  transition: transform 600ms var(--ease-standard);
+}
+@starting-style {
+  .bar-rise { transform: scaleY(0) !important; }
+}
+
 /* Retorno ao toque: 100 ms, encolhe levemente (a ação acontece no toque, sem esperar). */
 @utility press {
   transition: transform 100ms var(--ease-standard), background-color 150ms var(--ease-standard), box-shadow 150ms var(--ease-standard);

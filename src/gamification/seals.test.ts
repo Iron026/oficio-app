@@ -1,6 +1,6 @@
 import type { AppData, Appointment, Client, SealAward, Transaction, XpEvent } from '../domain/types';
 import { levelInfo, levelTitle, LEVEL_TITLES, totalXpForLevel } from './levels';
-import { awardsToSave, mergeAward, sealProgress, SEALS } from './seals';
+import { awardsToSave, featuredSeal, mergeAward, sealProgress, SEALS } from './seals';
 import { nextTier, TIERS, tierForLevel } from './tiers';
 
 const iso = (d: string) => `${d}T10:00:00.000Z`;
@@ -101,5 +101,22 @@ describe('Selos permanentes: nunca regridem', () => {
     expect(first).toHaveLength(1);
     expect(first[0]).toMatchObject({ id: 'experiencia', stage: 1 });
     expect(awardsToSave(data({ appointments: appts }), first, new Date('2026-11-05T10:00:00Z'))).toEqual([]);
+  });
+});
+
+describe('selo em destaque', () => {
+  const stored: SealAward[] = [
+    { id: 'metas', stage: 2, reachedAt: [iso('2026-01-01'), iso('2026-03-01'), null, null], createdAt: iso('2026-01-01'), updatedAt: iso('2026-03-01') },
+    { id: 'carteira', stage: 2, reachedAt: [iso('2026-01-01'), iso('2026-06-01'), null, null], createdAt: iso('2026-01-01'), updatedAt: iso('2026-06-01') },
+    { id: 'saude', stage: 1, reachedAt: [iso('2026-09-01'), null, null, null], createdAt: iso('2026-09-01'), updatedAt: iso('2026-09-01') },
+  ];
+  const p = sealProgress(data(), stored);
+  it('automático: maior estágio; no empate, o mais recente', () => {
+    expect(featuredSeal(p, 'auto')?.def.id).toBe('carteira');
+  });
+  it('escolhido: vale se conquistado; bloqueado volta ao automático', () => {
+    expect(featuredSeal(p, 'saude')?.def.id).toBe('saude');
+    expect(featuredSeal(p, 'experiencia')?.def.id).toBe('carteira');
+    expect(featuredSeal(sealProgress(data(), []), 'auto')).toBeNull();
   });
 });

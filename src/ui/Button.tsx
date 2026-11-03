@@ -31,7 +31,7 @@ export function Button({ variant = 'primary', size = 'md', icon, block, classNam
     <button
       type={type}
       className={cx(
-        'inline-flex items-center justify-center text-center leading-tight font-semibold [&>svg]:shrink-0 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none',
+        'press inline-flex items-center justify-center text-center leading-tight font-semibold [&>svg]:shrink-0 disabled:opacity-50 disabled:pointer-events-none select-none',
         variants[variant], sizes[size], block && 'w-full', className,
       )}
       {...rest}
@@ -48,7 +48,7 @@ export function IconButton({ label, className, children, ...rest }: ButtonHTMLAt
       type="button"
       aria-label={label}
       title={label}
-      className={cx('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg active:scale-95', className)}
+      className={cx('press inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg', className)}
       {...rest}
     >
       {children}
