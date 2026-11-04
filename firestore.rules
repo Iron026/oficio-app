@@ -65,7 +65,11 @@ service cloud.firestore {
 
       // Registros: clientes, serviços, lançamentos, XP e conquistas.
       match /records/{recordId} {
-        allow read, delete: if isOwner(uid);
+        allow read: if isOwner(uid);
+        // Selo permanente não pode ser apagado sozinho (excluir e recriar baixaria o estágio).
+        // Só some na exclusão da conta: o app apaga primeiro users/{uid} e depois os registros.
+        allow delete: if isOwner(uid)
+          && (!recordId.matches('sealAwards__.*') || !exists(/databases/$(database)/documents/users/$(uid)));
         allow create, update: if isOwner(uid)
           && request.resource.data.keys().hasOnly(['collection', 'id', 'data', 'deleted', 'rev', 'updatedAt', 'deviceId'])
           && request.resource.data.collection in ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages']

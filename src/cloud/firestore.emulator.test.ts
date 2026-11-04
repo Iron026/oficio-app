@@ -224,6 +224,27 @@ describe('regras 0.4: selos permanentes (sealAwards)', () => {
     await assertSucceeds(setDoc(ref('alice'), seal({ rev: 2 }, { stage: 3 }))); // mesmo estágio (datas mais antigas)
     await assertSucceeds(setDoc(ref('alice'), seal({ rev: 3 }, { stage: 4 })));
   });
+
+  it('excluir e recriar o selo com estágio menor é recusado enquanto a conta existe', async () => {
+    const meta = doc(db('alice'), 'users/alice');
+    await assertSucceeds(setDoc(meta, { schemaVersion: 1, data: { profile: null, settings: {} }, rev: 1, updatedAt: serverTimestamp(), deviceId: 'dev-1' }));
+    await assertSucceeds(setDoc(ref('alice'), seal({}, { stage: 3 })));
+    await assertFails(deleteDoc(ref('alice'))); // exclusão avulsa do selo
+    await assertFails(setDoc(ref('alice'), seal({ rev: 2 }, { stage: 1 }))); // e por cima continua recusado
+    expect((await getDoc(ref('alice'))).data()?.data.stage).toBe(3);
+    await assertFails(deleteDoc(doc(db('bob'), 'users/alice/records/sealAwards__experiencia')));
+  });
+
+  it('exclusão legítima da conta: apagado o perfil, os selos podem ser apagados', async () => {
+    const meta = doc(db('alice'), 'users/alice');
+    await assertSucceeds(setDoc(meta, { schemaVersion: 1, data: { profile: null, settings: {} }, rev: 1, updatedAt: serverTimestamp(), deviceId: 'dev-1' }));
+    await assertSucceeds(setDoc(ref('alice'), seal()));
+    await assertSucceeds(setDoc(doc(db('alice'), 'users/alice/records/clients__c1'), record()));
+    await assertSucceeds(deleteDoc(doc(db('alice'), 'users/alice/records/clients__c1'))); // outros registros: como antes
+    await assertSucceeds(deleteDoc(meta));
+    await assertSucceeds(deleteDoc(ref('alice')));
+    await assertFails(deleteDoc(doc(db('bob'), 'users/alice/records/sealAwards__metas')));
+  });
 });
 
 describe('regras 0.4: foto de perfil (profileImages)', () => {

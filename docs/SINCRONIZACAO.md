@@ -59,7 +59,9 @@ users/{uid}/records/profileImages__atual { mime webp|jpeg, data base64 ≤ 87 38
   publicadas no Firebase de produção, o app guarda selos e foto **só no aparelho** e no backup.
 - Selos: mesclagem "só cresce" (`mergeAward`: maior estágio, data mais antiga por estágio) —
   comutativa, associativa e idempotente. Nunca recebem lápide. A regra do servidor recusa estágio
-  menor que o já gravado.
+  menor que o já gravado **e** recusa apagar o documento do selo enquanto a conta existir (excluir e
+  recriar baixaria o estágio). Na exclusão da conta, o app apaga primeiro `users/{uid}` e depois os
+  registros; só então os selos podem ser apagados (testado no emulador).
 - Foto: um único documento por conta; conflito → fica a versão mais nova inteira (desempate pelo
   hash), nunca uma mistura de campos. Downloads só quando o documento muda (cursor incremental).
 - Versões antigas (≤ beta.1) ignoram coleções desconhecidas: nada quebra nem é apagado.

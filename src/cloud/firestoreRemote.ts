@@ -116,16 +116,20 @@ export class FirestoreRemote implements RemoteStore {
     return meta.exists() || !rec.empty;
   }
 
-  /** Exclui todos os registros e o perfil da conta. */
+  /**
+   * Exclui o perfil da conta e depois todos os registros. A ordem importa: as regras só
+   * permitem apagar selos permanentes quando o perfil (users/{uid}) já não existe. Se a
+   * exclusão for interrompida, repetir conclui (os outros aparelhos já veem a conta excluída).
+   */
   async deleteAll(uid: string) {
+    const first = writeBatch(this.db);
+    first.delete(this.userDoc(uid));
+    await first.commit();
     const snap = await getDocs(this.records(uid));
     for (let i = 0; i < snap.docs.length; i += 450) {
       const batch = writeBatch(this.db);
       for (const d of snap.docs.slice(i, i + 450)) batch.delete(d.ref);
       await batch.commit();
     }
-    const batch = writeBatch(this.db);
-    batch.delete(this.userDoc(uid));
-    await batch.commit();
   }
 }
