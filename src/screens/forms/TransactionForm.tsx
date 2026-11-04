@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { transactionLabel } from '../../domain/finance';
 import type { Transaction, TransactionType } from '../../domain/types';
 import { todayKey } from '../../lib/dates';
 import { centsToInput } from '../../lib/money';
@@ -6,7 +7,8 @@ import { hasErrors, validateTransaction, type Errors, type TransactionInput } fr
 import { useApp, useErrorHandler, useFeedback } from '../../state/AppContext';
 import { Button } from '../../ui/Button';
 import { useConfirm } from '../../ui/Confirm';
-import { SelectField, TextField } from '../../ui/Field';
+import { TextField } from '../../ui/Field';
+import { ChoiceChips } from '../../ui/ChoiceChips';
 import { Segmented } from '../../ui/Misc';
 import { Sheet } from '../../ui/Sheet';
 import { useToast } from '../../ui/Toast';
@@ -57,7 +59,7 @@ function TransactionForm({ transaction, defaultType, onDone }: { transaction?: T
 
   async function remove() {
     if (!transaction) return;
-    const ok = await confirm({ title: 'Excluir lançamento?', message: `"${transaction.description}" será removido permanentemente.`, confirmLabel: 'Excluir', danger: true });
+    const ok = await confirm({ title: 'Excluir lançamento?', message: `"${transactionLabel(transaction)}" será removido permanentemente.`, confirmLabel: 'Excluir', danger: true });
     if (!ok) return;
     try {
       await service.deleteTransaction(transaction.id);
@@ -77,11 +79,14 @@ function TransactionForm({ transaction, defaultType, onDone }: { transaction?: T
         options={[{ value: 'receita', label: 'Receita' }, { value: 'despesa', label: 'Despesa' }]}
       />
       <TextField label="Valor" prefix="R$" inputMode="decimal" placeholder="0,00" value={v.amount} onChange={set('amount')} error={errors.amount} />
-      <TextField label="Descrição" value={v.description} onChange={set('description')} error={errors.description} maxLength={80} placeholder={v.type === 'receita' ? 'Ex.: Pagamento do serviço' : 'Ex.: Compra de material'} />
-      <SelectField label="Categoria" value={v.category} onChange={set('category')} error={errors.category}>
-        <option value="">Selecione</option>
-        {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-      </SelectField>
+      <ChoiceChips
+        label="Categoria"
+        options={categoryOptions}
+        value={v.category}
+        onChange={(category) => setV((cur) => ({ ...cur, category }))}
+        error={errors.category}
+      />
+      <TextField label="Descrição" optional value={v.description} onChange={set('description')} error={errors.description} maxLength={80} placeholder={v.category ? `Se vazio, aparece como “${v.category}”` : v.type === 'receita' ? 'Ex.: Pagamento do serviço' : 'Ex.: Compra de material'} />
       <TextField label="Data" type="date" value={v.date} onChange={set('date')} error={errors.date} />
       <Button type="submit" block size="lg" disabled={saving}>{transaction ? 'Salvar alterações' : 'Registrar'}</Button>
       {transaction && <Button variant="ghost" block className="text-red-600 dark:text-red-400" onClick={remove}>Excluir lançamento</Button>}

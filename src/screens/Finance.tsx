@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CalendarClock, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, Link2, Receipt } from 'lucide-react';
-import { byCategory, futureServiceDateFor, sortByDateDesc, totals, transactionsInMonth } from '../domain/finance';
+import { byCategory, futureServiceDateFor, sortByDateDesc, totals, transactionsInMonth, transactionLabel } from '../domain/finance';
 import type { Transaction, TransactionType } from '../domain/types';
 import { addMonths, formatDateShort, monthKey, monthLabel, parseDateKey, relativeDayLabel } from '../lib/dates';
 import { useApp } from '../state/AppContext';
@@ -96,10 +96,10 @@ export function Finance() {
                         {t.type === 'receita' ? <CirclePlus size={20} aria-hidden="true" /> : <CircleMinus size={20} aria-hidden="true" />}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="line-clamp-2 font-medium leading-snug [overflow-wrap:anywhere]">{t.description}</span>
+                        <span className="line-clamp-2 font-medium leading-snug [overflow-wrap:anywhere]">{transactionLabel(t)}</span>
                         <span className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
                           <span className="sr-only">{t.type === 'receita' ? 'Receita,' : 'Despesa,'}</span>
-                          {t.category}
+                          {t.description.trim() ? t.category : t.type === 'receita' ? 'Receita' : 'Despesa'}
                           {t.appointmentId && <Link2 size={12} aria-label="Gerado por serviço concluído" />}
                           {t.isDemo && <DemoBadge />}
                           <FutureServiceBadge date={futureServiceDateFor(t, data.appointments)} />

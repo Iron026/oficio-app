@@ -58,3 +58,8 @@ export function futureServiceDateFor(
   if (!a || a.status !== 'concluido') return null;
   return isFutureDateKey(a.date, now) ? a.date : null;
 }
+
+/** Nome exibido do lançamento: a descrição ou, quando vazia, a categoria. */
+export function transactionLabel(t: { description: string; category: string }): string {
+  return t.description.trim() || t.category.trim() || 'Lançamento';
+}

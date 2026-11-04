@@ -23,8 +23,10 @@ describe('validação de formulários', () => {
   it('valida lançamento financeiro', () => {
     const e = validateTransaction({ type: 'receita', amount: '0', description: '', category: '', date: '' });
     expect(e.amount).toBeTruthy();
-    expect(e.description).toBeTruthy();
-    expect(e.category).toBeTruthy();
+    expect(e.description).toBeUndefined(); // descrição é opcional
+    expect(e.category).toBeTruthy(); // categoria é obrigatória
+    expect(validateTransaction({ type: 'despesa', amount: '10', description: '   ', category: 'Produtos', date: '2026-01-01' })).toEqual({});
+    expect(validateTransaction({ type: 'despesa', amount: '10', description: 'x'.repeat(81), category: 'Produtos', date: '2026-01-01' }).description).toBeTruthy();
     expect(e.date).toBeTruthy();
     expect(validateTransaction({ type: 'outro', amount: '10', description: 'x', category: 'y', date: '2026-01-01' }).type).toBeTruthy();
   });

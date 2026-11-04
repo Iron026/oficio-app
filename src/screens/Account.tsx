@@ -9,6 +9,7 @@ import { navigate } from '../state/router';
 import { Button, IconButton } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
 import { cx } from '../ui/cx';
+import { transactionLabel } from '../domain/finance';
 import { Card } from '../ui/Misc';
 import { sealsPhotoSyncEnabled } from '../sync/features';
 import { Sheet } from '../ui/Sheet';
@@ -487,7 +488,7 @@ export function GoogleButton({ onClick, busy, label = 'Continuar com Google' }: 
 
 function describe(c: SyncConflict, serviceLabel: string) {
   const v = (c.local ?? c.remote) as Record<string, unknown>;
-  const name = String(v.title ?? v.description ?? '');
+  const name = c.collection === 'transactions' ? transactionLabel({ description: String(v.description ?? ''), category: String(v.category ?? '') }) : String(v.title ?? '');
   return { kind: c.collection === 'transactions' ? 'Lançamento' : serviceLabel, name };
 }
 

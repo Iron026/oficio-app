@@ -160,7 +160,7 @@ async function seed(page) {
     const tx = page.getByRole('dialog');
     await tx.getByLabel(/valor/i).fill(amount);
     await tx.getByLabel(/descrição/i).fill(description);
-    await tx.getByLabel(/categoria/i).selectOption({ index: 1 });
+    await tx.getByRole('radiogroup', { name: /categoria/i }).getByRole('radio').first().click();
     await tx.getByLabel(/^data/i).fill(date);
     await tx.getByRole('button', { name: /registrar/i }).click();
     await tx.waitFor({ state: 'detached' });

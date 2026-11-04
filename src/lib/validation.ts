@@ -57,8 +57,8 @@ export function validateTransaction(v: TransactionInput): Errors<TransactionInpu
   if (cents === null) e.amount = 'Informe um valor válido. Ex.: 80,00';
   else if (cents <= 0) e.amount = 'O valor deve ser maior que zero.';
   else if (cents > 100_000_000) e.amount = 'Valor muito alto.';
-  if (!v.description.trim()) e.description = 'Descreva o lançamento.';
-  else if (v.description.trim().length > 80) e.description = 'Use no máximo 80 caracteres.';
+  // Descrição é opcional (rodada 3); a categoria identifica o lançamento quando ela falta.
+  if (v.description.trim().length > 80) e.description = 'Use no máximo 80 caracteres.';
   if (!v.category.trim()) e.category = 'Escolha uma categoria.';
   if (!DATE_RE.test(v.date)) e.date = 'Escolha uma data.';
   return e;
