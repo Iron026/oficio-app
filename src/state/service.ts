@@ -52,7 +52,7 @@ type PrefsListener = (prefs: DevicePrefs) => void;
  * A interface (React) apenas lê `data` e chama métodos.
  */
 export interface BackupCounts { clients: number; appointments: number; transactions: number }
-export interface BackupPreview { exportedAt: string | null; file: BackupCounts; current: BackupCounts }
+export interface BackupPreview { exportedAt: string | null; appVersion: string | null; file: BackupCounts; current: BackupCounts }
 
 /** Chave (só neste aparelho) da data do último backup exportado. */
 export const LAST_EXPORT_KEY = 'export:lastBackup';
@@ -581,14 +581,17 @@ export class AppService {
   previewBackup(text: string): BackupPreview {
     const parsed = parseBackup(text);
     let exportedAt: string | null = null;
+    let appVersion: string | null = null;
     try {
-      const raw = JSON.parse(text) as { exportedAt?: unknown };
+      const raw = JSON.parse(text) as { exportedAt?: unknown; appVersion?: unknown };
       if (typeof raw.exportedAt === 'string' && !Number.isNaN(Date.parse(raw.exportedAt))) exportedAt = raw.exportedAt;
+      // Só informativo; arquivos anteriores à beta.3 não têm.
+      if (typeof raw.appVersion === 'string' && /^\d+\.\d+\.\d+[\w.-]*$/.test(raw.appVersion) && raw.appVersion.length <= 32) appVersion = raw.appVersion;
     } catch {
       /* parseBackup já validou o JSON */
     }
     const count = (d: AppData) => ({ clients: d.clients.length, appointments: d.appointments.length, transactions: d.transactions.length });
-    return { exportedAt, file: count(parsed), current: count(this._data) };
+    return { exportedAt, appVersion, file: count(parsed), current: count(this._data) };
   }
 
   importBackup(text: string): Promise<void> {

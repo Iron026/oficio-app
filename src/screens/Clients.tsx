@@ -120,6 +120,8 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   const [mode, setMode] = useState<'view' | 'edit' | 'schedule'>('view');
   const history = data.appointments.filter((a) => a.clientId === client.id).sort((a, b) => b.date.localeCompare(a.date));
   const completed = history.filter((a) => a.status === 'concluido');
+  // Soma do preço dos serviços concluídos (valor combinado), não o que entrou no caixa: na 0.4 a conclusão
+  // pode ser feita sem lançar a receita. O "total pago" separado do "pendente" chega com a 0.5.
   const billed = completed.reduce((s, a) => s + a.price, 0);
   const wa = whatsappLink(client.phone);
 
@@ -155,7 +157,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">{t.services} {t.completedLabelPlural}</p><p className="num text-lg font-bold">{completed.length}</p></div>
-          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">Total faturado</p><p className="text-lg font-bold"><Money cents={billed} /></p></div>
+          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">Valor de {t.services.toLowerCase()} {t.completedLabelPlural}</p><p className="text-lg font-bold"><Money cents={billed} /></p></div>
         </div>
         <ul className="mb-4 space-y-2 text-sm">
           {client.email && <li className="flex items-center gap-2"><Mail size={16} className="text-muted" aria-hidden="true" />{client.email}</li>}
