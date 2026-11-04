@@ -45,10 +45,10 @@ describe('Ajustes > central de controle (0.4)', () => {
     expect(within(sheet).queryByText(/é sincronizada/i)).not.toBeInTheDocument();
     expect(within(sheet).getByRole('radio', { name: /tesoura/i })).toBeInTheDocument(); // Beleza e Estética
     expect(within(sheet).getByRole('radio', { name: /borrifador/i })).toBeInTheDocument(); // Limpeza
-    await user.click(within(sheet).getByRole('radio', { name: /estetoscópio/i }));
+    await user.click(within(sheet).getByRole('radio', { name: /^medicina$/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getAllByRole('img', { name: /avatar estetoscópio/i }).length).toBeGreaterThan(0);
-    expect(screen.getByText('Avatar: Estetoscópio')).toBeInTheDocument();
+    expect(screen.getAllByRole('img', { name: /avatar medicina/i }).length).toBeGreaterThan(0);
+    expect(screen.getByText('Avatar: Medicina')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /alterar imagem de perfil/i }));
     await user.click(within(await screen.findByRole('dialog', { name: /imagem de perfil/i })).getByRole('radio', { name: /^iniciais$/i }));

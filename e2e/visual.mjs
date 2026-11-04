@@ -337,6 +337,17 @@ try {
           .filter((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 || e.getBoundingClientRect().right > e.closest('button').getBoundingClientRect().right)
           .map((e) => e.textContent));
         if (cut.length) fail(`${vp.id}/${theme}: nomes cortados na galeria de avatares: ${cut.join(', ')}`);
+        // Fonte grande do Android (≈130%): a grade usa rem, então as colunas alargam e nada corta.
+        const cutBig = await page.evaluate(async () => {
+          document.documentElement.style.fontSize = '130%';
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          const out = [...document.querySelectorAll('[data-avatar-name]')]
+            .filter((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 || e.getBoundingClientRect().right > e.closest('button').getBoundingClientRect().right)
+            .map((e) => e.textContent);
+          document.documentElement.style.fontSize = '';
+          return out;
+        });
+        if (cutBig.length) fail(`${vp.id}/${theme}: com fonte 130%, nomes cortados na galeria: ${cutBig.join(', ')}`);
         // Galeria por dentro (a folha rola sozinha): meio e fim da lista de avatares.
         if (vp.id === 'celular-360') {
           for (const [frac, id] of [[0.45, 'ajustes-galeria-meio'], [1, 'ajustes-galeria-fim']]) {
@@ -348,7 +359,7 @@ try {
           }
         }
         if (vp.id === 'celular-360') await capture(page, vp, theme, 'ajustes-imagem-de-perfil-inteira', { full: true, skipChecks: true });
-        await page.getByRole('radio', { name: /criatividade/i }).first().click();
+        await page.getByRole('radio', { name: /^artista$/i }).click();
         await page.getByRole('dialog').waitFor({ state: 'detached' });
         await capture(page, vp, theme, 'ajustes-com-avatar');
         await page.getByRole('button', { name: /alterar imagem de perfil/i }).click();

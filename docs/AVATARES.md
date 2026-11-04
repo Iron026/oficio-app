@@ -33,7 +33,7 @@ redesenhados como SVG minimalistas (`scripts/avatares-svg.py`), junto com dois n
 | Saúde e ciência | Laboratório (`simbolo-ciencia`) |
 | Campo e agronegócio | Broto (`simbolo-agronegocio`) |
 | Educação | Formatura (`simbolo-educacao`) |
-| Obras e engenharia | Engrenagem (`simbolo-engenharia`) |
+| Obras e engenharia | Indústria (`simbolo-engenharia`) |
 | Negócios, direito e finanças | Maleta (`simbolo-negocios`) |
 | **Beleza e Estética** (nova) | Tesoura (`simbolo-beleza`) |
 | **Limpeza** (nova) | Borrifador (`simbolo-limpeza`) |
@@ -41,7 +41,7 @@ redesenhados como SVG minimalistas (`scripts/avatares-svg.py`), junto com dois n
 Mesma paleta do pack (disco #d2eded, traço petróleo, detalhes amarelo e verde), quadro 256 × 256 com o disco
 centralizado. Conferidos em 40, 64 e 128 px nos dois temas (1× e 3×); centro do desenho a ≤ 0,5 px do centro
 do disco. Cada SVG tem menos de 1 KB, sem scripts nem imagens externas (teste em `src/ui/avatarCatalog.test.ts`).
-Nomes curtos na galeria ("Crescimento", "Programação") para não quebrar no cartão.
+Nomes curtos na galeria ("Gráfico", "Código", "Medicina", "Artista", "Cozinha", "Indústria") para não quebrar no cartão.
 
 ## Observações para próximas versões
 

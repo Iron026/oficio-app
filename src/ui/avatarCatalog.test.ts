@@ -31,6 +31,6 @@ describe('avatares do Ofício', () => {
   });
 
   it('nomes curtos para a galeria (cabem em 2 linhas)', () => {
-    for (const a of INTERNAL_AVATARS) expect(a.name.split(' ').every((w) => w.length <= 12)).toBe(true);
+    for (const a of INTERNAL_AVATARS) expect(a.name.split(' ').every((w) => w.length <= 11)).toBe(true);
   });
 });
