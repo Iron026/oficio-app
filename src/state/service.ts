@@ -8,6 +8,7 @@ import { tierForLevel, tierKey, type Tier } from '../gamification/tiers';
 import { DEFAULT_SETTINGS } from '../domain/types';
 import { actionAward, evaluate, totalXp, type ActionType } from '../gamification/engine';
 import { levelInfo } from '../gamification/levels';
+import { CELEBRATION_KEY, isCelebrationDue, nextCelebration, readCelebration, type CelebrationRecord } from '../gamification/celebration';
 import { todayKey } from '../lib/dates';
 import { newId } from '../lib/id';
 import { parseMoney } from '../lib/money';
@@ -54,6 +55,7 @@ export class AppService {
   private prefsListeners = new Set<PrefsListener>();
   private queue: Promise<unknown> = Promise.resolve();
   private _prefs: DevicePrefs = DEFAULT_DEVICE_PREFS;
+  private _celebration: CelebrationRecord | null = null;
 
   constructor(
     private storage: StorageAdapter,
@@ -68,7 +70,36 @@ export class AppService {
     const stored = await storage.kvGet<unknown>(DEVICE_PREFS_KEY);
     service._prefs = readDevicePrefs(stored, data.settings.theme);
     if (stored === undefined) await storage.kvSet(DEVICE_PREFS_KEY, service._prefs);
+    // Comemorações: na primeira abertura da versão nova, o que já foi conquistado não é comemorado de novo.
+    service._celebration = readCelebration(await storage.kvGet<unknown>(CELEBRATION_KEY));
+    if (!service._celebration && data.profile) await service.recordCelebration(true);
     return service;
+  }
+
+  /** Categoria atual (derivada do nível; não é gravada). */
+  get currentTier(): Tier {
+    return tierForLevel(levelInfo(totalXp(this._data.xpEvents)).level);
+  }
+
+  /**
+   * Categoria que ainda precisa ser comemorada neste aparelho (subiu por sincronização,
+   * por exemplo). Sem registro ainda, grava a atual em silêncio e devolve null.
+   */
+  celebrationDue(): Tier | null {
+    if (!this._data.profile) return null;
+    if (!this._celebration) {
+      void this.recordCelebration(true);
+      return null;
+    }
+    const tier = this.currentTier;
+    return isCelebrationDue(tier, this._celebration) ? tier : null;
+  }
+
+  /** Marca a categoria atual como comemorada (nunca volta para trás; `reset` regrava a atual). */
+  async recordCelebration(reset = false): Promise<void> {
+    const next = reset ? nextCelebration(this.currentTier, null) : nextCelebration(this.currentTier, this._celebration);
+    this._celebration = next;
+    await this.storage.kvSet(CELEBRATION_KEY, next);
   }
 
   /** Preferências deste aparelho (tema, densidade, ocultar valores, animações). */
@@ -201,6 +232,7 @@ export class AppService {
       };
       await this.storage.saveProfile(profile);
       this.set({ ...this._data, profile });
+      await this.recordCelebration(true);
       return profile;
     });
   }
@@ -471,6 +503,8 @@ export class AppService {
       await this.storage.replaceAll(data);
       this.set(data);
       await this.awardSeals();
+      // Categoria vinda do backup não é comemorada como conquista nova.
+      await this.recordCelebration(true);
     });
   }
 
@@ -479,6 +513,8 @@ export class AppService {
       await this.storage.clearAll();
       // "Apagar todos os dados" também volta as preferências do aparelho ao padrão.
       await this.storage.kvDelete(DEVICE_PREFS_KEY);
+      await this.storage.kvDelete(CELEBRATION_KEY);
+      this._celebration = null;
       this._prefs = { ...DEFAULT_DEVICE_PREFS };
       this.prefsListeners.forEach((l) => l(this._prefs));
       this.set(emptyData());

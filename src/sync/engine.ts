@@ -253,7 +253,13 @@ export class SyncEngine implements ChangeTracker {
     r.deleted = deleted;
     r.seq++;
     await this.save();
+    this.markPending();
     this.schedule();
+  }
+
+  /** Alteração local nova: "Sincronizado" deixa de ser verdade até o envio ser confirmado. */
+  private markPending() {
+    if (this.status.state === 'sincronizado') this.setStatus({ state: 'pendente' });
   }
 
   async touchMeta() {
@@ -261,6 +267,7 @@ export class SyncEngine implements ChangeTracker {
     this.state.meta.dirty = true;
     this.state.meta.seq++;
     await this.save();
+    this.markPending();
     this.schedule();
   }
 

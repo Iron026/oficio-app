@@ -13,6 +13,7 @@ import { SyncEngine } from './sync/engine';
 import { TrackedStorage } from './sync/tracked';
 import { ConfirmProvider } from './ui/Confirm';
 import { ToastProvider } from './ui/Toast';
+import { CelebrationProvider } from './ui/Celebration';
 import { Agenda } from './screens/Agenda';
 import { Clients } from './screens/Clients';
 import { Dashboard } from './screens/Dashboard';
@@ -117,9 +118,11 @@ function Root() {
   };
   return (
     <HideValuesContext.Provider value={prefs.hideValues}>
-      <Shell route={route} title={TITLES[route]}>
-        {screens[route]}
-      </Shell>
+      <CelebrationProvider>
+        <Shell route={route} title={TITLES[route]}>
+          {screens[route]}
+        </Shell>
+      </CelebrationProvider>
     </HideValuesContext.Provider>
   );
 }

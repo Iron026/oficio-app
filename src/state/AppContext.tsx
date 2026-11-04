@@ -1,3 +1,4 @@
+import { useCelebration } from '../ui/celebrationContext';
 import { getSeal, ROMAN } from '../gamification/seals';
 import { createContext, useCallback, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { getProfession, type ProfessionModule } from '../domain/professions';
@@ -52,6 +53,7 @@ export function useAppearanceEffect(settings: Settings, prefs: DevicePrefs) {
 /** Converte o resultado da gamificação em feedback visual (toasts). */
 export function useFeedback() {
   const toast = useToast();
+  const celebrate = useCelebration();
   return useCallback(
     (message: string, feedback?: Feedback, description?: string) => {
       toast({ title: message, description, tone: 'success', xp: feedback?.xpGained || undefined });
@@ -65,7 +67,10 @@ export function useFeedback() {
       }
       if (feedback.levelUp) {
         const tier = feedback.tierUp;
-        if (tier) toast({ title: `Nova categoria: ${tier.name}`, description: `Nível ${feedback.levelUp} · ${tier.title}. Sua moldura de perfil mudou.`, tone: 'achievement' });
+        if (tier) {
+          toast({ title: tier.id === 'diamante' && tier.rank > 1 ? `Novo grau: ${tier.name}` : `Nova categoria: ${tier.name}`, description: `Nível ${feedback.levelUp} · ${tier.title}. Sua moldura de perfil mudou.`, tone: 'achievement' });
+          celebrate(tier, feedback.levelUp);
+        }
         else toast({ title: `Você chegou ao nível ${feedback.levelUp}!`, description: 'Continue evoluindo no seu ofício.', tone: 'achievement' });
       }
       for (const a of feedback.seals ?? []) {
@@ -73,7 +78,7 @@ export function useFeedback() {
         if (def) toast({ title: `Selo ${def.name} · estágio ${ROMAN[a.stage]}`, description: def.unit(def.thresholds[a.stage - 1]!), tone: 'achievement' });
       }
     },
-    [toast],
+    [toast, celebrate],
   );
 }
 

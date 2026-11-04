@@ -235,3 +235,45 @@ describe('Ciclo de vida ao desmontar (regressão: setState após o fim do ambien
     errors.mockRestore();
   });
 });
+
+describe('Sincronização e nuvem (botão de nuvem do topo)', () => {
+  it('sem conta conectada: o botão abre a folha e diz que os dados ficam só no aparelho', async () => {
+    const t = setup();
+    await seedLocal(t.dbName);
+    const user = userEvent.setup();
+    await openSettings(t);
+    await user.click(screen.getByRole('button', { name: /sincronização e nuvem: somente neste aparelho/i }));
+    const sheet = await screen.findByRole('dialog', { name: /sincronização e nuvem/i });
+    expect(within(sheet).getAllByText(/somente neste aparelho/i).length).toBeGreaterThan(0);
+    expect(within(sheet).getByText(/só neste aparelho e no backup/i)).toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: /sincronizar agora/i })).not.toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: /conectar conta google/i })).toBeInTheDocument();
+  });
+
+  it('conectada: mostra sincronizado sem pendências; com alteração nova, o topo indica pendente', async () => {
+    const t = setup();
+    await seedLocal(t.dbName);
+    const user = userEvent.setup();
+    await openSettings(t);
+    await user.click(await screen.findByRole('button', { name: /continuar com google/i }));
+    await user.click(within(await screen.findByRole('dialog', { name: /conectar seus dados/i })).getByRole('button', { name: /enviar e conectar/i }));
+    await screen.findByText('Sincronizado');
+    await user.click(screen.getByRole('button', { name: /sincronização e nuvem: sincronizado/i }));
+    const sheet = await screen.findByRole('dialog', { name: /sincronização e nuvem/i });
+    expect(within(sheet).getByText('Nenhuma alteração aguardando envio')).toBeInTheDocument();
+    expect(within(sheet).getByText(/última sincronização confirmada/i)).toBeInTheDocument();
+    expect(within(sheet).getByText('ana@example.com', { exact: false })).toBeInTheDocument();
+    await user.click(within(sheet).getByRole('button', { name: /sincronizar agora/i }));
+    expect(await within(sheet).findByText('Nenhuma alteração aguardando envio')).toBeInTheDocument();
+    // a nuvem não "mente": rede fora → nova alteração fica pendente, não sincronizada
+    t.remote.offline = true;
+    await user.click(within(sheet).getByRole('button', { name: /fechar/i }));
+    await user.click(screen.getByRole('navigation').querySelector('a[href="#/painel"]') as HTMLElement);
+    await user.click(await screen.findByRole('button', { name: /^cliente$/i }));
+    const form = await screen.findByRole('dialog', { name: /novo cliente/i });
+    await user.type(within(form).getByLabelText(/^nome/i), 'Cliente Novo');
+    await user.click(within(form).getByRole('button', { name: /cadastrar cliente/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /sincronização e nuvem: (aguardando conexão|alterações pendentes)/i })).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /sincronização e nuvem: sincronizado/i })).not.toBeInTheDocument();
+  });
+});

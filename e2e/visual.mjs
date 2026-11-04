@@ -84,7 +84,7 @@ async function newPage(vp, theme) {
 
 /** Espera os avisos temporários sumirem para a captura não depender do tempo. */
 async function settle(page, keepScroll = false) {
-  await page.waitForFunction(() => !document.querySelector('[role="status"] > *'), null, { timeout: 8000 }).catch(() => undefined);
+  await page.waitForFunction(() => !document.querySelector('[role="status"] > *') && !document.querySelector('[data-celebration]'), null, { timeout: 8000 }).catch(() => undefined);
   await page.evaluate(() => document.fonts.ready);
   if (!keepScroll) await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(150);
@@ -417,6 +417,14 @@ try {
       await capture(page, vp, theme, 'experiente-painel');
       await page.goto(BASE + '#/evolucao');
       await capture(page, vp, theme, 'experiente-evolucao');
+      // Rever a comemoração tocando na categoria atual da trilha (camada por cima da tela).
+      await page.getByRole('button', { name: /você está aqui/i }).click();
+      await page.locator('[data-celebration]').waitFor();
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: `${OUT}/${vp.id}-${theme}-experiente-comemoracao.png` });
+      report.capturas.push({ arquivo: `${vp.id}-${theme}-experiente-comemoracao.png`, viewport: vp.id, tema: theme, tela: 'experiente-comemoracao' });
+      await page.locator('[data-celebration]').click();
+      await page.locator('[data-celebration]').waitFor({ state: 'detached' });
       await page.getByRole('radio', { name: /^selos$/i }).click();
       await capture(page, vp, theme, 'experiente-selos');
       if (vp.id === 'celular-360') await capture(page, vp, theme, 'experiente-selos-inteira', { full: true, skipChecks: true });

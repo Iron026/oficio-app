@@ -8,6 +8,7 @@ import { initials } from './Avatar';
 import { getInternalAvatar } from './avatarCatalog';
 import { cx } from './cx';
 import { SealMedal } from './SealMedal';
+import { CategoryMedal } from './CategoryMedal';
 
 /** Cores das molduras (metal); o símbolo e o nome identificam a categoria sem depender da cor. */
 export const TIER_COLORS: Record<TierId, { c1: string; c2: string; c3: string; chipBg: string; chipFg: string }> = {
@@ -33,7 +34,7 @@ export function TierChip({ tier, onHero, className }: { tier: Tier; onHero?: boo
       className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border py-0.5 pl-2 pr-2.5 font-display text-xs font-bold', !onHero && 'dark:!bg-[color-mix(in_srgb,var(--c2)_26%,#131f23)] dark:!text-[var(--c1)]', className)}
       style={{ '--c1': c.c1, '--c2': c.c2, background: onHero ? `color-mix(in srgb, ${c.c2} 30%, rgb(255 255 255 / .08))` : c.chipBg, color: onHero ? '#fff' : c.chipFg, borderColor: `color-mix(in srgb, ${c.c2} 60%, transparent)` } as React.CSSProperties}
     >
-      <span aria-hidden="true" className="tracking-[1px]">{tierGlyph(tier)}</span>
+      <CategoryMedal tier={tier} size={18} decorative className="-my-1 -ml-1 shrink-0" />
       {tier.name}
     </span>
   );

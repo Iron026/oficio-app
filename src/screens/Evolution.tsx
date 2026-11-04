@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, CircleCheck, Lock, Minus, Pencil } from 'lucide-react';
 import { growthPercent } from '../domain/finance';
 import { monthlyHistory } from '../domain/insights';
@@ -18,7 +18,9 @@ import { cx } from '../ui/cx';
 import { TextField } from '../ui/Field';
 import { AchievementIcon } from '../ui/icons';
 import { Card, ProgressBar, SectionTitle, Segmented } from '../ui/Misc';
-import { ProfileAvatar, TIER_COLORS, TierChip, tierGlyph } from '../ui/ProfileAvatar';
+import { ProfileAvatar } from '../ui/ProfileAvatar';
+import { CategoryMedal } from '../ui/CategoryMedal';
+import { useCelebration } from '../ui/celebrationContext';
 import { SealMedal, StagePips } from '../ui/SealMedal';
 import { Sheet } from '../ui/Sheet';
 import { HeroSlot } from './Shell';
@@ -31,34 +33,66 @@ const TABS: { value: Tab; label: string }[] = [
 ];
 
 export function Evolution() {
-  const { data } = useApp();
+  const { data, service } = useApp();
   const { lv, tier, next, seals, featured } = useProfile();
   const [tab, setTab] = useState<Tab>('missoes');
   const owned = seals.filter((p) => p.stage > 0).length;
+
+  const celebrate = useCelebration();
+  // Categoria que subiu por sincronização (outro aparelho): comemora uma vez, ao abrir a Evolução.
+  useEffect(() => {
+    const due = service.celebrationDue();
+    if (due) celebrate(due, lv.level);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const fmt = (n: number) => n.toLocaleString('pt-BR');
 
   return (
     <div>
       <HeroSlot overlap>
         <div className="flex items-center gap-4 pt-1">
-          <ProfileAvatar data={data} tier={tier} size={84} seal={featured ? { id: featured.def.id, stage: featured.stage } : null} onHero />
+          <span className="relative shrink-0">
+            <ProfileAvatar data={data} tier={tier} size={92} onHero />
+            <span className="absolute -bottom-1 -right-2 drop-shadow-[0_2px_3px_rgb(0_0_0/0.35)]"><CategoryMedal tier={tier} size={40} decorative /></span>
+          </span>
           <div className="min-w-0">
-            <h2 className="font-display text-title-2 font-extrabold leading-tight">Nível <span className="num">{lv.level}</span> · {lv.title}</h2>
-            <TierChip tier={tier} onHero className="mt-1.5" />
-            <p className="mt-1.5 text-sm text-white/85"><span className="num">{lv.totalXp}</span> XP acumulados</p>
+            <p className="font-display text-xs font-bold uppercase tracking-[0.1em] text-white/85">{tier.name} · Nível</p>
+            <h2 className="flex flex-wrap items-baseline gap-x-2 leading-none">
+              <span className="num font-display text-[2.5rem] font-extrabold">{lv.level}</span>
+              <span className="font-display text-lg font-bold leading-tight">{lv.title}</span>
+            </h2>
+            <p className="mt-1 text-sm text-white/85"><span className="num">{fmt(lv.totalXp)}</span> XP acumulados</p>
           </div>
         </div>
+        <div role="progressbar" aria-label="Progresso para o próximo nível" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(lv.progress * 100)} className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-white/20">
+          <div className="bar-fill h-full w-full rounded-full bg-gradient-to-r from-xp-400 to-xp-500" style={{ transform: `scaleX(${Math.min(1, Math.max(0, lv.progress))})` }} />
+        </div>
+        <p className="mt-1.5 flex justify-between gap-3 text-[0.8125rem] text-white/90">
+          <span className="num">{fmt(lv.xpIntoLevel)} / {fmt(lv.xpForNext)} XP</span>
+          <span>nível <span className="num">{lv.level + 1}</span> em <span className="num">{fmt(totalXpForLevel(lv.level + 1))}</span> XP</span>
+        </p>
       </HeroSlot>
 
-      <Card className="!p-5 shadow-md">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="text-sm font-semibold">Próximo nível</p>
-          <p className="num text-sm text-muted">{lv.xpIntoLevel}/{lv.xpForNext} XP</p>
+      <Card className="!p-4 shadow-md">
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <h3 className="font-display font-bold">Sua trilha</h3>
+          <span className="text-xs text-muted">toque para rever</span>
         </div>
-        <ProgressBar value={lv.progress} label="Progresso para o próximo nível" tone="xp" className="mt-2" />
-        <p className="mt-2 text-sm text-muted">
-          Nível <span className="num">{lv.level + 1}</span> em <span className="num">{totalXpForLevel(lv.level + 1)}</span> XP · {next.tier.name} no nível <span className="num">{next.tier.minLevel}</span>, faltam <span className="num">{next.xpNeeded}</span> XP
-        </p>
-        <TierPath current={tier} />
+        <TierTrail current={tier} level={lv.level} onReplay={(t) => celebrate(t, lv.level)} />
+        <div className="mt-4 grid gap-2">
+          <div className="relative flex items-center gap-3 rounded-2xl border border-brand-500 bg-brand-50 px-3 py-2.5 dark:bg-brand-500/15">
+            <span className="absolute -top-2.5 right-3 rounded-full bg-brand-600 px-2 py-0.5 font-display text-xs font-extrabold text-white dark:bg-brand-300 dark:text-[#062421]">Você está aqui</span>
+            <CategoryMedal tier={tier} size={40} decorative />
+            <span className="min-w-0"><b className="font-display">{tier.name}</b><span className="block text-sm text-muted">desde o nível <span className="num">{tier.minLevel}</span></span></span>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl border border-dashed border-line px-3 py-2.5">
+            <CategoryMedal tier={next.tier} size={40} decorative className="opacity-80 grayscale-[.4]" />
+            <span className="min-w-0">
+              <b className="font-display">{next.tier.id === tier.id ? `Próximo grau: ${next.tier.name}` : `Próxima: ${next.tier.name}`}</b>
+              <span className="block text-sm text-muted">nível <span className="num">{next.tier.minLevel}</span> · faltam <span className="num">{fmt(next.xpNeeded)}</span> XP</span>
+            </span>
+          </div>
+        </div>
       </Card>
 
       <div className="mt-[var(--gap-section)]">
@@ -75,28 +109,41 @@ export function Evolution() {
   );
 }
 
-/** Caminho das 6 categorias; a atual em destaque. Símbolo + nome (não depende só de cor). */
-function TierPath({ current }: { current: Tier }) {
+/** Trilha das 6 categorias: conquistadas, atual (ampliada), próxima e bloqueadas. */
+function TierTrail({ current, level, onReplay }: { current: Tier; level: number; onReplay: (t: Tier) => void }) {
   const idx = TIERS.findIndex((t) => t.id === current.id);
   return (
-    <ol aria-label={`Categorias: ${tierLabel(current)}`} className="mt-4 grid grid-cols-3 gap-x-1 gap-y-3 min-[420px]:grid-cols-6">
-      {TIERS.map((t, i) => {
-        const c = TIER_COLORS[t.id];
-        const reached = i <= idx;
-        return (
-          <li key={t.id} aria-current={i === idx ? 'step' : undefined} className="flex min-w-0 flex-col items-center gap-1 text-center">
-            <span
-              className={cx('flex h-7 w-12 items-center justify-center rounded-full border-2 text-xs font-bold', i === idx && 'ring-2 ring-offset-2 ring-offset-surface', !reached && 'border-line')}
-              style={reached ? { background: `linear-gradient(135deg, ${c.c1}, ${c.c2})`, borderColor: c.c3, color: c.chipFg, '--tw-ring-color': c.c2 } as React.CSSProperties : undefined}
-            >
-              <span aria-hidden="true" className={cx('tracking-[-1px]', !reached && 'text-muted')}>{tierGlyph(t)}</span>
-            </span>
-            <span className={cx('w-full text-xs', i === idx ? 'font-bold' : 'text-muted')}>{i === idx ? current.name : t.name}</span>
-            <span className="sr-only">{reached ? (i === idx ? ', atual' : ', alcançada') : `, a partir do nível ${t.minLevel}`}</span>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="relative px-0.5 pt-1">
+      <div aria-hidden="true" className="absolute left-6 right-6 top-[1.6rem] h-1 rounded-full bg-line">
+        <div className="bar-fill h-full w-full rounded-full bg-brand-500" style={{ transform: `scaleX(${idx / (TIERS.length - 1)})` }} />
+      </div>
+      <ol aria-label={`Categorias: ${tierLabel(current)}`} className="relative flex justify-between">
+        {TIERS.map((t, i) => {
+          const state = i < idx ? 'done' : i === idx ? 'cur' : i === idx + 1 ? 'next' : 'lock';
+          const shown = i === idx ? current : t;
+          const label = state === 'done' ? 'conquistada' : state === 'cur' ? 'você está aqui' : `a partir do nível ${t.minLevel}`;
+          return (
+            <li key={t.id} aria-current={state === 'cur' ? 'step' : undefined}>
+              <button
+                type="button"
+                disabled={state === 'next' || state === 'lock'}
+                onClick={() => onReplay(shown)}
+                aria-label={`${shown.name}: ${label}${state === 'done' || state === 'cur' ? '. Toque para rever a comemoração' : ''}`}
+                className={cx(
+                  'press grid h-12 w-12 place-items-center rounded-full bg-surface disabled:cursor-default',
+                  state === 'cur' && 'scale-110 shadow-[0_0_0_3px_var(--surface),0_0_0_5px_var(--color-brand-500)]',
+                  state === 'next' && 'opacity-80 grayscale-[.6]',
+                  state === 'lock' && 'opacity-45 grayscale',
+                )}
+              >
+                <CategoryMedal tier={shown} size={46} decorative />
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <span className="sr-only">Nível {level}.</span>
+    </div>
   );
 }
 

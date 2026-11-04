@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { AlertTriangle, Cloud, CloudOff, Download, LogOut, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, Check, Cloud, CloudAlert, CloudCheck, CloudOff, CloudUpload, Database, Download, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2, UserRound } from 'lucide-react';
 import type { LinkAnalysis, LinkMode } from '../sync/engine';
 import type { SyncConflict, SyncStatus } from '../sync/types';
 import { formatMoney } from '../lib/money';
@@ -42,23 +42,120 @@ const toneClass = {
   off: 'text-muted',
 };
 
+/** Ícone do estado real da sincronização (cada estado com um desenho próprio). */
 export function StatusIcon({ status, size = 18, onHero }: { status: SyncStatus; size?: number; onHero?: boolean }) {
   const { tone } = statusLabel(status);
-  const Icon = tone === 'error' ? AlertTriangle : tone === 'wait' || tone === 'off' ? CloudOff : tone === 'busy' ? RefreshCw : Cloud;
-  // Girar só enquanto a sincronização está de fato em andamento (única animação contínua permitida).
-  return <Icon size={size} aria-hidden="true" className={cx(onHero ? 'text-white' : toneClass[tone], tone === 'busy' && 'animate-spin')} />;
+  const Icon = status.state === 'erro' ? CloudAlert
+    : status.state === 'offline' ? CloudOff
+    : status.state === 'pendente' ? CloudUpload
+    : status.state === 'sincronizando' ? RefreshCw
+    : status.state === 'sincronizado' ? CloudCheck
+    : Cloud;
+  // Girar só enquanto a sincronização está de fato em andamento (para com "Reduzir animações").
+  return <Icon size={size} aria-hidden="true" className={cx(onHero ? 'text-white' : toneClass[tone], tone === 'busy' && 'animate-spin motion-reduce:animate-none')} />;
 }
 
-/** Indicador discreto no topo (somente com conta conectada). */
+/** Botão de nuvem do topo: abre direto a folha "Sincronização e nuvem". */
 export function SyncIndicator({ onHero }: { onHero?: boolean }) {
-  const { linked, status } = useCloud();
-  if (!linked) return null;
-  const { text, tone } = statusLabel(status);
+  const { available, linked, status, sync } = useCloud();
+  const [open, setOpen] = useState(false);
+  if (!available && !linked) return null;
+  const shown: SyncStatus = linked ? status : { state: 'desativado' };
+  const { text, tone } = statusLabel(shown);
+  const pending = linked ? sync.pendingCount : 0;
   return (
-    <IconButton label={`Sincronização: ${text}`} onClick={() => navigate('ajustes')} className={cx(onHero && 'relative text-white hover:bg-white/15 hover:text-white')}>
-      <StatusIcon status={status} size={20} onHero={onHero} />
-      {onHero && tone !== 'ok' && <span className={cx('absolute right-2 top-2 h-2.5 w-2.5 rounded-full ring-2 ring-[var(--hero-1)]', tone === 'error' ? 'bg-red-400' : tone === 'busy' ? 'bg-sky-300' : 'bg-amber-300')} aria-hidden="true" />}
-    </IconButton>
+    <>
+      <IconButton
+        label={`Sincronização e nuvem: ${text}${pending ? `, ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}` : ''}`}
+        onClick={() => setOpen(true)}
+        className={cx(onHero && 'relative text-white hover:bg-white/15 hover:text-white')}
+      >
+        <StatusIcon status={shown} size={20} onHero={onHero} />
+        {onHero && pending > 0 && (shown.state === 'pendente' || shown.state === 'offline') ? (
+          <span aria-hidden="true" className="absolute right-0.5 top-0.5 min-w-[1.125rem] rounded-full bg-amber-300 px-1 font-display text-[0.75rem] font-extrabold leading-[1.125rem] text-amber-950 ring-2 ring-[var(--hero-1)]">{pending > 99 ? '99+' : pending}</span>
+        ) : onHero && tone === 'error' ? (
+          <span aria-hidden="true" className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-400 ring-2 ring-[var(--hero-1)]" />
+        ) : null}
+      </IconButton>
+      <SyncSheet open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+function Row({ icon, k, children }: { icon: ReactNode; k: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 px-3.5 py-3">
+      <span className="mt-0.5 shrink-0 text-muted" aria-hidden="true">{icon}</span>
+      <div className="min-w-0 flex-1"><p className="font-display text-xs font-bold uppercase tracking-wider text-muted">{k}</p>{children}</div>
+    </div>
+  );
+}
+
+/** Folha "Sincronização e nuvem": estado real, pendências, conexão, erros e ações. */
+export function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { linked, status, sync, user } = useCloud();
+  const onError = useErrorHandler();
+  const [busy, setBusy] = useState(false);
+  const shown: SyncStatus = linked ? status : { state: 'desativado' };
+  const { text, tone } = statusLabel(shown);
+  const pending = linked ? sync.pendingCount : 0;
+  const goAccount = () => { onClose(); navigate('ajustes'); };
+  async function syncNow() {
+    setBusy(true);
+    try { await sync.sync(); } catch (err) { onError(err); } finally { setBusy(false); }
+  }
+  return (
+    <Sheet open={open} onClose={onClose} title="Sincronização e nuvem">
+      <div className="space-y-4 text-sm">
+        <div className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-800 dark:bg-brand-500/25 dark:text-brand-50" aria-hidden="true"><UserRound size={20} /></span>
+          <div className="min-w-0">
+            <p className="font-display font-bold [overflow-wrap:anywhere]">{linked ? (user?.name || 'Conta Google') : 'Somente neste aparelho'}</p>
+            <p className="text-muted [overflow-wrap:anywhere]">{linked ? `${sync.linkedEmail ?? user?.email ?? ''} · conta Google conectada` : 'Nenhuma conta conectada. Os dados ficam só aqui.'}</p>
+          </div>
+        </div>
+        <div className="divide-y divide-line rounded-2xl border border-line">
+          <Row icon={<StatusIcon status={shown} size={20} />} k="Estado">
+            <p role="status" className={cx('font-display text-base font-bold', toneClass[tone])}>{text}</p>
+            <p className="text-muted">
+              {shown.state === 'erro' ? 'Seus dados continuam seguros neste aparelho.'
+                : sync.lastSyncedAt && linked ? `Última sincronização confirmada: ${fmtDateTime(sync.lastSyncedAt)}`
+                : linked ? 'Ainda não há sincronização confirmada.' : 'Conecte a conta Google para guardar uma cópia na nuvem.'}
+            </p>
+            {shown.state === 'erro' && <p className="mt-1 text-red-700 dark:text-red-300 [overflow-wrap:anywhere]">{shown.message}</p>}
+          </Row>
+          {linked && (
+            <Row icon={<CloudUpload size={20} />} k="Pendentes">
+              <p className="font-display font-bold">{pending === 0 ? 'Nenhuma alteração aguardando envio' : `${pending} ${pending === 1 ? 'alteração aguardando envio' : 'alterações aguardando envio'}`}</p>
+              <p className="text-muted">{pending === 0 ? 'Tudo o que você registrou já está na nuvem.' : 'Serão enviadas automaticamente quando houver conexão.'}</p>
+            </Row>
+          )}
+          <Row icon={shown.state === 'offline' ? <CloudOff size={20} /> : <Smartphone size={20} />} k="Conexão">
+            <p className="font-display font-bold">{shown.state === 'offline' ? 'Sem conexão' : 'Funciona sem internet'}</p>
+            <p className="text-muted">O Ofício guarda tudo neste aparelho primeiro{linked ? ' e envia para a nuvem quando a conexão volta' : ''}.</p>
+          </Row>
+          {linked && sync.conflicts.length > 0 && (
+            <Row icon={<AlertTriangle size={20} />} k="Para revisar">
+              <p className="font-display font-bold">{sync.conflicts.length} {sync.conflicts.length === 1 ? 'registro financeiro' : 'registros financeiros'} com versões diferentes</p>
+              <button type="button" onClick={goAccount} className="mt-1 font-semibold text-brand-700 underline underline-offset-2 dark:text-brand-300">Revisar em Conta e sincronização</button>
+            </Row>
+          )}
+        </div>
+        <div>
+          <p className="mb-1.5 font-semibold">O que vai para a nuvem</p>
+          <ul className="space-y-1.5">
+            <li className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />Perfil, clientes, agenda, finanças, XP, missões e conquistas{linked ? '' : ' (quando você conectar a conta)'}</li>
+            {sealsPhotoSyncEnabled()
+              ? <li className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />Foto de perfil e selos</li>
+              : <li className="flex gap-2 text-muted"><Smartphone size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Foto de perfil e selos: <b className="text-fg">só neste aparelho e no backup</b> nesta versão</span></li>}
+          </ul>
+        </div>
+        <div className="grid gap-2">
+          {linked && <Button block icon={<RefreshCw size={18} className={busy ? 'animate-spin motion-reduce:animate-none' : undefined} />} disabled={busy || shown.state === 'sincronizando'} onClick={syncNow}>{shown.state === 'erro' ? 'Tentar novamente' : 'Sincronizar agora'}</Button>}
+          <Button block variant={linked ? 'secondary' : 'primary'} icon={<Database size={18} />} onClick={goAccount}>{linked ? 'Conta, backup e dados' : 'Conectar conta Google'}</Button>
+        </div>
+      </div>
+    </Sheet>
   );
 }
 
