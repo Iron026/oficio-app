@@ -366,6 +366,11 @@ try {
         // também com a fonte grande do Android (≈130%: a grade usa rem e as colunas alargam).
         const tileProblems = () => page.evaluate(async () => {
           const out = [];
+          // Avatares são arquivos próprios (não embutidos no JS): todos precisam carregar de verdade.
+          const imgs = [...document.querySelectorAll('[data-avatar-id] img')];
+          imgs.forEach((i) => { i.loading = 'eager'; });
+          await Promise.all(imgs.map((i) => i.decode().catch(() => undefined)));
+          for (const i of imgs) if (!i.complete || i.naturalWidth === 0) out.push(`${i.closest('[data-avatar-id]').dataset.avatarId}: imagem não carregou`);
           for (const scale of ['', '130%']) {
             document.documentElement.style.fontSize = scale;
             await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));

@@ -18,6 +18,10 @@ export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), ...(mode === 'single' ? [viteSingleFile()] : [])],
   build: {
     outDir: mode === 'single' ? 'dist-single' : 'dist',
+    // Avatares (SVG pequenos) viram arquivos próprios em vez de texto dentro do JavaScript principal:
+    // continuam no app (funcionam offline), mas só são lidos quando aparecem na tela. O arquivo único
+    // (mode 'single') continua embutindo tudo.
+    assetsInlineLimit: (file: string) => (mode !== 'single' && file.includes('/assets/avatars/') ? false : undefined),
   },
   test: {
     environment: 'jsdom',
