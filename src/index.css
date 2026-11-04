@@ -260,6 +260,8 @@ input, select, textarea, button { font: inherit; }
   & > *:nth-child(3) { animation-delay: 72ms; }
   & > *:nth-child(4) { animation-delay: 108ms; }
   & > *:nth-child(n + 5) { animation-delay: 144ms; }
+  /* Listas longas: só os primeiros itens (os visíveis) animam. */
+  & > *:nth-child(n + 13) { animation: none; }
 }
 @keyframes card-in {
   from { opacity: 0; transform: translateY(10px); }

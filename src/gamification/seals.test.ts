@@ -27,8 +27,29 @@ describe('Categorias (derivadas do nível)', () => {
 
   it('próxima categoria usa a fórmula real de XP', () => {
     expect(nextTier(6, 1600)).toEqual({ tier: TIERS[3], xpNeeded: totalXpForLevel(8) - 1600 });
-    expect(nextTier(16, 99_999)).toBeNull();
+    expect(nextTier(16, totalXpForLevel(16))).toEqual({ tier: expect.objectContaining({ id: 'diamante', name: 'Diamante II', minLevel: 21, rank: 2 }), xpNeeded: totalXpForLevel(21) - totalXpForLevel(16) });
     expect(levelInfo(totalXpForLevel(8)).level).toBe(8);
+  });
+});
+
+describe('R3: graus do Diamante (só visual)', () => {
+  it.each([
+    [15, 'Platina', 1], [16, 'Diamante', 1], [20, 'Diamante', 1], [21, 'Diamante II', 2], [25, 'Diamante II', 2],
+    [26, 'Diamante III', 3], [31, 'Diamante IV', 4], [36, 'Diamante V', 5], [41, 'Diamante VI', 6], [66, 'Diamante XI', 11],
+  ])('nível %i → %s', (level, name, rank) => {
+    const t = tierForLevel(level);
+    expect([t.name, t.rank]).toEqual([name, rank]);
+    expect(t.title).toBe(levelTitle(level)); // título do nível não muda
+  });
+
+  it('não altera a fórmula de XP nem os níveis', () => {
+    expect([16, 21, 26].map(totalXpForLevel)).toEqual([12000, 21000, 32500]);
+    expect(levelInfo(21000).level).toBe(21);
+  });
+
+  it('o próximo grau é sempre 5 níveis depois', () => {
+    expect(nextTier(23, totalXpForLevel(23)).tier.name).toBe('Diamante III');
+    expect(nextTier(23, totalXpForLevel(23)).tier.minLevel).toBe(26);
   });
 });
 

@@ -40,6 +40,11 @@ describe('Ajustes > central de controle (0.4)', () => {
     await open();
     await user.click(screen.getByRole('button', { name: /alterar imagem de perfil/i }));
     const sheet = await screen.findByRole('dialog', { name: /imagem de perfil/i });
+    // Sincronização de foto desligada nesta versão: o texto não pode prometer nuvem.
+    expect(within(sheet).getByText(/fica só neste aparelho e no arquivo de backup/i)).toBeInTheDocument();
+    expect(within(sheet).queryByText(/é sincronizada/i)).not.toBeInTheDocument();
+    expect(within(sheet).getByRole('radio', { name: /tesoura/i })).toBeInTheDocument(); // Beleza e Estética
+    expect(within(sheet).getByRole('radio', { name: /borrifador/i })).toBeInTheDocument(); // Limpeza
     await user.click(within(sheet).getByRole('radio', { name: /estetoscópio/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getAllByRole('img', { name: /avatar estetoscópio/i }).length).toBeGreaterThan(0);

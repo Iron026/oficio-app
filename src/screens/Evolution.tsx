@@ -56,9 +56,7 @@ export function Evolution() {
         </div>
         <ProgressBar value={lv.progress} label="Progresso para o próximo nível" tone="xp" className="mt-2" />
         <p className="mt-2 text-sm text-muted">
-          {next
-            ? <>Nível <span className="num">{lv.level + 1}</span> em <span className="num">{totalXpForLevel(lv.level + 1)}</span> XP · {next.tier.name} no nível <span className="num">{next.tier.minLevel}</span>, faltam <span className="num">{next.xpNeeded}</span> XP</>
-            : <>Nível <span className="num">{lv.level + 1}</span> em <span className="num">{totalXpForLevel(lv.level + 1)}</span> XP · você está na categoria máxima</>}
+          Nível <span className="num">{lv.level + 1}</span> em <span className="num">{totalXpForLevel(lv.level + 1)}</span> XP · {next.tier.name} no nível <span className="num">{next.tier.minLevel}</span>, faltam <span className="num">{next.xpNeeded}</span> XP
         </p>
         <TierPath current={tier} />
       </Card>
@@ -93,7 +91,7 @@ function TierPath({ current }: { current: Tier }) {
             >
               <span aria-hidden="true" className={cx('tracking-[-1px]', !reached && 'text-muted')}>{tierGlyph(t)}</span>
             </span>
-            <span className={cx('w-full text-xs', i === idx ? 'font-bold' : 'text-muted')}>{t.name}</span>
+            <span className={cx('w-full text-xs', i === idx ? 'font-bold' : 'text-muted')}>{i === idx ? current.name : t.name}</span>
             <span className="sr-only">{reached ? (i === idx ? ', atual' : ', alcançada') : `, a partir do nível ${t.minLevel}`}</span>
           </li>
         );

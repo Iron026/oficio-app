@@ -83,10 +83,10 @@ async function newPage(vp, theme) {
 }
 
 /** Espera os avisos temporários sumirem para a captura não depender do tempo. */
-async function settle(page) {
+async function settle(page, keepScroll = false) {
   await page.waitForFunction(() => !document.querySelector('[role="status"] > *'), null, { timeout: 8000 }).catch(() => undefined);
   await page.evaluate(() => document.fonts.ready);
-  await page.evaluate(() => window.scrollTo(0, 0));
+  if (!keepScroll) await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(150);
 }
 
@@ -168,7 +168,7 @@ async function seed(page) {
  * Backup sintético de uma profissional com ~10 meses de uso (dados fictícios, sem
  * marca de demonstração): ~4 000 XP (Ouro), selos em vários estágios.
  */
-function veteranBackup(accent) {
+function veteranBackup(accent, extraXp = 0) {
   const iso = (d, h = 10) => `${d}T${String(h).padStart(2, '0')}:00:00.000Z`;
   const day = (m, d) => `2026-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   const names = ['Maria', 'Juliana', 'Carla', 'Fernanda', 'Patrícia', 'Aline', 'Beatriz', 'Camila', 'Daniela', 'Elaine', 'Gabriela', 'Helena'];
@@ -190,6 +190,7 @@ function veteranBackup(accent) {
   for (let w = 2; w <= 15; w++) xpEvents.push({ id: `vw${w}`, key: `goal_week:2026-W${String(w).padStart(2, '0')}`, category: 'meta', xp: 50, label: 'Meta semanal batida', createdAt: iso(day(1 + Math.floor((w - 1) / 4.4), 1 + ((w * 7) % 27))) });
   for (const m of [2, 4, 6, 9]) xpEvents.push({ id: `vm${m}`, key: `goal_month:2026-${String(m).padStart(2, '0')}`, category: 'meta', xp: 100, label: 'Meta do mês batida', createdAt: iso(day(m, 27)) });
   for (const a of appointments) xpEvents.push({ id: `vx${a.id}`, key: `appointment_completed:${a.id}`, category: 'conclusao', xp: 12, label: 'Atendimento concluído', createdAt: a.completedAt });
+  if (extraXp) xpEvents.push({ id: 'vextra', key: 'historico:importado', category: 'meta', xp: extraXp, label: 'Histórico anterior', createdAt: iso('2026-10-30') });
   return JSON.stringify({
     format: 'oficio-backup', version: 1, exportedAt: '2026-11-03T12:00:00.000Z',
     data: {
@@ -261,7 +262,7 @@ async function checks(page, tag) {
 }
 
 async function capture(page, vp, theme, id, opts = {}) {
-  await settle(page);
+  await settle(page, opts.keepScroll);
   const file = `${vp.id}-${theme}-${id}.png`;
   await page.screenshot({ path: `${OUT}/${file}`, fullPage: !!opts.full });
   const tag = `${vp.id}/${theme}/${id}`;
@@ -331,6 +332,21 @@ try {
         await page.getByRole('button', { name: /alterar imagem de perfil/i }).click();
         await page.getByRole('dialog', { name: /imagem de perfil/i }).waitFor();
         await capture(page, vp, theme, 'ajustes-imagem-de-perfil');
+        // Nomes da galeria: nada cortado nem transbordando do cartão.
+        const cut = await page.evaluate(() => [...document.querySelectorAll('[data-avatar-name]')]
+          .filter((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 || e.getBoundingClientRect().right > e.closest('button').getBoundingClientRect().right)
+          .map((e) => e.textContent));
+        if (cut.length) fail(`${vp.id}/${theme}: nomes cortados na galeria de avatares: ${cut.join(', ')}`);
+        // Galeria por dentro (a folha rola sozinha): meio e fim da lista de avatares.
+        if (vp.id === 'celular-360') {
+          for (const [frac, id] of [[0.45, 'ajustes-galeria-meio'], [1, 'ajustes-galeria-fim']]) {
+            await page.evaluate((f) => {
+              const box = [...document.querySelectorAll('[role="dialog"] *')].find((e) => e.scrollHeight > e.clientHeight + 20 && /(auto|scroll)/.test(getComputedStyle(e).overflowY));
+              if (box) box.scrollTop = (box.scrollHeight - box.clientHeight) * f;
+            }, frac);
+            await capture(page, vp, theme, id, { skipChecks: true, keepScroll: true });
+          }
+        }
         if (vp.id === 'celular-360') await capture(page, vp, theme, 'ajustes-imagem-de-perfil-inteira', { full: true, skipChecks: true });
         await page.getByRole('radio', { name: /criatividade/i }).first().click();
         await page.getByRole('dialog').waitFor({ state: 'detached' });
@@ -397,8 +413,32 @@ try {
       await page.getByRole('dialog', { name: /selo experiência/i }).waitFor();
       await capture(page, vp, theme, 'experiente-detalhe-do-selo');
       await page.keyboard.press('Escape');
+      // 112 clientes: o botão flutuante não pode cobrir o último cartão (checks rola até o fim).
+      await page.goto(BASE + '#/clientes');
+      await capture(page, vp, theme, 'experiente-clientes');
+      const last = await page.evaluate(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        const items = document.querySelectorAll('main li');
+        const li = items[items.length - 1].getBoundingClientRect();
+        const fab = [...document.querySelectorAll('body > button')].find((b) => getComputedStyle(b).position === 'fixed')?.getBoundingClientRect();
+        const nav = document.querySelector('nav[aria-label="Navegação principal"]')?.getBoundingClientRect();
+        return { liBottom: Math.round(li.bottom), fabTop: fab ? Math.round(fab.top) : null, navTop: nav ? Math.round(nav.top) : null };
+      });
+      if (last.fabTop !== null && last.liBottom > last.fabTop) fail(`${vp.id}/${theme}: último cliente (fim em ${last.liBottom}px) fica atrás do botão flutuante (${last.fabTop}px)`);
+      report.fab = report.fab ?? [];
+      report.fab.push({ viewport: vp.id, tema: theme, ...last });
+      await capture(page, vp, theme, 'experiente-clientes-fim', { skipChecks: true, keepScroll: true });
       await page.goto(BASE + '#/ajustes');
       await capture(page, vp, theme, 'experiente-ajustes');
+      // R3: nível 26 → Diamante III (só visual).
+      if (vp.id === 'celular-360') {
+        await page.locator('input[type=file]').first().setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(veteranBackup('petroleo', 32500 - 4244)) });
+        await page.getByRole('button', { name: /^importar$/i }).click();
+        await page.getByText(/backup importado/i).first().waitFor();
+        await page.goto(BASE + '#/evolucao');
+        await page.getByText(/Diamante III/).first().waitFor();
+        await capture(page, vp, theme, 'diamante-iii-evolucao');
+      }
       await ctx.close();
     }
   }

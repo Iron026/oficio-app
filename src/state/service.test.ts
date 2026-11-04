@@ -128,4 +128,18 @@ describe('AppService: avisos de selo e de categoria (0.4)', () => {
     const again = (await service.saveClient({ ...clientInput, name: 'Outra' })).feedback;
     expect(again.tierUp).toBeNull();
   });
+
+  it('avisa o novo grau do Diamante (nível 21) sem mudar o XP recebido', async () => {
+    const storage = createMemoryAdapter();
+    const first = await AppService.load(storage, () => new Date(2026, 10, 4, 10));
+    await first.completeOnboarding({ name: 'Ana', businessName: '', professionId: 'beleza' });
+    await storage.xpEvents.putMany([{ id: 'seed', key: 'seed', category: 'meta', xp: totalXpForLevel(21) - 5, label: 'Histórico', createdAt: '2026-10-01T10:00:00.000Z' } as XpEvent]);
+    const service = await AppService.load(storage, () => new Date(2026, 10, 4, 10));
+    const { feedback } = await service.saveClient(clientInput);
+    expect(feedback.levelUp).toBe(21);
+    expect(feedback.tierUp?.name).toBe('Diamante II');
+    // XP só das regras de sempre (cliente + missão inicial); o grau não concede nada.
+    expect(feedback.events.map((e) => [e.category, e.xp])).toEqual([['cliente', 10], ['missao', 20]]);
+    expect(feedback.xpGained).toBe(30);
+  });
 });

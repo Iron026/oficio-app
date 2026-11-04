@@ -5,6 +5,10 @@ Design, estética e experiência. Etapas: 0 rede de segurança visual · 1 funda
 system · 2 componentes · 3 telas do dia a dia · 4 Evolução, Ajustes e Boas-vindas · 5 tablets e
 computador · 6 acessibilidade, desempenho e entrega. Ver `docs/DESIGN.md`.
 - 0.4.0-beta.1: primeiro APK de teste (etapas 0 a 3: design system, componentes, Painel, Agenda, Clientes e Finanças).
+- 0.4.0-beta.2: identidade global, Evolução com categorias e selos permanentes, central de Ajustes, foto de perfil
+  (só no aparelho e no backup), avatares (pack + 7 SVGs: Ciência, Agronegócio, Educação, Engenharia, Negócios,
+  Beleza e Estética, Limpeza), graus do Diamante (R3, só visual). Selos e foto **não** sincronizam até as
+  regras novas do Firestore serem autorizadas e publicadas.
 
 ## 0.3.1 (manutenção — branch `fix/v0.3.1-maintenance`, aguardando aprovação)
 - Exportar backup no Android: “Salvar no aparelho” pela janela “Salvar como” (Storage Access

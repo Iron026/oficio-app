@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { completedCountByClient } from '../domain/insights';
 import { CalendarPlus, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Search, Trash2, UserPlus } from 'lucide-react';
 import type { Client } from '../domain/types';
 import { useApp, useErrorHandler } from '../state/AppContext';
@@ -31,7 +32,11 @@ export function Clients() {
   }, [data.clients, query]);
 
   const wa = whatsappLink;
-  const countFor = (id: string) => data.appointments.filter((a) => a.clientId === id && a.status === 'concluido').length;
+  // Listas grandes: os primeiros cartões aparecem na hora e o restante é montado em segundo
+  // plano (renderização interrompível do React), sem travar a troca de tela.
+  const shown = useDeferredValue(list, list.slice(0, 24));
+  const completedBy = useMemo(() => completedCountByClient(data.appointments), [data.appointments]);
+  const countFor = (id: string) => completedBy.get(id) ?? 0;
   const selectedClient = data.clients.find((c) => c.id === selected);
 
   return (
@@ -65,7 +70,7 @@ export function Clients() {
         <>
           {query.trim() && <p className="mb-2 mt-4 text-sm text-muted" aria-live="polite">{list.length} {list.length === 1 ? 'resultado' : 'resultados'} para “{query.trim()}”</p>}
           <ul className="enter-stagger grid gap-[var(--gap-list)]">
-            {list.map((c) => {
+            {shown.map((c) => {
               const n = countFor(c.id);
               return (
                 <li key={c.id} className="flex items-stretch gap-1 rounded-2xl border border-line bg-surface shadow-sm">

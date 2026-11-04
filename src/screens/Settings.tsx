@@ -22,6 +22,7 @@ import { SealMedal } from '../ui/SealMedal';
 import { useProfile } from '../state/useProfile';
 import { ProfileImageSheet } from './ProfileImageSheet';
 import { HeroSlot } from './Shell';
+import { sealsPhotoSyncEnabled } from '../sync/features';
 import { Sheet } from '../ui/Sheet';
 import { AccountSection } from './Account';
 import { useBackupExport } from './BackupExport';
@@ -389,6 +390,7 @@ function PrivacyCard() {
             <strong>Com conta conectada:</strong> seus dados ficam neste aparelho e uma cópia é guardada na nuvem (Google Cloud Firestore, via Firebase), vinculada à sua conta
             Google. Regras de acesso permitem que somente a sua conta leia e grave esses dados. Do Google, o Ofício usa apenas nome, e-mail, foto e um identificador da conta.
           </p>
+          {!sealsPhotoSyncEnabled() && <p className="text-muted">Nesta versão, a foto de perfil e os selos ficam só neste aparelho e no arquivo de backup; não vão para a nuvem.</p>}
           <p className="text-muted">Você pode exportar seus dados, desconectar ou excluir a conta e os dados da nuvem a qualquer momento em “Conta e sincronização”.</p>
         </>
       ) : (

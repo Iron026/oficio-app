@@ -49,6 +49,10 @@ jobs:
         run: npm run lint
       - name: Testes automatizados
         run: npm test
+      # beta.2: selos e foto ficam fora da nuvem até as regras novas serem autorizadas e publicadas.
+      - name: Selos e foto sem sincronização (regras não publicadas)
+        run: |
+          if [ -n "${VITE_SYNC_SEALS_PHOTO:-}" ]; then echo "::error::VITE_SYNC_SEALS_PHOTO não pode ser definido antes da publicação das regras"; exit 1; fi
       - name: Build web
         run: npm run build
 

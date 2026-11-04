@@ -2,9 +2,9 @@
 // Imagens locais em WebP (256 px, qualidade 82), empacotadas no app: funcionam offline.
 // Os ids são estáveis: ficam gravados nas preferências da conta (settings.avatar).
 //
-// Símbolos 06–10 do pack (Ciência, Agronegócio, Educação, Engenharia, Negócios) NÃO
-// foram incluídos: têm um disco branco deslocado atrás do círculo e, em dois casos,
-// o desenho cortado na borda. Ver docs/AVATARES.md.
+// Símbolos 06–10 do pack (Ciência, Agronegócio, Educação, Engenharia, Negócios) tinham um
+// disco branco deslocado e cortes: foram REFEITOS em SVG (scripts/avatares-svg.py), assim
+// como os novos de Beleza e Estética e Limpeza. Ver docs/AVATARES.md.
 import retratoGeral from '../assets/avatars/retrato-01_perfil_geral.webp';
 import retratoSaude from '../assets/avatars/retrato-02_saude.webp';
 import retratoDireito from '../assets/avatars/retrato-03_direito.webp';
@@ -22,8 +22,15 @@ import simboloDireito from '../assets/avatars/simbolo-02_direito.webp';
 import simboloFinancas from '../assets/avatars/simbolo-03_financas.webp';
 import simboloTecnologia from '../assets/avatars/simbolo-04_tecnologia.webp';
 import simboloDesign from '../assets/avatars/simbolo-05_design.webp';
+import simboloCiencia from '../assets/avatars/simbolo-06_ciencia.svg';
+import simboloAgro from '../assets/avatars/simbolo-07_agronegocio.svg';
+import simboloEducacao from '../assets/avatars/simbolo-08_educacao.svg';
+import simboloEngenharia from '../assets/avatars/simbolo-09_engenharia.svg';
+import simboloNegocios from '../assets/avatars/simbolo-10_negocios.svg';
+import simboloBeleza from '../assets/avatars/simbolo-11_beleza.svg';
+import simboloLimpeza from '../assets/avatars/simbolo-12_limpeza.svg';
 
-export type AvatarArea = 'geral' | 'saude' | 'direito-financas' | 'criatividade' | 'obras' | 'alimentacao' | 'seguranca' | 'educacao' | 'tecnologia';
+export type AvatarArea = 'geral' | 'beleza' | 'limpeza' | 'saude' | 'direito-financas' | 'criatividade' | 'obras' | 'alimentacao' | 'campo' | 'seguranca' | 'educacao' | 'tecnologia';
 export type AvatarKind = 'retrato' | 'simbolo';
 
 export interface InternalAvatar {
@@ -36,11 +43,14 @@ export interface InternalAvatar {
 
 export const AVATAR_AREAS: { id: AvatarArea; label: string }[] = [
   { id: 'geral', label: 'Geral' },
-  { id: 'saude', label: 'Saúde' },
-  { id: 'direito-financas', label: 'Direito e finanças' },
+  { id: 'beleza', label: 'Beleza e Estética' },
+  { id: 'limpeza', label: 'Limpeza' },
+  { id: 'saude', label: 'Saúde e ciência' },
+  { id: 'direito-financas', label: 'Negócios, direito e finanças' },
   { id: 'criatividade', label: 'Criatividade' },
-  { id: 'obras', label: 'Obras e manutenção' },
+  { id: 'obras', label: 'Obras e engenharia' },
   { id: 'alimentacao', label: 'Alimentação' },
+  { id: 'campo', label: 'Campo e agronegócio' },
   { id: 'seguranca', label: 'Segurança' },
   { id: 'educacao', label: 'Educação' },
   { id: 'tecnologia', label: 'Tecnologia' },
@@ -53,7 +63,7 @@ export const INTERNAL_AVATARS: InternalAvatar[] = [
   { id: 'simbolo-saude', name: 'Estetoscópio', area: 'saude', kind: 'simbolo', src: simboloSaude },
   { id: 'retrato-direito', name: 'Direito', area: 'direito-financas', kind: 'retrato', src: retratoDireito },
   { id: 'simbolo-direito', name: 'Balança', area: 'direito-financas', kind: 'simbolo', src: simboloDireito },
-  { id: 'simbolo-financas', name: 'Gráfico de crescimento', area: 'direito-financas', kind: 'simbolo', src: simboloFinancas },
+  { id: 'simbolo-financas', name: 'Crescimento', area: 'direito-financas', kind: 'simbolo', src: simboloFinancas },
   { id: 'retrato-criatividade', name: 'Criatividade', area: 'criatividade', kind: 'retrato', src: retratoCriatividade },
   { id: 'simbolo-design', name: 'Paleta e pincel', area: 'criatividade', kind: 'simbolo', src: simboloDesign },
   { id: 'retrato-construcao', name: 'Construção civil', area: 'obras', kind: 'retrato', src: retratoConstrucao },
@@ -63,7 +73,14 @@ export const INTERNAL_AVATARS: InternalAvatar[] = [
   { id: 'retrato-bombeiros', name: 'Brigada de incêndio', area: 'seguranca', kind: 'retrato', src: retratoBombeiros },
   { id: 'retrato-educacao', name: 'Educação', area: 'educacao', kind: 'retrato', src: retratoEducacao },
   { id: 'retrato-tecnologia', name: 'Tecnologia', area: 'tecnologia', kind: 'retrato', src: retratoTecnologia },
-  { id: 'simbolo-tecnologia', name: 'Notebook com código', area: 'tecnologia', kind: 'simbolo', src: simboloTecnologia },
+  { id: 'simbolo-tecnologia', name: 'Programação', area: 'tecnologia', kind: 'simbolo', src: simboloTecnologia },
+  { id: 'simbolo-beleza', name: 'Tesoura', area: 'beleza', kind: 'simbolo', src: simboloBeleza },
+  { id: 'simbolo-limpeza', name: 'Borrifador', area: 'limpeza', kind: 'simbolo', src: simboloLimpeza },
+  { id: 'simbolo-ciencia', name: 'Laboratório', area: 'saude', kind: 'simbolo', src: simboloCiencia },
+  { id: 'simbolo-negocios', name: 'Maleta', area: 'direito-financas', kind: 'simbolo', src: simboloNegocios },
+  { id: 'simbolo-engenharia', name: 'Engrenagem', area: 'obras', kind: 'simbolo', src: simboloEngenharia },
+  { id: 'simbolo-agronegocio', name: 'Broto', area: 'campo', kind: 'simbolo', src: simboloAgro },
+  { id: 'simbolo-educacao', name: 'Formatura', area: 'educacao', kind: 'simbolo', src: simboloEducacao },
 ];
 
 export function getInternalAvatar(id: string | undefined): InternalAvatar | undefined {

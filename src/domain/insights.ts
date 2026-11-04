@@ -63,3 +63,10 @@ export function overdue(appointments: Appointment[], now: Date): Appointment[] {
   const today = toDateKey(now);
   return appointments.filter((a) => a.status === 'agendado' && a.date < today);
 }
+
+/** Atendimentos concluídos por cliente, num único passe (listas grandes sem custo quadrático). */
+export function completedCountByClient(appointments: readonly Appointment[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const a of appointments) if (a.clientId && a.status === 'concluido') out.set(a.clientId, (out.get(a.clientId) ?? 0) + 1);
+  return out;
+}

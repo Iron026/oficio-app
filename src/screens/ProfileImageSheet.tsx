@@ -3,6 +3,7 @@ import { Camera, Check, Minus, Plus, Trash2 } from 'lucide-react';
 import { avatarOf } from '../domain/preferences';
 import type { AvatarChoice } from '../domain/types';
 import { useApp, useErrorHandler, useFeedback } from '../state/AppContext';
+import { sealsPhotoSyncEnabled } from '../sync/features';
 import { useProfile } from '../state/useProfile';
 import { useConfirm } from '../ui/Confirm';
 import { Button } from '../ui/Button';
@@ -50,7 +51,7 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
   }
 
   async function removePhoto() {
-    const ok = await confirm({ title: 'Remover sua foto?', message: 'A foto será apagada deste aparelho e, com conta conectada, também da nuvem. O perfil volta a mostrar suas iniciais.', confirmLabel: 'Remover foto', danger: true });
+    const ok = await confirm({ title: 'Remover sua foto?', message: sealsPhotoSyncEnabled() ? 'A foto será apagada deste aparelho e, com conta conectada, também da nuvem. O perfil volta a mostrar suas iniciais.' : 'A foto será apagada deste aparelho. O perfil volta a mostrar suas iniciais.', confirmLabel: 'Remover foto', danger: true });
     if (!ok) return;
     try {
       await service.removeProfileImage();
@@ -69,7 +70,7 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
     }
   }
 
-  const option = 'press-soft relative flex flex-col items-center gap-1.5 rounded-2xl border-2 p-2 text-center text-xs font-medium';
+  const option = 'press-soft relative flex w-full min-w-0 flex-col items-center gap-1.5 rounded-2xl border-2 px-1 py-2 text-center text-xs font-medium';
   return (
     <div className="space-y-5">
       <div className="flex justify-center">
@@ -84,7 +85,10 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
           {photo && <Button variant="ghost" icon={<Trash2 size={18} />} onClick={removePhoto} className="text-red-700 dark:text-red-300">Remover foto</Button>}
         </div>
         <p className="text-xs leading-relaxed text-muted">
-          A foto é recortada e reduzida neste aparelho (até 64 KB, sem dados de localização). Com conta conectada, ela é sincronizada só com a sua conta.
+          A foto é recortada e reduzida neste aparelho (até 64 KB, sem dados de localização).{' '}
+          {sealsPhotoSyncEnabled()
+            ? 'Com conta conectada, ela também é guardada na nuvem, acessível só pela sua conta.'
+            : 'Nesta versão ela fica só neste aparelho e no arquivo de backup; não é enviada para a nuvem, mesmo com conta conectada.'}
         </p>
         <input
           ref={fileRef}
@@ -103,7 +107,7 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
       <div role="radiogroup" aria-label="Imagem de perfil" className="space-y-4">
         <section aria-labelledby="img-ini" className="space-y-2">
           <h3 id="img-ini" className="text-sm font-bold">Iniciais</h3>
-          <div className="grid grid-cols-3 gap-2 min-[400px]:grid-cols-4 sm:grid-cols-6">
+          <div className="grid grid-cols-3 gap-2 min-[480px]:grid-cols-4 sm:grid-cols-5">
             <button type="button" role="radio" aria-checked={is({ kind: 'iniciais' })} onClick={() => pick({ kind: 'iniciais' })} className={cx(option, is({ kind: 'iniciais' }) ? 'border-brand-500' : 'border-line')}>
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 font-display text-lg font-extrabold text-brand-800 dark:bg-brand-500/25 dark:text-brand-50" aria-hidden="true">
                 {initials(data.profile?.name ?? '') || '?'}
@@ -120,13 +124,13 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
           return (
             <section key={area.id} aria-labelledby={`img-${area.id}`} className="space-y-2">
               <h3 id={`img-${area.id}`} className="text-sm font-bold">{area.label}</h3>
-              <div className="grid grid-cols-3 gap-2 min-[400px]:grid-cols-4 sm:grid-cols-6">
+              <div className="grid grid-cols-3 gap-2 min-[480px]:grid-cols-4 sm:grid-cols-5">
                 {items.map((a) => {
                   const on = is({ kind: 'interno', id: a.id });
                   return (
                     <button key={a.id} type="button" role="radio" aria-checked={on} onClick={() => pick({ kind: 'interno', id: a.id })} className={cx(option, on ? 'border-brand-500' : 'border-line')}>
                       <img src={a.src} alt="" width={56} height={56} loading="lazy" decoding="async" className="h-14 w-14 rounded-full bg-surface-2 object-cover" />
-                      <span className="line-clamp-2 leading-tight [overflow-wrap:anywhere]">{a.name}</span>
+                      <span data-avatar-name className="line-clamp-2 w-full leading-tight [hyphens:auto] [overflow-wrap:break-word]">{a.name}</span>
                       {on && <Selected />}
                     </button>
                   );

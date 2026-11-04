@@ -11,6 +11,7 @@ import { Button, IconButton } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
 import { cx } from '../ui/cx';
 import { Card, SectionTitle } from '../ui/Misc';
+import { sealsPhotoSyncEnabled } from '../sync/features';
 import { Sheet } from '../ui/Sheet';
 import { useToast } from '../ui/Toast';
 
@@ -162,8 +163,9 @@ function LinkSheet({ analysis, onDone }: { analysis: LinkAnalysis; onDone: () =>
           <p>Esta conta ainda não tem dados do Ofício. Ao conectar, o que você cadastrar será guardado nela automaticamente.</p>
         ) : (
           <p>
-            Ao conectar, uma cópia dos seus dados do Ofício (perfil, clientes, serviços, receitas e despesas, metas, XP, missões e conquistas) passa a ser guardada na
+            Ao conectar, uma cópia dos seus dados do Ofício (perfil, clientes, serviços, receitas e despesas, metas, XP, missões e conquistas{sealsPhotoSyncEnabled() ? ', selos e foto de perfil' : ''}) passa a ser guardada na
             nuvem, vinculada à sua conta Google, para você recuperá-los em outro aparelho.
+            {!sealsPhotoSyncEnabled() && ' Nesta versão, selos e foto de perfil ficam só neste aparelho e no arquivo de backup.'}
           </p>
         )}
         <div className="flex gap-2">

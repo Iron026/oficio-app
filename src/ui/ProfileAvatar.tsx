@@ -3,7 +3,7 @@ import { avatarOf } from '../domain/preferences';
 import { profileImageUrl } from '../domain/profileImage';
 import type { AppData, SealId } from '../domain/types';
 import { ROMAN, getSeal } from '../gamification/seals';
-import type { Tier, TierId } from '../gamification/tiers';
+import { tierKey, type Tier, type TierId } from '../gamification/tiers';
 import { initials } from './Avatar';
 import { getInternalAvatar } from './avatarCatalog';
 import { cx } from './cx';
@@ -76,6 +76,13 @@ function Frame({ tier, gap }: { tier: Tier; gap: string }) {
   if (tier.symbol === 'circulo') ornament = <circle cx="50" cy="4" r="3.6" fill={c2} stroke={gap} strokeWidth="1.4" />;
   else if (tier.symbol === 'gema') ornament = (
     <g>
+      {/* Graus do Diamante (R3): um losango pequeno de cada lado por grau acima do I (até 3). */}
+      {Array.from({ length: Math.min(3, tier.rank - 1) }, (_, i) => (
+        <g key={i}>
+          <path d={`M${37 - i * 6.5} 6.6l2.6 3-2.6 3-2.6-3z`} fill={c1} stroke={c3} strokeWidth=".8" />
+          <path d={`M${63 + i * 6.5} 6.6l2.6 3-2.6 3-2.6-3z`} fill={c1} stroke={c3} strokeWidth=".8" />
+        </g>
+      ))}
       <path d="M44 3h12l3.5 3.6L50 15.5 40.5 6.6z" fill={`url(#${id}g)`} stroke={c3} strokeWidth=".9" />
       <path d="M40.5 6.6h19M47 3l3 3.6L53 3M50 6.6v8.9" fill="none" stroke="#fff" strokeOpacity=".7" strokeWidth=".7" />
     </g>
@@ -135,16 +142,17 @@ export function ProfileAvatar({ data, tier, size, seal, onHero, className }: {
   onHero?: boolean;
   className?: string;
 }) {
-  const prev = useRef(tier.id);
+  const key = tierKey(tier);
+  const prev = useRef(key);
   const [changed, setChanged] = useState(false);
   useEffect(() => {
-    if (prev.current !== tier.id) {
-      prev.current = tier.id;
+    if (prev.current !== key) {
+      prev.current = key;
       setChanged(true);
       const t = setTimeout(() => setChanged(false), 900);
       return () => clearTimeout(t);
     }
-  }, [tier.id]);
+  }, [key]);
   const def = seal ? getSeal(seal.id) : undefined;
   const label = `Imagem de perfil de ${data.profile?.name ?? 'você'} (${describe(data)}), moldura ${tier.name}${def && seal ? `, selo ${def.name} estágio ${ROMAN[seal.stage]}` : ''}`;
   const gap = onHero ? 'var(--hero-1)' : 'var(--surface)';

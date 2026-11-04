@@ -4,6 +4,7 @@ import { newId } from '../lib/id';
 import { serializeBackup } from '../storage/backup';
 import type { AppService } from '../state/service';
 import { duplicateAutoIncomeIds, duplicateXpIds, mergeMeta, mergeRecord } from './merge';
+import { sealsPhotoSyncEnabled } from './features';
 import type { ChangeTracker, TrackedStorage } from './tracked';
 import {
   BASE_SYNC_COLLECTIONS,
@@ -94,7 +95,7 @@ function hasContent(data: Pick<AppData, 'profile' | 'clients' | 'appointments' |
  * VITE_SYNC_SEALS_PHOTO=1, depois que as regras novas forem publicadas no Firebase.
  */
 export function defaultSyncCollections(env: Record<string, string | boolean | undefined> = import.meta.env): readonly SyncCollection[] {
-  return env.VITE_SYNC_SEALS_PHOTO === '1' ? [...BASE_SYNC_COLLECTIONS, ...V04_SYNC_COLLECTIONS] : BASE_SYNC_COLLECTIONS;
+  return sealsPhotoSyncEnabled(env) ? [...BASE_SYNC_COLLECTIONS, ...V04_SYNC_COLLECTIONS] : BASE_SYNC_COLLECTIONS;
 }
 
 /** Defesa extra (as regras do Firestore já validam): selo ou foto malformados vindos da nuvem são ignorados. */

@@ -331,3 +331,13 @@ describe('armazenamento local e backup (0.4)', () => {
     expect(d.profileImages).toEqual([]);
   });
 });
+
+describe('beta.2: selos e foto fora da nuvem', () => {
+  it('sem VITE_SYNC_SEALS_PHOTO=1 a sincronização deles fica desligada (padrão do APK)', async () => {
+    const { sealsPhotoSyncEnabled } = await import('./features');
+    expect(sealsPhotoSyncEnabled({})).toBe(false);
+    expect(sealsPhotoSyncEnabled({ VITE_SYNC_SEALS_PHOTO: '0' })).toBe(false);
+    expect(sealsPhotoSyncEnabled({ VITE_SYNC_SEALS_PHOTO: '1' })).toBe(true);
+    expect(sealsPhotoSyncEnabled()).toBe(false); // ambiente dos testes = build sem a variável
+  });
+});
