@@ -400,7 +400,7 @@ try {
           }
         }
         if (vp.id === 'celular-360') await capture(page, vp, theme, 'ajustes-imagem-de-perfil-inteira', { full: true, skipChecks: true });
-        await page.getByRole('radio', { name: /^artista$/i }).click();
+        await page.getByRole('radio', { name: 'Criatividade, mulher' }).click();
         await page.getByRole('dialog').waitFor({ state: 'detached' });
         await capture(page, vp, theme, 'ajustes-com-avatar');
         await page.getByRole('button', { name: /alterar imagem de perfil/i }).click();

@@ -9,7 +9,7 @@ import { useConfirm } from '../ui/Confirm';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { initials } from '../ui/Avatar';
-import { avatarsByArea, getInternalAvatar, groupOf, type AvatarGroup } from '../ui/avatarCatalog';
+import { avatarSpokenName, avatarsByArea, getInternalAvatar, groupOf, type AvatarGroup, type InternalAvatar } from '../ui/avatarCatalog';
 import { Segmented } from '../ui/Misc';
 import { ProfileAvatar } from '../ui/ProfileAvatar';
 import { clampCrop, drawCrop, encodePhoto, loadPhoto, type Crop, type Source } from '../ui/photoEncode';
@@ -76,6 +76,17 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
   const current = choice.kind === 'interno' ? getInternalAvatar(choice.id) : undefined;
   const [tab, setTab] = useState<AvatarGroup>(current ? groupOf(current) : 'personagens');
   const currentName = choice.kind === 'foto' && photo ? 'Sua foto' : current ? current.name : 'Iniciais';
+  const tileFor = (a: InternalAvatar) => {
+    const on = is({ kind: 'interno', id: a.id });
+    const spoken = avatarSpokenName(a);
+    // Sem nome embaixo da imagem: o TalkBack lê o nome; o escolhido aparece na prévia acima.
+    return (
+      <button key={a.id} type="button" role="radio" aria-checked={on} aria-label={spoken} title={spoken} data-avatar-id={a.id} onClick={() => pick({ kind: 'interno', id: a.id })} className={cx(tile, on ? 'border-brand-500' : 'border-line')}>
+        <img src={a.src} alt="" width={56} height={56} loading="lazy" decoding="async" className="h-14 w-14 rounded-full bg-surface-2 object-cover" />
+        {on && <Selected />}
+      </button>
+    );
+  };
   return (
     <div className="space-y-5">
       <div className="flex flex-col items-center gap-2">
@@ -127,23 +138,28 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
         <div>
           <Segmented label="Tipo de avatar" value={tab} onChange={setTab} options={[{ value: 'personagens', label: 'Personagens' }, { value: 'icones', label: 'Ícones' }]} />
         </div>
-        {avatarsByArea(tab).map(({ area, items }) => (
-          <section key={`${tab}-${area.id}`} aria-labelledby={`img-${tab}-${area.id}`} className="space-y-2">
-            <h3 id={`img-${tab}-${area.id}`} className="text-sm font-bold">{area.label}</h3>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(4.25rem,1fr))] gap-2">
-              {items.map((a) => {
-                const on = is({ kind: 'interno', id: a.id });
-                // Sem nome embaixo da imagem: o TalkBack lê o nome; o escolhido aparece na prévia acima.
-                return (
-                  <button key={a.id} type="button" role="radio" aria-checked={on} aria-label={a.name} title={a.name} data-avatar-id={a.id} onClick={() => pick({ kind: 'interno', id: a.id })} className={cx(tile, on ? 'border-brand-500' : 'border-line')}>
-                    <img src={a.src} alt="" width={56} height={56} loading="lazy" decoding="async" className="h-14 w-14 rounded-full bg-surface-2 object-cover" />
-                    {on && <Selected />}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+        {current?.legacy && (
+          <p className="rounded-xl bg-surface-2 p-3 text-sm text-muted" data-avatar-legacy>
+            Seu avatar atual é da coleção anterior. Ele continua no seu perfil; se escolher outro, a galeria mostra só a coleção atual.
+          </p>
+        )}
+        {tab === 'personagens' ? (
+          // Duas áreas por linha no celular: título da área e, embaixo, mulher e homem.
+          // Subgrade: títulos da mesma linha têm a mesma altura, então os cartões ficam alinhados
+          // mesmo quando um nome de área quebra em duas linhas.
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-x-3 gap-y-1.5">
+            {avatarsByArea('personagens').map(({ area, items }) => (
+              <section key={area.id} aria-labelledby={`img-p-${area.id}`} className="row-span-2 grid min-w-0 grid-rows-subgrid">
+                <h3 id={`img-p-${area.id}`} className="self-end text-sm font-bold leading-snug">{area.label}</h3>
+                <div className="grid grid-cols-2 gap-2 pb-3">{items.map(tileFor)}</div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(4.25rem,1fr))] gap-2">
+            {avatarsByArea('icones').flatMap(({ items }) => items).map(tileFor)}
+          </div>
+        )}
       </div>
       <p className="text-xs text-muted">Os avatares do Ofício ficam no próprio app e funcionam sem internet.</p>
     </div>

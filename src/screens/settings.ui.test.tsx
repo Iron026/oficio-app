@@ -152,21 +152,26 @@ describe('Central de Ajustes — páginas internas', () => {
     expect(people).toHaveLength(24);
     expect(within(sheet).getByRole('radio', { name: 'Beleza e Estética, mulher' })).toHaveTextContent('');
     expect(within(sheet).getByRole('radio', { name: 'Limpeza, homem' })).toBeInTheDocument();
-    expect(within(sheet).getByRole('radio', { name: /^artista$/i })).toBeInTheDocument(); // pacote anterior continua
+    // Coleção anterior (estilo diferente) fora da galeria.
+    expect(within(sheet).queryByRole('radio', { name: /^artista$/i })).not.toBeInTheDocument();
+    expect(within(sheet).getAllByRole('radio').filter((r) => r.hasAttribute('data-avatar-id')).every((r) => r.getAttribute('data-avatar-id')!.startsWith('personagem-'))).toBe(true);
     await user.click(within(sheet).getByRole('radio', { name: /^ícones$/i }));
-    expect(within(sheet).getByRole('radio', { name: /tesoura/i })).toBeInTheDocument();
-    expect(within(sheet).getByRole('radio', { name: /borrifador/i })).toBeInTheDocument();
-    expect(within(sheet).getByRole('radio', { name: /escudo/i })).toBeInTheDocument();
+    const icons = within(sheet).getAllByRole('radio').filter((r) => r.hasAttribute('data-avatar-id'));
+    expect(icons).toHaveLength(12); // um por área
+    expect(within(sheet).getByRole('radio', { name: 'Beleza e Estética: Tesoura' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('radio', { name: 'Limpeza: Borrifador' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('radio', { name: 'Segurança: Escudo' })).toBeInTheDocument();
+    expect(within(sheet).queryByRole('radio', { name: /medicina|laboratório|gráfico|balança/i })).not.toBeInTheDocument();
     expect(within(sheet).queryByRole('radio', { name: 'Limpeza, homem' })).not.toBeInTheDocument();
-    await user.click(within(sheet).getByRole('radio', { name: /^medicina$/i }));
+    await user.click(within(sheet).getByRole('radio', { name: 'Saúde e ciência: Coração' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getByText('Avatar: Medicina')).toBeInTheDocument();
+    expect(screen.getByText('Avatar: Coração')).toBeInTheDocument();
 
     // Reabrir: volta na aba do avatar escolhido e mostra o nome na prévia.
     await user.click(screen.getByRole('button', { name: /imagem de perfil/i }));
     const again = await screen.findByRole('dialog', { name: /imagem de perfil/i });
     expect(within(again).getByRole('radio', { name: /^ícones$/i })).toHaveAttribute('aria-checked', 'true');
-    expect(within(again).getByText('Medicina', { selector: '[data-avatar-current]' })).toBeInTheDocument();
+    expect(within(again).getByText('Coração', { selector: '[data-avatar-current]' })).toBeInTheDocument();
     await user.click(within(again).getByRole('radio', { name: /^personagens$/i }));
     await user.click(within(again).getByRole('radio', { name: 'Saúde e ciência, mulher' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

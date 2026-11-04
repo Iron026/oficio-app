@@ -127,7 +127,9 @@ export function ProfileImageView({ data }: { data: Pick<AppData, 'settings' | 'p
 function describe(data: Pick<AppData, 'settings' | 'profileImages'>): string {
   const choice = avatarOf(data.settings);
   if (choice.kind === 'foto' && data.profileImages[0]) return 'foto';
-  if (choice.kind === 'interno') return `avatar ${getInternalAvatar(choice.id)?.name.toLowerCase() ?? 'do Ofício'}`;
+  // Id desconhecido (ex.: de uma versão mais nova): a imagem cai para as iniciais, e o nome também.
+  const internal = choice.kind === 'interno' ? getInternalAvatar(choice.id) : undefined;
+  if (internal) return `avatar ${internal.name.toLowerCase()}`;
   return 'iniciais';
 }
 

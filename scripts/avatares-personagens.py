@@ -27,7 +27,9 @@ def face(sk, eyes='round', brow='#3b2a20', lips='#c46a5a', lash=False, beard=Non
         out+=f'<path d="M102 120q7-8 14 0" stroke="{INK}" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M140 120q7-8 14 0" stroke="{INK}" stroke-width="4" fill="none" stroke-linecap="round"/>'
     elif eyes=='big':
         out+=f'<ellipse cx="109" cy="118" rx="6.2" ry="7.4" fill="{INK}"/><ellipse cx="147" cy="118" rx="6.2" ry="7.4" fill="{INK}"/><circle cx="111.5" cy="115.5" r="2.2" fill="#fff"/><circle cx="149.5" cy="115.5" r="2.2" fill="#fff"/>'
-    else: # almond
+    elif eyes=='calm':
+        out+=f'<ellipse cx="109" cy="119" rx="5.2" ry="5.6" fill="{INK}"/><ellipse cx="147" cy="119" rx="5.2" ry="5.6" fill="{INK}"/><circle cx="111" cy="117" r="1.7" fill="#fff"/><circle cx="149" cy="117" r="1.7" fill="#fff"/><path d="M101 115q8-6 16 0M139 115q8-6 16 0" stroke="{INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>'
+    else: # almond (não usado: parecia fechado nesse estilo)
         out+=f'<path d="M102 119q7-7 14 0q-7 5-14 0z" fill="{INK}"/><path d="M140 119q7-7 14 0q-7 5-14 0z" fill="{INK}"/><circle cx="111" cy="117" r="1.5" fill="#fff"/><circle cx="149" cy="117" r="1.5" fill="#fff"/>'
     if lash: out+=f'<path d="M101 115l-3-3M155 115l3-3" stroke="{INK}" stroke-width="2.4" stroke-linecap="round"/>'
     out+=f'<path d="M127 124q-4 12 2 14" stroke="{s}" stroke-width="3.2" fill="none" stroke-linecap="round"/>'
@@ -101,9 +103,9 @@ def hardhat(c='#f2b632'): return (f'<path d="M80 100c0-34 22-54 48-54s48 20 48 5
             f'<rect x="70" y="96" width="116" height="13" rx="6.5" fill="{shade(c,0.86)}"/><path d="M120 50h16v46h-16z" fill="{shade(c,0.9)}"/>')
 def vest(c='#f07c2a'): return (f'<path d="M66 256l14-60 26-10 22 32 22-32 26 10 14 60z" fill="{c}"/>'
             '<path d="M70 232h40v8H68zM146 232h40l2 8h-42z" fill="#eef3f4"/>')
-def toque(): return ('<path d="M90 86V74c-14 0-22-10-22-22 0-14 12-24 26-20 4-12 16-18 34-18s30 6 34 18c14-4 26 6 26 20 0 12-8 22-22 22v12z" fill="#ffffff" stroke="#d5dee1" stroke-width="2.5"/>'
-            '<rect x="88" y="78" width="80" height="14" rx="4" fill="#f1f5f6" stroke="#d5dee1" stroke-width="2"/>')
-def chefcoat(): return ('<path d="M110 186l18 16 18-16-4 14-14 8-14-8z" fill="#d94f3d"/>'
+def toque(): return ('<g transform="translate(0 6)"><path d="M90 86V74c-14 0-22-10-22-22 0-14 12-24 26-20 4-12 16-18 34-18s30 6 34 18c14-4 26 6 26 20 0 12-8 22-22 22v12z" fill="#ffffff" stroke="#d5dee1" stroke-width="2.5"/>'
+            '<rect x="88" y="78" width="80" height="14" rx="4" fill="#f1f5f6" stroke="#d5dee1" stroke-width="2"/></g>')
+def chefcoat(scarf='#d94f3d'): return (f'<path d="M110 186l18 16 18-16-4 14-14 8-14-8z" fill="{scarf}"/>'
             + ''.join(f'<circle cx="{x}" cy="{y}" r="3.4" fill="#9fb0b6"/>' for x in (114,142) for y in (220,240)))
 def strawhat(): return ('<ellipse cx="128" cy="90" rx="78" ry="16" fill="#dcae55"/>'
             '<path d="M92 90c0-28 16-42 36-42s36 14 36 42z" fill="#e7c06a"/><rect x="92" y="76" width="72" height="10" fill="#8f5428"/>')
@@ -133,38 +135,38 @@ SPECS={
  'geral-f':dict(label='Geral, mulher',skin='s2',hair='#4a2c1c',back='f_bob_back',front='f_bob_front',top='#2a8f86',collar='round',lash=True,eyes='big',acc=studs()),
  'geral-m':dict(label='Geral, homem',skin='s4',hair='#1c1512',front='m_side',top='#3d6fa8',collar='shirt',jaw='square',smile='open'),
  # Beleza e Estética
- 'beleza-f':dict(label='Beleza e Estética, mulher',skin='s3',hair='#3a2418',back='f_long_back',front='f_long_front',top='#2b2b33',lash=True,lips='#b3474f',eyes='big',acc=hoops(),body_extra=apron('#e9d7c6')+scissors_pocket()),
+ 'beleza-f':dict(eyes='calm',label='Beleza e Estética, mulher',skin='s3',hair='#3a2418',back='f_long_back',front='f_long_front',top='#2b2b33',lash=True,lips='#b3474f',acc=hoops(),body_extra=apron('#e9d7c6')+scissors_pocket()),
  'beleza-m':dict(label='Beleza e Estética, homem',eyes='smile',skin='s1',hair='#1f1a17',front='m_quiff',top='#2b2b33',jaw='square',beard='#2a211c',body_extra=apron('#cfd8d6')+scissors_pocket(),collar='round'),
  # Limpeza
  'limpeza-f':dict(label='Limpeza, mulher',skin='s5',hair='#1b1412',back='f_pony_back',front='f_bandana',top='#2a8f86',collar='v',lash=True,eyes='big',lips='#9c3b45',acc=hoops('#f2b632'),body_extra=badge('#ffffff'),smile='open'),
- 'limpeza-m':dict(label='Limpeza, homem',smile='open',skin='s2',hair='#5a3a26',front='m_short',top='#3d6fa8',collar='v',jaw='round',acc=cap('#2a8f86'),body_extra=badge('#ffffff')),
+ 'limpeza-m':dict(eyes='big',label='Limpeza, homem',smile='open',skin='s2',hair='#5a3a26',front='m_short',top='#3d6fa8',collar='v',jaw='round',acc=cap('#2a8f86'),body_extra=badge('#ffffff')),
  # Saúde
- 'saude-f':dict(label='Saúde, mulher',eyes='big',skin='s2',hair='#6b3e26',front='f_bun',top='#ffffff',collar='v',lash=True,acc=glasses('#5b3b2a'),body_extra=steth()+'<path d="M84 190q-10 30-6 66h14zM172 190q10 30 6 66h-14z" fill="#e8eef0"/>'),
- 'saude-m':dict(label='Saúde, homem',skin='s6',hair='#151110',front='m_buzz',top='#ffffff',collar='shirt',jaw='square',beard='#1a1412',body_extra=steth()),
+ 'saude-f':dict(label='Saúde e ciência, mulher',eyes='big',skin='s2',hair='#6b3e26',front='f_bun',top='#ffffff',collar='v',lash=True,acc=glasses('#5b3b2a'),body_extra=steth()+'<path d="M84 190q-10 30-6 66h14zM172 190q10 30 6 66h-14z" fill="#e8eef0"/>'),
+ 'saude-m':dict(eyes='calm',label='Saúde e ciência, homem',skin='s6',hair='#151110',front='m_buzz',top='#ffffff',collar='shirt',jaw='square',beard='#1a1412',body_extra=steth()),
  # Negócios, direito e finanças
- 'direito-financas-f':dict(label='Negócios, direito e finanças, mulher',skin='s5',hair='#17110f',back='f_long_back',front='f_side_part',top='#2c3a5c',lash=True,eyes='big',lips='#8e3440',acc=pearls(),body_extra=blazer('#2c3a5c')),
- 'direito-financas-m':dict(label='Negócios, direito e finanças, homem',skin='s1',hair='#6d6460',front='m_side',top='#30363d',jaw='square',acc=glasses('#3b3330'),body_extra=blazer('#30363d')+tie('#a5343f')),
+ 'direito-financas-f':dict(eyes='round',label='Negócios, direito e finanças, mulher',skin='s5',hair='#17110f',back='f_long_back',front='f_side_part',top='#2c3a5c',lash=True,lips='#8e3440',acc=pearls(),body_extra=blazer('#2c3a5c')),
+ 'direito-financas-m':dict(label='Negócios, direito e finanças, homem',skin='s1',hair='#3b2a20',front='m_side',top='#30363d',jaw='square',smile='open',body_extra=blazer('#30363d')+tie('#a5343f')),
  # Criatividade
  'criatividade-f':dict(label='Criatividade, mulher',skin='s1',hair='#b8502a',back='f_bob_back',front='f_bob_front',top='#f2b632',collar='round',lash=True,eyes='big',freckles=True,acc=beret('#c2384f')+smudge()),
  'criatividade-m':dict(label='Criatividade, homem',skin='s3',hair='#2b1d15',front='m_curly',top='#3f5d7a',collar='round',jaw='long',beard='#2b1d15',body_extra=scarf('#e0703c')),
  # Obras e engenharia
  'obras-f':dict(label='Obras e engenharia, mulher',skin='s3',hair='#2a1a12',back='f_pony_back',top='#3d6fa8',collar='shirt',lash=True,eyes='round',smile='open',acc=hardhat('#f2b632'),body_extra=vest('#f07c2a')),
- 'obras-m':dict(label='Obras e engenharia, homem',skin='s6',hair='#151110',top='#4d5b66',collar='shirt',jaw='square',beard='#1a1412',acc=hardhat('#f2b632'),body_extra=vest('#f07c2a')),
+ 'obras-m':dict(label='Obras e engenharia, homem',skin='s4',hair='#151110',top='#4d5b66',collar='shirt',jaw='square',smile='open',acc=hardhat('#f2b632')+mustache('#1a1412'),body_extra=vest('#f07c2a')),
  # Alimentação
- 'alimentacao-f':dict(label='Alimentação, mulher',skin='s4',hair='#24160f',back='f_short_back',top='#ffffff',lash=True,eyes='big',smile='open',acc=toque()+studs(),body_extra=chefcoat()),
+ 'alimentacao-f':dict(eyes='round',label='Alimentação, mulher',skin='s4',hair='#24160f',back='f_short_back',top='#ffffff',lash=True,smile='open',acc=toque()+studs(),body_extra=chefcoat('#2a8f86')),
  'alimentacao-m':dict(label='Alimentação, homem',skin='s2',hair='#3b2a20',top='#ffffff',jaw='round',eyes='smile',acc=toque()+mustache('#3b2a20'),body_extra=chefcoat()),
  # Campo e agronegócio
  'campo-f':dict(label='Campo e agronegócio, mulher',skin='s2',hair='#7a4a26',back='f_braid_back',top='#b8443a',collar='shirt',lash=True,eyes='big',freckles=True,smile='open',acc=strawhat(),body_extra=plaid('#b8443a','#5c1f1a')),
- 'campo-m':dict(label='Campo e agronegócio, homem',skin='s3',hair='#9a948e',front='m_bald_sides',top='#2f6b4a',collar='shirt',jaw='square',acc=strawhat()+mustache('#a8a29c'),body_extra=plaid('#2f6b4a','#173a27')),
+ 'campo-m':dict(eyes='calm',label='Campo e agronegócio, homem',skin='s3',hair='#9a948e',front='m_bald_sides',top='#2f6b4a',collar='shirt',jaw='square',acc=strawhat()+mustache('#a8a29c'),body_extra=plaid('#2f6b4a','#173a27')),
  # Segurança
- 'seguranca-f':dict(label='Segurança, mulher',skin='s6',hair='#120d0b',back='f_pony_back',top='#22324a',collar='shirt',lash=True,eyes='big',acc=cap('#22324a'),body_extra=guard()),
- 'seguranca-m':dict(label='Segurança, homem',skin='s2',hair='#2a1f18',front='m_buzz',top='#22324a',collar='shirt',jaw='square',acc=cap('#22324a'),body_extra=guard()),
+ 'seguranca-f':dict(eyes='round',label='Segurança, mulher',skin='s6',hair='#120d0b',back='f_pony_back',top='#22324a',collar='shirt',lash=True,acc=cap('#22324a'),body_extra=guard()),
+ 'seguranca-m':dict(label='Segurança, homem',skin='s3',hair='#2a1f18',front='m_buzz',top='#22324a',collar='shirt',jaw='long',eyes='calm',acc=cap('#22324a'),body_extra=guard()),
  # Tecnologia
- 'tecnologia-f':dict(label='Tecnologia, mulher',skin='s4',hair='#2a1a12',back='f_curly_back',top='#4b3f8f',collar='round',freckles=True,acc=headset(),eyes='big'),
+ 'tecnologia-f':dict(eyes='calm',label='Tecnologia, mulher',skin='s4',hair='#2a1a12',back='f_curly_back',top='#4b3f8f',collar='round',freckles=True,acc=headset()),
  'tecnologia-m':dict(label='Tecnologia, homem',skin='s1',hair='#c8823e',front='m_curly',top='#3a4750',jaw='long',acc=glasses(),body_extra=hood('#3a4750'),freckles=True),
  # Educação
  'educacao-f':dict(label='Educação, mulher',skin='s1',hair='#b7b2ad',back='f_bob_back',front='f_bob_front',top='#7a4b8f',lash=True,eyes='round',acc=glasses('#5b4a5f')+studs('#c9c3bd'),body_extra=cardigan('#7a4b8f')),
- 'educacao-m':dict(label='Educação, homem',skin='s5',hair='#1b1412',front='m_short',top='#4a6d58',collar='shirt',jaw='oval',beard='#5a5550',acc=glasses('#2b2420'),body_extra=cardigan('#4a6d58')),
+ 'educacao-m':dict(eyes='round',label='Educação, homem',skin='s5',hair='#1b1412',front='m_short',top='#4a6d58',collar='shirt',jaw='oval',beard='#5a5550',acc=glasses('#2b2420'),body_extra=cardigan('#4a6d58')),
 }
 for k,v in SPECS.items(): open(f'{OUT}/personagem-{k}.svg','w').write(char(v))
 print(len(SPECS))

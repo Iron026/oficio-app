@@ -63,6 +63,30 @@ Revisão individual (40, 64, 128 e 240 px, fundo claro e escuro), com correçõe
 Teste `src/ui/avatarCatalog.test.ts` confere: mulher e homem em todas as áreas, ids estáveis,
 disco centrado 256×256 com recorte circular, nome acessível, sem script nem links.
 
+## Padrão oficial (beta.3, padronização)
+
+O estilo minimalista dos personagens da beta.3 é o **padrão oficial**. A galeria mostra um único conjunto:
+
+| Aba | Conteúdo | Formato |
+| --- | --- | --- |
+| Personagens | 24: mulher e homem de cada uma das 12 áreas | SVG, `personagem-<área>-<f\|m>.svg` |
+| Ícones | 12: um por área (traço petróleo, disco #d2eded, detalhes amarelo/verde) | SVG, `simbolo-*.svg` |
+
+Regras do conjunto (todas no gerador `scripts/avatares-personagens.py`): mesma cabeça, pescoço e ombros, mesmo
+enquadramento 256 × 256 com recorte circular, mesmos traços (sobrancelha 4,2; óculos 3,4) e o mesmo nível de detalhe;
+a profissão aparece por um único elemento (chapéu, avental, jaleco, colete…). Diversidade por tom de pele (6), cabelo,
+idade, barba/bigode, óculos e quatro tipos de olho (redondo, grande, sorrindo, calmo — o "amendoado" foi abolido porque
+parecia fechado). Revisão desta rodada: Alimentação (mulher e homem iguais demais), Direito/Educação (dois rostos
+claros, grisalhos e de óculos), Obras/Saúde (mesma pele e barba) e Segurança/Limpeza (mesmo rosto de boné) foram
+diferenciados; chapéu de cozinha e ícones de Alimentação e Tecnologia recentralizados. Conferido em 40, 64, 128 e
+240 px, claro e escuro, com medição automática: todos centrados (x = 127,5) e nada encostando na borda do disco.
+
+**Coleção anterior** (12 retratos e 5 símbolos WebP do pacote, mais o Laboratório): `legacy: true` no catálogo.
+Fica fora da galeria, mas o arquivo continua no app e o id continua válido — quem já usa um deles segue vendo a
+mesma imagem, com a mesma moldura e selo, e a galeria avisa que é da coleção anterior. Ids desconhecidos caem para
+as iniciais. Testes: `src/screens/avatarCompat.ui.test.tsx` (as 18 escolhas antigas, foto, iniciais, id desconhecido
+e backup) e `src/ui/avatarCatalog.test.ts` (24 + 12, um ícone por área, tudo vetorial, nomes acessíveis, < 80 KB).
+
 ## Observações para próximas versões
 
 - Beleza e Estética e Limpeza ainda só têm símbolo; retratos dessas áreas exigiriam nova arte.

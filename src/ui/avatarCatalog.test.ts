@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { AVATAR_AREAS, INTERNAL_AVATARS, avatarsByArea, getInternalAvatar, groupOf } from './avatarCatalog';
+import { AVATAR_AREAS, INTERNAL_AVATARS, avatarSpokenName, avatarsByArea, getInternalAvatar, groupOf } from './avatarCatalog';
 
 const DIR = 'src/assets/avatars';
 
@@ -75,5 +75,56 @@ describe('Galeria de avatares (rodada 3)', () => {
         expect(svg.length).toBeLessThan(8000);
       }
     }
+  });
+});
+
+describe('Padronização (estilo minimalista oficial)', () => {
+  const gallery = (g: 'personagens' | 'icones') => avatarsByArea(g).flatMap((x) => x.items);
+  const file = (id: string) => INTERNAL_AVATARS.find((a) => a.id === id)!.src;
+
+  it('galeria = 24 personagens (mulher e homem por área) + 12 ícones (um por área), todos vetoriais', () => {
+    const people = gallery('personagens');
+    const icons = gallery('icones');
+    expect(people).toHaveLength(24);
+    expect(icons).toHaveLength(12);
+    expect(new Set(icons.map((a) => a.area)).size).toBe(12);
+    for (const a of [...people, ...icons]) {
+      expect(a.legacy).toBeUndefined();
+      expect(a.src).toMatch(/\.svg(\?|$)|^data:image\/svg\+xml/); // vetorial (o Vite embute SVGs pequenos)
+    }
+    for (const g of avatarsByArea('personagens')) expect(g.items.map((a) => a.gender)).toEqual(['f', 'm']);
+  });
+
+  it('coleção anterior fora da galeria, mas com arquivo e id válidos (perfis existentes não mudam)', () => {
+    const legacy = INTERNAL_AVATARS.filter((a) => a.legacy);
+    expect(legacy).toHaveLength(18);
+    const shown = new Set([...gallery('personagens'), ...gallery('icones')].map((a) => a.id));
+    for (const a of legacy) {
+      expect(shown.has(a.id)).toBe(false);
+      expect(getInternalAvatar(a.id)?.src).toBe(file(a.id));
+    }
+    // todo WebP do pacote anterior está marcado como coleção anterior (nenhum estilo misturado)
+    for (const f of readdirSync(DIR).filter((x) => x.endsWith('.webp'))) {
+      expect(INTERNAL_AVATARS.some((a) => a.legacy && a.src.includes(f.replace('.webp', '')))).toBe(true);
+    }
+  });
+
+  it('nome lido pelo TalkBack: personagem pelo nome; ícone com a área', () => {
+    expect(avatarSpokenName(getInternalAvatar('personagem-obras-m')!)).toBe('Obras e engenharia, homem');
+    expect(avatarSpokenName(getInternalAvatar('simbolo-coracao')!)).toBe('Saúde e ciência: Coração');
+  });
+
+  it('o SVG de cada personagem tem o mesmo nome acessível da galeria', () => {
+    for (const a of gallery('personagens')) {
+      const svg = readFileSync(resolve(__dirname, `../assets/avatars/${a.id}.svg`), 'utf8');
+      expect(svg).toContain(`aria-label="${a.name}"`);
+    }
+  });
+
+  it('tamanho: a coleção padronizada inteira (24 personagens + 12 ícones SVG) fica abaixo de 80 KB', () => {
+    const files = readdirSync(DIR).filter((f) => /^personagem-.*\.svg$/.test(f) || /^simbolo-(0[7-9]|1[0-8])_.*\.svg$/.test(f));
+    expect(files).toHaveLength(36);
+    const total = files.reduce((sum, f) => sum + readFileSync(`${DIR}/${f}`).length, 0);
+    expect(total).toBeLessThan(80_000);
   });
 });

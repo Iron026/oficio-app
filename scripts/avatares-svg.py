@@ -56,9 +56,20 @@ icons={
    f'<path d="M128 52l64 24v46c0 42-28 70-64 84-36-14-64-42-64-84V76z" fill="{INK}"/>'
    f'<path d="M128 76l42 16v32c0 28-18 48-42 58-24-10-42-30-42-58V92z" fill="{T}"/>'
    f'<path d="M128 100l8 17 18 2-13 12 4 18-17-9-17 9 4-18-13-12 18-2z" fill="{Y}"/>'),
+ 'simbolo-16_saude': ('Coração com batimento',
+   f'<path d="M128 194c-48-30-74-56-74-88 0-22 16-38 36-38 16 0 30 10 38 24 8-14 22-24 38-24 20 0 36 16 36 38 0 32-26 58-74 88z" fill="{T}" stroke="{INK}" stroke-width="10" stroke-linejoin="round"/>'
+   f'<path d="M72 124h30l10-20 16 40 12-26h44" stroke="{W}" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'),
+ 'simbolo-17_criatividade': ('Paleta de pintura',
+   f'<path d="M128 60c-40 0-72 28-72 64 0 34 30 60 64 60 12 0 14-10 8-18-6-8 0-18 12-18h16c26 0 44-14 44-38 0-28-32-50-72-50z" fill="{W}" stroke="{INK}" stroke-width="10" stroke-linejoin="round"/>'
+   f'<circle cx="100" cy="110" r="11" fill="{T}"/><circle cx="130" cy="90" r="11" fill="{Y}"/><circle cx="162" cy="102" r="11" fill="#e0703c"/><circle cx="96" cy="146" r="11" fill="{G}"/>'),
+ 'simbolo-18_tecnologia': ('Tela com código',
+   f'<rect x="56" y="66" width="144" height="98" rx="12" fill="{INK}"/>'
+   f'<path d="M106 96l-20 19 20 19M150 96l20 19-20 19" stroke="{W}" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+   f'<path d="M136 90l-16 50" stroke="{Y}" stroke-width="8" stroke-linecap="round"/>'
+   f'<path d="M112 164h32l6 18h-44z" fill="{INK}"/><rect x="92" y="180" width="72" height="10" rx="5" fill="{T}"/>'),
 }
 # Recentraliza pela caixa medida do desenho e aproxima do tamanho dos símbolos do pack.
-OFF={'simbolo-06_ciencia':(0,3.5),'simbolo-07_agronegocio':(0,4.5),'simbolo-08_educacao':(0,2),'simbolo-09_engenharia':(0,0),'simbolo-10_negocios':(0,4),'simbolo-11_beleza':(-7.5,-5.5),'simbolo-12_limpeza':(-15,4),'simbolo-13_geral':(0,1),'simbolo-14_alimentacao':(0,20),'simbolo-15_seguranca':(0,-1)}
+OFF={'simbolo-06_ciencia':(0,3.5),'simbolo-07_agronegocio':(0,4.5),'simbolo-08_educacao':(0,2),'simbolo-09_engenharia':(0,0),'simbolo-10_negocios':(0,4),'simbolo-11_beleza':(-7.5,-5.5),'simbolo-12_limpeza':(-15,4),'simbolo-13_geral':(0,1),'simbolo-14_alimentacao':(0,24),'simbolo-15_seguranca':(0,-1),'simbolo-16_saude':(0,-3),'simbolo-17_criatividade':(0,6),'simbolo-18_tecnologia':(0,0.5)}
 for name,(title,body) in icons.items():
     dx,dy=OFF[name]
     g=f'<g transform="translate(128 128) scale(1.18) translate({-128+dx} {-128+dy})">{body}</g>'
