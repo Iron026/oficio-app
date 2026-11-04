@@ -6,26 +6,37 @@ export type SaveResult = { status: 'salvo'; where: string } | { status: 'cancela
 
 /** Plugin nativo do app (android/.../BackupFilePlugin.java). */
 export interface OficioFilesPlugin {
-  saveDocument(options: { filename: string; content: string; mimeType: string }): Promise<{ cancelled: boolean; uri?: string; name?: string | null; bytes?: number }>;
+  saveDocument(options: { filename: string; content: string; mimeType: string; encoding?: 'utf8' | 'base64' }): Promise<{ cancelled: boolean; uri?: string; name?: string | null; bytes?: number }>;
 }
 
 const OficioFiles = registerPlugin<OficioFilesPlugin>('OficioFiles');
 
+/** Conteúdo de um arquivo: texto (gravado em UTF-8) ou bytes (ex.: PDF). */
+export type FileData = string | Uint8Array;
+
+/** Bytes → base64 em blocos (sem estourar a pilha em arquivos grandes). */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
 /**
- * Salvar arquivo de texto.
+ * Salvar arquivo.
  * - Navegador: download comum.
  * - Android: janela "Salvar como" do sistema (Storage Access Framework). O usuário
- *   escolhe o local; nenhuma permissão de armazenamento é necessária. O conteúdo
- *   é gravado exatamente como recebido (UTF-8).
+ *   escolhe o local; nenhuma permissão de armazenamento é necessária. Texto é gravado
+ *   exatamente como recebido (UTF-8); bytes vão em base64 e são gravados sem alteração.
  */
-export async function saveTextFile(
+export async function saveFile(
   filename: string,
-  content: string,
+  data: FileData,
+  mimeType: string,
   deps: { native?: boolean; plugin?: OficioFilesPlugin } = {},
 ): Promise<SaveResult> {
   const native = deps.native ?? isNative();
   if (!native) {
-    const blob = new Blob([content], { type: 'application/json' });
+    const blob = new Blob([typeof data === 'string' ? data : data.slice().buffer], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -37,17 +48,32 @@ export async function saveTextFile(
     return { status: 'salvo', where: 'Downloads' };
   }
   const plugin = deps.plugin ?? OficioFiles;
-  const res = await plugin.saveDocument({ filename, content, mimeType: 'application/json' });
+  const res = await plugin.saveDocument(
+    typeof data === 'string'
+      ? { filename, content: data, mimeType }
+      : { filename, content: bytesToBase64(data), mimeType, encoding: 'base64' },
+  );
   if (res.cancelled) return { status: 'cancelado' };
   return { status: 'salvo', where: res.name ?? filename };
 }
 
+/** Backup em JSON (mantido para a exportação existente). */
+export function saveTextFile(filename: string, content: string, deps: { native?: boolean; plugin?: OficioFilesPlugin } = {}): Promise<SaveResult> {
+  return saveFile(filename, content, 'application/json', deps);
+}
+
 /** Android: abre o menu de compartilhar (Drive, WhatsApp, e-mail...) com o arquivo. */
-export async function shareTextFile(filename: string, content: string, title: string): Promise<void> {
+export async function shareFile(filename: string, data: FileData, title: string): Promise<void> {
   const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
   const { Share } = await import('@capacitor/share');
-  const res = await Filesystem.writeFile({ path: filename, data: content, directory: Directory.Cache, encoding: Encoding.UTF8 });
+  const res = typeof data === 'string'
+    ? await Filesystem.writeFile({ path: filename, data, directory: Directory.Cache, encoding: Encoding.UTF8 })
+    : await Filesystem.writeFile({ path: filename, data: bytesToBase64(data), directory: Directory.Cache });
   await Share.share({ title, files: [res.uri], dialogTitle: title });
+}
+
+export function shareTextFile(filename: string, content: string, title: string): Promise<void> {
+  return shareFile(filename, content, title);
 }
 
 export function canShareFiles(): boolean {

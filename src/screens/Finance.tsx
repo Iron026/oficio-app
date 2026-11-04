@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarClock, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, Link2, Receipt } from 'lucide-react';
+import { CalendarClock, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, FileDown, Link2, Receipt } from 'lucide-react';
 import { byCategory, futureServiceDateFor, sortByDateDesc, totals, transactionsInMonth, transactionLabel } from '../domain/finance';
 import type { Transaction, TransactionType } from '../domain/types';
 import { addMonths, formatDateShort, monthKey, monthLabel, parseDateKey, relativeDayLabel } from '../lib/dates';
@@ -10,6 +10,7 @@ import { Card, DemoBadge, EmptyState, ProgressBar, Segmented } from '../ui/Misc'
 import { Money } from '../ui/Money';
 import { TransactionFormSheet } from './forms/TransactionForm';
 import { HeroSlot } from './Shell';
+import { StatementSheet } from './StatementExport';
 
 type Filter = 'todos' | TransactionType;
 
@@ -19,6 +20,7 @@ export function Finance() {
   const [filter, setFilter] = useState<Filter>('todos');
   const [creating, setCreating] = useState<TransactionType | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const monthTx = useMemo(() => transactionsInMonth(data.transactions, month), [data.transactions, month]);
   const sum = totals(monthTx);
@@ -76,6 +78,9 @@ export function Finance() {
         <Button variant="secondary" icon={<CirclePlus size={20} className="text-income" />} onClick={() => setCreating('receita')}>Receita</Button>
         <Button variant="secondary" icon={<CircleMinus size={20} className="text-expense" />} onClick={() => setCreating('despesa')}>Despesa</Button>
       </div>
+      <Button variant="tonal" block className="mt-3" icon={<FileDown size={20} />} onClick={() => setExporting(true)}>
+        Exportar extrato do mês
+      </Button>
 
       <div className="mt-5">
         <Segmented label="Filtrar lançamentos" value={filter} onChange={setFilter} options={[{ value: 'todos', label: 'Todos' }, { value: 'receita', label: 'Receitas' }, { value: 'despesa', label: 'Despesas' }]} />
@@ -118,6 +123,7 @@ export function Finance() {
       )}
       <TransactionFormSheet open={!!creating} defaultType={creating ?? 'receita'} onClose={() => setCreating(null)} />
       <TransactionFormSheet open={!!editing} transaction={editing ?? undefined} onClose={() => setEditing(null)} />
+      <StatementSheet open={exporting} onClose={() => setExporting(false)} monthKey={month} monthTitle={monthLabel(month)} count={monthTx.length} />
     </div>
   );
 }

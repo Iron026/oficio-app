@@ -141,6 +141,18 @@ const findBackupFiles = () => {
   }
 };
 
+/** Extratos exportados (PDF/CSV) no armazenamento compartilhado. */
+const findStatementFiles = (ext) => {
+  try {
+    return adb('shell', `find /sdcard/ -name 'oficio-extrato-*.${ext}' -not -path '*/Android/*' 2>/dev/null; true`)
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+
 const namesIn = (rows) => rows.map((r) => r.name ?? r.title ?? r.description);
 
 const [device] = await android.devices({ omitDriverInstall: true });
@@ -364,6 +376,33 @@ try {
     assert(JSON.stringify(namesIn(saved.data.clients).sort()) === JSON.stringify(dbClients), 'clientes do backup diferem do app');
     assert(saved.data.transactions.length === dbTx, 'lançamentos do backup diferem do app');
     assert(saved.data.clients.some((c) => c.name === 'Cliente Persistente'), 'backup sem o cliente cadastrado');
+  });
+
+  await step('Extrato do mês em PDF: "Salvar como" grava um PDF válido', async () => {
+    await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
+    await tap(page.getByRole('button', { name: /exportar extrato do mês/i }));
+    const sheet = page.getByRole('dialog', { name: /exportar extrato/i });
+    await tap(sheet.getByRole('radio', { name: /pdf/i }));
+    shot('05b-extrato-opcoes');
+    await tap(sheet.getByRole('button', { name: /salvar no aparelho/i }));
+    await eventually(() => /documentsui/.test(resumedPackage()), 'janela "Salvar como" do Android não abriu');
+    const save = await eventually(() => findUiNode((n) => /^(save|salvar)$/i.test(n.text) && n.enabled), 'botão Salvar da janela do sistema não encontrado', 15_000);
+    adb('shell', 'input', 'tap', String(save.x), String(save.y));
+    await eventually(() => resumedPackage() === PKG, 'o app não voltou após salvar');
+    await sheet.waitFor({ state: 'detached' });
+    await noteToast(page, /extrato salvo/i);
+    const files = await eventually(() => {
+      const f = findStatementFiles('pdf');
+      return f.length ? f : null;
+    }, 'PDF do extrato não encontrado no armazenamento');
+    console.log('\n  extrato salvo:', files.join(', '));
+    // Binário íntegro: cabeçalho, fim e tamanho coerente (base64 → bytes no plugin nativo).
+    const head = adb('shell', `head -c 8 '${files[0]}'`);
+    const tail = adb('shell', `tail -c 6 '${files[0]}'`);
+    const size = Number(adb('shell', `wc -c < '${files[0]}'`).trim());
+    assert(head.startsWith('%PDF-1.4'), `cabeçalho do PDF inválido: ${JSON.stringify(head)}`);
+    assert(tail.includes('%%EOF'), 'PDF sem marcador de fim');
+    assert(size > 1500, `PDF pequeno demais (${size} bytes)`);
   });
 
   await step('Botão Voltar no Painel minimiza o app', async () => {

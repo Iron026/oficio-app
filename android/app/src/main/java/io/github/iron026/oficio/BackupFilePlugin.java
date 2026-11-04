@@ -7,6 +7,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
+import android.util.Base64;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -20,7 +21,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Salva o backup com o Storage Access Framework (janela "Salvar como" do Android).
+ * Salva arquivos (backup, extrato CSV/PDF) com o Storage Access Framework (janela "Salvar como" do Android).
  *
  * O usuário escolhe o local (Documentos, Downloads, Drive...). Não exige nenhuma
  * permissão de armazenamento: o app só recebe acesso ao documento escolhido.
@@ -35,9 +36,18 @@ public class BackupFilePlugin extends Plugin {
         String filename = call.getString("filename");
         String content = call.getString("content");
         String mimeType = call.getString("mimeType", "application/json");
-        if (filename == null || filename.isEmpty() || content == null) {
+        String encoding = call.getString("encoding", "utf8");
+        if (filename == null || filename.isEmpty() || content == null || !("utf8".equals(encoding) || "base64".equals(encoding))) {
             call.reject("Parâmetros inválidos para salvar o arquivo.", "INVALID_INPUT");
             return;
+        }
+        if ("base64".equals(encoding)) {
+            try {
+                Base64.decode(content, Base64.DEFAULT); // valida antes de abrir a janela
+            } catch (IllegalArgumentException e) {
+                call.reject("Arquivo inválido para salvar.", "INVALID_INPUT", e);
+                return;
+            }
         }
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -62,7 +72,11 @@ public class BackupFilePlugin extends Plugin {
             return;
         }
         ContentResolver resolver = getContext().getContentResolver();
-        byte[] bytes = call.getString("content", "").getBytes(StandardCharsets.UTF_8);
+        // Texto (backup, CSV) em UTF-8; arquivos binários (PDF) chegam em base64.
+        String content = call.getString("content", "");
+        byte[] bytes = "base64".equals(call.getString("encoding", "utf8"))
+            ? Base64.decode(content, Base64.DEFAULT)
+            : content.getBytes(StandardCharsets.UTF_8);
         try {
             write(resolver, uri, bytes);
         } catch (SecurityException e) {
