@@ -327,7 +327,7 @@ try {
       await page.getByRole('dialog').waitFor({ state: 'detached' });
 
       // Ajustes: imagem de perfil (avatares do pack), recorte de foto e selo em destaque.
-      if (vp.id === 'celular-360' || vp.id === 'computador-1280') {
+      { // todos os tamanhos (galeria e foto)
         await page.goto(BASE + '#/ajustes');
         await page.getByRole('button', { name: /alterar imagem de perfil/i }).click();
         await page.getByRole('dialog', { name: /imagem de perfil/i }).waitFor();

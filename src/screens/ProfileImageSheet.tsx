@@ -107,7 +107,7 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
       <div role="radiogroup" aria-label="Imagem de perfil" className="space-y-4">
         <section aria-labelledby="img-ini" className="space-y-2">
           <h3 id="img-ini" className="text-sm font-bold">Iniciais</h3>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-2">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(6.75rem,1fr))] gap-2">
             <button type="button" role="radio" aria-checked={is({ kind: 'iniciais' })} onClick={() => pick({ kind: 'iniciais' })} className={cx(option, is({ kind: 'iniciais' }) ? 'border-brand-500' : 'border-line')}>
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 font-display text-lg font-extrabold text-brand-800 dark:bg-brand-500/25 dark:text-brand-50" aria-hidden="true">
                 {initials(data.profile?.name ?? '') || '?'}
@@ -124,7 +124,7 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
           return (
             <section key={area.id} aria-labelledby={`img-${area.id}`} className="space-y-2">
               <h3 id={`img-${area.id}`} className="text-sm font-bold">{area.label}</h3>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(6.75rem,1fr))] gap-2">
                 {items.map((a) => {
                   const on = is({ kind: 'interno', id: a.id });
                   return (
