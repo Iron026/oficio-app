@@ -75,8 +75,10 @@ O estilo minimalista dos personagens da beta.3 é o **padrão oficial**. A galer
 Regras do conjunto (todas no gerador `scripts/avatares-personagens.py`): mesma cabeça, pescoço e ombros, mesmo
 enquadramento 256 × 256 com recorte circular, mesmos traços (sobrancelha 4,2; óculos 3,4) e o mesmo nível de detalhe;
 a profissão aparece por um único elemento (chapéu, avental, jaleco, colete…). Diversidade por tom de pele (6), cabelo,
-idade, barba/bigode, óculos e quatro tipos de olho (redondo, grande, sorrindo, calmo — o "amendoado" foi abolido porque
-parecia fechado). Revisão desta rodada: Alimentação (mulher e homem iguais demais), Direito/Educação (dois rostos
+idade, barba/bigode, óculos e três tipos de olho, todos abertos, com pupila e brilho branco (redondo, grande e calmo).
+O "amendoado" e o "sorrindo" (só um traço curvo) foram abolidos porque pareciam olhos fechados — o teste
+`Olhos dos personagens` impede que voltem. Nas peles mais escuras (s5, s6) a pupila é mais escura e o brilho um pouco
+maior, para o olho não sumir em 40 px. Revisão desta rodada: Alimentação (mulher e homem iguais demais), Direito/Educação (dois rostos
 claros, grisalhos e de óculos), Obras/Saúde (mesma pele e barba) e Segurança/Limpeza (mesmo rosto de boné) foram
 diferenciados; chapéu de cozinha e ícones de Alimentação e Tecnologia recentralizados. Conferido em 40, 64, 128 e
 240 px, claro e escuro, com medição automática: todos centrados (x = 127,5) e nada encostando na borda do disco.

@@ -21,16 +21,20 @@ def neck(sk):
 def face(sk, eyes='round', brow='#3b2a20', lips='#c46a5a', lash=False, beard=None, freckles=False, smile='soft'):
     f,s=SKIN[sk]
     out=f'<path d="M100 103q9-6 18-1" stroke="{brow}" stroke-width="4.2" fill="none" stroke-linecap="round"/><path d="M138 102q9-5 18 1" stroke="{brow}" stroke-width="4.2" fill="none" stroke-linecap="round"/>'
+    # Olhos sempre abertos: pupila escura + brilho branco (nada de traço curvo, que parece olho fechado).
+    # Peles mais escuras (s5, s6): pupila mais escura e brilho um pouco maior, para o olho não sumir em 40 px.
+    ink = '#0f0a08' if sk in ('s5', 's6') else INK
+    k = 1.35 if sk in ('s5', 's6') else 1
+    hl = lambda x, y, r: f'<circle cx="{x}" cy="{y}" r="{round(r * k, 2)}" fill="#fff"/>'
     if eyes=='round':
-        out+=f'<ellipse cx="109" cy="118" rx="5" ry="6" fill="{INK}"/><ellipse cx="147" cy="118" rx="5" ry="6" fill="{INK}"/><circle cx="111" cy="116" r="1.7" fill="#fff"/><circle cx="149" cy="116" r="1.7" fill="#fff"/>'
-    elif eyes=='smile':
-        out+=f'<path d="M102 120q7-8 14 0" stroke="{INK}" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M140 120q7-8 14 0" stroke="{INK}" stroke-width="4" fill="none" stroke-linecap="round"/>'
+        out+=f'<ellipse cx="109" cy="118" rx="5" ry="6" fill="{ink}"/><ellipse cx="147" cy="118" rx="5" ry="6" fill="{ink}"/>'+hl(111,116,1.7)+hl(149,116,1.7)
     elif eyes=='big':
-        out+=f'<ellipse cx="109" cy="118" rx="6.2" ry="7.4" fill="{INK}"/><ellipse cx="147" cy="118" rx="6.2" ry="7.4" fill="{INK}"/><circle cx="111.5" cy="115.5" r="2.2" fill="#fff"/><circle cx="149.5" cy="115.5" r="2.2" fill="#fff"/>'
+        out+=f'<ellipse cx="109" cy="118" rx="6.2" ry="7.4" fill="{ink}"/><ellipse cx="147" cy="118" rx="6.2" ry="7.4" fill="{ink}"/>'+hl(111.5,115.5,2.2)+hl(149.5,115.5,2.2)
     elif eyes=='calm':
-        out+=f'<ellipse cx="109" cy="119" rx="5.2" ry="5.6" fill="{INK}"/><ellipse cx="147" cy="119" rx="5.2" ry="5.6" fill="{INK}"/><circle cx="111" cy="117" r="1.7" fill="#fff"/><circle cx="149" cy="117" r="1.7" fill="#fff"/><path d="M101 115q8-6 16 0M139 115q8-6 16 0" stroke="{INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>'
-    else: # almond (não usado: parecia fechado nesse estilo)
-        out+=f'<path d="M102 119q7-7 14 0q-7 5-14 0z" fill="{INK}"/><path d="M140 119q7-7 14 0q-7 5-14 0z" fill="{INK}"/><circle cx="111" cy="117" r="1.5" fill="#fff"/><circle cx="149" cy="117" r="1.5" fill="#fff"/>'
+        out+=f'<ellipse cx="109" cy="119" rx="5.2" ry="5.6" fill="{ink}"/><ellipse cx="147" cy="119" rx="5.2" ry="5.6" fill="{ink}"/>'+hl(111,117,1.7)+hl(149,117,1.7)+f'<path d="M101 115q8-6 16 0M139 115q8-6 16 0" stroke="{ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>'
+    else:
+        # "smile" (traço curvo) e "almond" foram abolidos: pareciam olhos fechados.
+        raise ValueError(f'tipo de olho não permitido: {eyes}')
     if lash: out+=f'<path d="M101 115l-3-3M155 115l3-3" stroke="{INK}" stroke-width="2.4" stroke-linecap="round"/>'
     out+=f'<path d="M127 124q-4 12 2 14" stroke="{s}" stroke-width="3.2" fill="none" stroke-linecap="round"/>'
     out+=f'<ellipse cx="99" cy="136" rx="8" ry="5" fill="#ef8f7d" opacity=".28"/><ellipse cx="157" cy="136" rx="8" ry="5" fill="#ef8f7d" opacity=".28"/>'
@@ -136,7 +140,7 @@ SPECS={
  'geral-m':dict(label='Geral, homem',skin='s4',hair='#1c1512',front='m_side',top='#3d6fa8',collar='shirt',jaw='square',smile='open'),
  # Beleza e Estética
  'beleza-f':dict(eyes='calm',label='Beleza e Estética, mulher',skin='s3',hair='#3a2418',back='f_long_back',front='f_long_front',top='#2b2b33',lash=True,lips='#b3474f',acc=hoops(),body_extra=apron('#e9d7c6')+scissors_pocket()),
- 'beleza-m':dict(label='Beleza e Estética, homem',eyes='smile',skin='s1',hair='#1f1a17',front='m_quiff',top='#2b2b33',jaw='square',beard='#2a211c',body_extra=apron('#cfd8d6')+scissors_pocket(),collar='round'),
+ 'beleza-m':dict(smile='open',label='Beleza e Estética, homem',eyes='round',skin='s1',hair='#1f1a17',front='m_quiff',top='#2b2b33',jaw='square',beard='#2a211c',body_extra=apron('#cfd8d6')+scissors_pocket(),collar='round'),
  # Limpeza
  'limpeza-f':dict(label='Limpeza, mulher',skin='s5',hair='#1b1412',back='f_pony_back',front='f_bandana',top='#2a8f86',collar='v',lash=True,eyes='big',lips='#9c3b45',acc=hoops('#f2b632'),body_extra=badge('#ffffff'),smile='open'),
  'limpeza-m':dict(eyes='big',label='Limpeza, homem',smile='open',skin='s2',hair='#5a3a26',front='m_short',top='#3d6fa8',collar='v',jaw='round',acc=cap('#2a8f86'),body_extra=badge('#ffffff')),
@@ -154,7 +158,7 @@ SPECS={
  'obras-m':dict(label='Obras e engenharia, homem',skin='s4',hair='#151110',top='#4d5b66',collar='shirt',jaw='square',smile='open',acc=hardhat('#f2b632')+mustache('#1a1412'),body_extra=vest('#f07c2a')),
  # Alimentação
  'alimentacao-f':dict(eyes='round',label='Alimentação, mulher',skin='s4',hair='#24160f',back='f_short_back',top='#ffffff',lash=True,smile='open',acc=toque()+studs(),body_extra=chefcoat('#2a8f86')),
- 'alimentacao-m':dict(label='Alimentação, homem',skin='s2',hair='#3b2a20',top='#ffffff',jaw='round',eyes='smile',acc=toque()+mustache('#3b2a20'),body_extra=chefcoat()),
+ 'alimentacao-m':dict(smile='open',label='Alimentação, homem',skin='s2',hair='#3b2a20',top='#ffffff',jaw='round',eyes='big',acc=toque()+mustache('#3b2a20'),body_extra=chefcoat()),
  # Campo e agronegócio
  'campo-f':dict(label='Campo e agronegócio, mulher',skin='s2',hair='#7a4a26',back='f_braid_back',top='#b8443a',collar='shirt',lash=True,eyes='big',freckles=True,smile='open',acc=strawhat(),body_extra=plaid('#b8443a','#5c1f1a')),
  'campo-m':dict(eyes='calm',label='Campo e agronegócio, homem',skin='s3',hair='#9a948e',front='m_bald_sides',top='#2f6b4a',collar='shirt',jaw='square',acc=strawhat()+mustache('#a8a29c'),body_extra=plaid('#2f6b4a','#173a27')),

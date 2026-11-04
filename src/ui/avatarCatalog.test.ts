@@ -128,3 +128,18 @@ describe('Padronização (estilo minimalista oficial)', () => {
     expect(total).toBeLessThan(80_000);
   });
 });
+
+describe('Olhos dos personagens', () => {
+  it.each(AVATAR_AREAS.flatMap((a) => (['f', 'm'] as const).map((g) => [`${a.id}-${g}`] as const)))('%s: dois olhos abertos (pupila e brilho), nunca só um traço', (key) => {
+    const svg = readFileSync(resolve(__dirname, `../assets/avatars/personagem-${key}.svg`), 'utf8');
+    // Pupilas: duas elipses preenchidas na altura dos olhos, uma de cada lado do rosto.
+    const pupils = [...svg.matchAll(/<ellipse cx="(109|147)" cy="11[89]" rx="([\d.]+)" ry="([\d.]+)" fill="#[0-9a-f]{6}"\/>/g)];
+    expect(pupils.map((m) => m[1]).sort()).toEqual(['109', '147']);
+    for (const m of pupils) expect(Number(m[3])).toBeGreaterThanOrEqual(5.5); // altura suficiente para parecer aberto
+    // Brilho branco em cada olho (o que separa "aberto" de "fechado" em 40 px).
+    const highlights = [...svg.matchAll(/<circle cx="(1(?:11|49)(?:\.5)?)" cy="11[5-7](?:\.5)?" r="([\d.]+)" fill="#fff"\/>/g)];
+    expect(highlights).toHaveLength(2);
+    // Traço curvo no lugar do olho (o antigo "olho sorrindo") não pode voltar.
+    expect(svg).not.toMatch(/M10[12] 120q7-8 14 0/);
+  });
+});
