@@ -9,6 +9,10 @@ computador · 6 acessibilidade, desempenho e entrega. Ver `docs/DESIGN.md`.
   (só no aparelho e no backup), avatares (pack + 7 SVGs: Ciência, Agronegócio, Educação, Engenharia, Negócios,
   Beleza e Estética, Limpeza), graus do Diamante (R3, só visual). Selos e foto **não** sincronizam até as
   regras novas do Firestore serem autorizadas e publicadas.
+- 0.4.0-beta.3: 8 paletas globais (Petróleo padrão), Central de Ajustes por categorias, descrição
+  opcional nos lançamentos (categoria obrigatória), extrato mensal em PDF e CSV, tipos de serviço
+  personalizados (só no aparelho e no backup), galeria Personagens (mulher e homem por área) e Ícones.
+  Medalhões e comemorações da rodada 4 mantidos; XP, níveis e títulos sem mudança (R1/R2 pendentes).
 
 ## 0.3.1 (manutenção — branch `fix/v0.3.1-maintenance`, aguardando aprovação)
 - Exportar backup no Android: “Salvar no aparelho” pela janela “Salvar como” (Storage Access
