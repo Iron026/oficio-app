@@ -147,11 +147,30 @@ describe('Central de Ajustes — páginas internas', () => {
     // Sincronização de foto desligada nesta versão: o texto não pode prometer nuvem.
     expect(within(sheet).getByText(/fica só neste aparelho e no arquivo de backup/i)).toBeInTheDocument();
     expect(within(sheet).queryByText(/é sincronizada/i)).not.toBeInTheDocument();
+    // Abre na aba Personagens: mulher e homem de cada uma das 12 áreas, só a imagem (nome no TalkBack).
+    const people = within(sheet).getAllByRole('radio').filter((r) => r.hasAttribute('data-avatar-id') && r.getAttribute('data-avatar-id')!.startsWith('personagem-'));
+    expect(people).toHaveLength(24);
+    expect(within(sheet).getByRole('radio', { name: 'Beleza e Estética, mulher' })).toHaveTextContent('');
+    expect(within(sheet).getByRole('radio', { name: 'Limpeza, homem' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('radio', { name: /^artista$/i })).toBeInTheDocument(); // pacote anterior continua
+    await user.click(within(sheet).getByRole('radio', { name: /^ícones$/i }));
     expect(within(sheet).getByRole('radio', { name: /tesoura/i })).toBeInTheDocument();
     expect(within(sheet).getByRole('radio', { name: /borrifador/i })).toBeInTheDocument();
+    expect(within(sheet).getByRole('radio', { name: /escudo/i })).toBeInTheDocument();
+    expect(within(sheet).queryByRole('radio', { name: 'Limpeza, homem' })).not.toBeInTheDocument();
     await user.click(within(sheet).getByRole('radio', { name: /^medicina$/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByText('Avatar: Medicina')).toBeInTheDocument();
+
+    // Reabrir: volta na aba do avatar escolhido e mostra o nome na prévia.
+    await user.click(screen.getByRole('button', { name: /imagem de perfil/i }));
+    const again = await screen.findByRole('dialog', { name: /imagem de perfil/i });
+    expect(within(again).getByRole('radio', { name: /^ícones$/i })).toHaveAttribute('aria-checked', 'true');
+    expect(within(again).getByText('Medicina', { selector: '[data-avatar-current]' })).toBeInTheDocument();
+    await user.click(within(again).getByRole('radio', { name: /^personagens$/i }));
+    await user.click(within(again).getByRole('radio', { name: 'Saúde e ciência, mulher' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByText('Avatar: Saúde e ciência, mulher')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /selo em destaque/i }));
     const seal = await screen.findByRole('dialog', { name: /selo em destaque/i });

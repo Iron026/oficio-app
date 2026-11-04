@@ -43,9 +43,22 @@ icons={
    f'<path d="M98 106h44l12 26v50a10 10 0 0 1-10 10H96a10 10 0 0 1-10-10v-50z" fill="{T}" stroke="{INK}" stroke-width="8" stroke-linejoin="round"/>'
    f'<rect x="102" y="140" width="36" height="30" rx="6" fill="{W}"/>'
    f'<path d="M176 74l4 10 10 4-10 4-4 10-4-10-10-4 10-4z" fill="{Y}"/><path d="M196 112l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="{Y}"/><circle cx="170" cy="58" r="5" fill="{Y}"/>'),
+ 'simbolo-13_geral': ('Prancheta com visto',
+   f'<rect x="80" y="66" width="96" height="132" rx="14" fill="{W}" stroke="{INK}" stroke-width="10"/>'
+   f'<rect x="104" y="54" width="48" height="24" rx="8" fill="{INK}"/>'
+   f'<path d="M102 132l18 18 34-38" fill="none" stroke="{T}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>'
+   f'<path d="M104 176h48" stroke="{Y}" stroke-width="8" stroke-linecap="round"/>'),
+ 'simbolo-14_alimentacao': ('Chapéu de cozinha',
+   f'<path d="M86 140v-18c-18 0-28-14-28-30 0-18 16-30 34-26 6-16 20-24 36-24s30 8 36 24c18-4 34 8 34 26 0 16-10 30-28 30v18z" fill="{W}" stroke="{INK}" stroke-width="10" stroke-linejoin="round"/>'
+   f'<rect x="84" y="138" width="88" height="34" rx="8" fill="{INK}"/>'
+   f'<path d="M100 155h56" stroke="{Y}" stroke-width="7" stroke-linecap="round"/>'),
+ 'simbolo-15_seguranca': ('Escudo',
+   f'<path d="M128 52l64 24v46c0 42-28 70-64 84-36-14-64-42-64-84V76z" fill="{INK}"/>'
+   f'<path d="M128 76l42 16v32c0 28-18 48-42 58-24-10-42-30-42-58V92z" fill="{T}"/>'
+   f'<path d="M128 100l8 17 18 2-13 12 4 18-17-9-17 9 4-18-13-12 18-2z" fill="{Y}"/>'),
 }
 # Recentraliza pela caixa medida do desenho e aproxima do tamanho dos símbolos do pack.
-OFF={'simbolo-06_ciencia':(0,3.5),'simbolo-07_agronegocio':(0,4.5),'simbolo-08_educacao':(0,2),'simbolo-09_engenharia':(0,0),'simbolo-10_negocios':(0,4),'simbolo-11_beleza':(-7.5,-5.5),'simbolo-12_limpeza':(-15,4)}
+OFF={'simbolo-06_ciencia':(0,3.5),'simbolo-07_agronegocio':(0,4.5),'simbolo-08_educacao':(0,2),'simbolo-09_engenharia':(0,0),'simbolo-10_negocios':(0,4),'simbolo-11_beleza':(-7.5,-5.5),'simbolo-12_limpeza':(-15,4),'simbolo-13_geral':(0,1),'simbolo-14_alimentacao':(0,20),'simbolo-15_seguranca':(0,-1)}
 for name,(title,body) in icons.items():
     dx,dy=OFF[name]
     g=f'<g transform="translate(128 128) scale(1.18) translate({-128+dx} {-128+dy})">{body}</g>'

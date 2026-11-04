@@ -29,9 +29,19 @@ import simboloEngenharia from '../assets/avatars/simbolo-09_engenharia.svg';
 import simboloNegocios from '../assets/avatars/simbolo-10_negocios.svg';
 import simboloBeleza from '../assets/avatars/simbolo-11_beleza.svg';
 import simboloLimpeza from '../assets/avatars/simbolo-12_limpeza.svg';
+import simboloGeral from '../assets/avatars/simbolo-13_geral.svg';
+import simboloAlimentacao from '../assets/avatars/simbolo-14_alimentacao.svg';
+import simboloSeguranca from '../assets/avatars/simbolo-15_seguranca.svg';
+
+// Rodada 3: personagens vetoriais (uma mulher e um homem por área), gerados por
+// scripts/avatares-personagens.py e revisados um a um (40/64/128 px, claro e escuro).
+const PERSONAGENS = import.meta.glob<string>('../assets/avatars/personagem-*.svg', { eager: true, query: '?url', import: 'default' });
 
 export type AvatarArea = 'geral' | 'beleza' | 'limpeza' | 'saude' | 'direito-financas' | 'criatividade' | 'obras' | 'alimentacao' | 'campo' | 'seguranca' | 'educacao' | 'tecnologia';
+/** retrato = personagem (ilustração de pessoa); simbolo = ícone da área. */
 export type AvatarKind = 'retrato' | 'simbolo';
+/** Abas da galeria. */
+export type AvatarGroup = 'personagens' | 'icones';
 
 export interface InternalAvatar {
   id: string;
@@ -39,7 +49,11 @@ export interface InternalAvatar {
   area: AvatarArea;
   kind: AvatarKind;
   src: string;
+  /** Personagem da rodada 3 (mulher/homem); os demais retratos vêm do pacote anterior. */
+  gender?: 'f' | 'm';
 }
+
+export const groupOf = (a: InternalAvatar): AvatarGroup => (a.kind === 'simbolo' ? 'icones' : 'personagens');
 
 export const AVATAR_AREAS: { id: AvatarArea; label: string }[] = [
   { id: 'geral', label: 'Geral' },
@@ -81,7 +95,26 @@ export const INTERNAL_AVATARS: InternalAvatar[] = [
   { id: 'simbolo-engenharia', name: 'Indústria', area: 'obras', kind: 'simbolo', src: simboloEngenharia },
   { id: 'simbolo-agronegocio', name: 'Broto', area: 'campo', kind: 'simbolo', src: simboloAgro },
   { id: 'simbolo-educacao', name: 'Formatura', area: 'educacao', kind: 'simbolo', src: simboloEducacao },
+  { id: 'simbolo-geral', name: 'Prancheta', area: 'geral', kind: 'simbolo', src: simboloGeral },
+  { id: 'simbolo-alimentacao', name: 'Chapéu de cozinha', area: 'alimentacao', kind: 'simbolo', src: simboloAlimentacao },
+  { id: 'simbolo-seguranca', name: 'Escudo', area: 'seguranca', kind: 'simbolo', src: simboloSeguranca },
+  // Personagens: mulher e homem de cada área (ids estáveis: personagem-<área>-<f|m>).
+  ...AVATAR_AREAS.flatMap((area) =>
+    (['f', 'm'] as const).map((g) => {
+      const src = PERSONAGENS[`../assets/avatars/personagem-${area.id}-${g}.svg`];
+      if (!src) throw new Error(`personagem ausente: ${area.id}-${g}`);
+      return { id: `personagem-${area.id}-${g}`, name: `${area.label}, ${g === 'f' ? 'mulher' : 'homem'}`, area: area.id, kind: 'retrato' as const, src, gender: g };
+    }),
+  ),
 ];
+
+/** Avatares de uma aba, por área: personagens novos (mulher, homem) primeiro, depois os do pacote anterior. */
+export function avatarsByArea(group: AvatarGroup): { area: (typeof AVATAR_AREAS)[number]; items: InternalAvatar[] }[] {
+  return AVATAR_AREAS.map((area) => ({
+    area,
+    items: INTERNAL_AVATARS.filter((a) => a.area === area.id && groupOf(a) === group).sort((a, b) => Number(!a.gender) - Number(!b.gender) || (a.gender ?? '').localeCompare(b.gender ?? '')),
+  })).filter((g) => g.items.length > 0);
+}
 
 export function getInternalAvatar(id: string | undefined): InternalAvatar | undefined {
   return id ? INTERNAL_AVATARS.find((a) => a.id === id) : undefined;

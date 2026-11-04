@@ -43,6 +43,26 @@ centralizado. Conferidos em 40, 64 e 128 px nos dois temas (1× e 3×); centro d
 do disco. Cada SVG tem menos de 1 KB, sem scripts nem imagens externas (teste em `src/ui/avatarCatalog.test.ts`).
 Nomes curtos na galeria ("Gráfico", "Código", "Medicina", "Artista", "Cozinha", "Indústria") para não quebrar no cartão.
 
+## Rodada 3 (beta.3): Personagens e Ícones
+
+A galeria tem duas abas, sem nome embaixo das imagens (o nome vai no rótulo do TalkBack e aparece
+na prévia do topo quando escolhido):
+
+- **Personagens**: uma mulher e um homem de cada uma das 12 áreas (`personagem-<área>-<f|m>.svg`,
+  24 SVG, gerados por `scripts/avatares-personagens.py`), seguidos dos retratos do pacote anterior
+  da mesma área — nenhuma escolha já feita deixa de existir.
+- **Ícones**: os símbolos de cada área; novos nesta rodada: Prancheta (Geral), Chapéu de cozinha
+  (Alimentação) e Escudo (Segurança), em `scripts/avatares-svg.py` (os anteriores continuam
+  idênticos byte a byte).
+
+Revisão individual (40, 64, 128 e 240 px, fundo claro e escuro), com correções antes de integrar:
+- olhos "amendoados" pareciam fechados nesse estilo → trocados por olhos abertos nas 5 personagens
+  que os usavam (direito-finanças, alimentação, segurança, beleza e tecnologia, mulheres);
+- franja lateral cobria a sobrancelha e parte do olho (direito-finanças, mulher) → recortada;
+- uniforme de Segurança genérico (escudo amarelo), sem insígnia de nenhuma instituição real.
+Teste `src/ui/avatarCatalog.test.ts` confere: mulher e homem em todas as áreas, ids estáveis,
+disco centrado 256×256 com recorte circular, nome acessível, sem script nem links.
+
 ## Observações para próximas versões
 
 - Beleza e Estética e Limpeza ainda só têm símbolo; retratos dessas áreas exigiriam nova arte.

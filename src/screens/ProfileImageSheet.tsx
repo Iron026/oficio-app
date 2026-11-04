@@ -9,7 +9,8 @@ import { useConfirm } from '../ui/Confirm';
 import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { initials } from '../ui/Avatar';
-import { AVATAR_AREAS, INTERNAL_AVATARS } from '../ui/avatarCatalog';
+import { avatarsByArea, getInternalAvatar, groupOf, type AvatarGroup } from '../ui/avatarCatalog';
+import { Segmented } from '../ui/Misc';
 import { ProfileAvatar } from '../ui/ProfileAvatar';
 import { clampCrop, drawCrop, encodePhoto, loadPhoto, type Crop, type Source } from '../ui/photoEncode';
 import { Sheet } from '../ui/Sheet';
@@ -71,10 +72,15 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
   }
 
   const option = 'press-soft relative flex w-full min-w-0 flex-col items-center gap-1.5 rounded-2xl border-2 px-1 py-2 text-center text-xs font-medium';
+  const tile = 'press-soft relative flex aspect-square w-full min-w-0 items-center justify-center rounded-2xl border-2 p-1';
+  const current = choice.kind === 'interno' ? getInternalAvatar(choice.id) : undefined;
+  const [tab, setTab] = useState<AvatarGroup>(current ? groupOf(current) : 'personagens');
+  const currentName = choice.kind === 'foto' && photo ? 'Sua foto' : current ? current.name : 'Iniciais';
   return (
     <div className="space-y-5">
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-2">
         <ProfileAvatar data={data} tier={tier} size={112} seal={featured ? { id: featured.def.id, stage: featured.stage } : null} />
+        <p className="text-center text-sm font-semibold" aria-live="polite" data-avatar-current>{currentName}</p>
       </div>
 
       <section aria-labelledby="img-foto" className="space-y-2">
@@ -118,27 +124,26 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
           </div>
         </section>
 
-        {AVATAR_AREAS.map((area) => {
-          const items = INTERNAL_AVATARS.filter((a) => a.area === area.id);
-          if (!items.length) return null;
-          return (
-            <section key={area.id} aria-labelledby={`img-${area.id}`} className="space-y-2">
-              <h3 id={`img-${area.id}`} className="text-sm font-bold">{area.label}</h3>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(6.75rem,1fr))] gap-2">
-                {items.map((a) => {
-                  const on = is({ kind: 'interno', id: a.id });
-                  return (
-                    <button key={a.id} type="button" role="radio" aria-checked={on} onClick={() => pick({ kind: 'interno', id: a.id })} className={cx(option, on ? 'border-brand-500' : 'border-line')}>
-                      <img src={a.src} alt="" width={56} height={56} loading="lazy" decoding="async" className="h-14 w-14 rounded-full bg-surface-2 object-cover" />
-                      <span data-avatar-name className="line-clamp-2 w-full leading-tight [hyphens:none] [overflow-wrap:normal]">{a.name}</span>
-                      {on && <Selected />}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
+        <div>
+          <Segmented label="Tipo de avatar" value={tab} onChange={setTab} options={[{ value: 'personagens', label: 'Personagens' }, { value: 'icones', label: 'Ícones' }]} />
+        </div>
+        {avatarsByArea(tab).map(({ area, items }) => (
+          <section key={`${tab}-${area.id}`} aria-labelledby={`img-${tab}-${area.id}`} className="space-y-2">
+            <h3 id={`img-${tab}-${area.id}`} className="text-sm font-bold">{area.label}</h3>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(4.25rem,1fr))] gap-2">
+              {items.map((a) => {
+                const on = is({ kind: 'interno', id: a.id });
+                // Sem nome embaixo da imagem: o TalkBack lê o nome; o escolhido aparece na prévia acima.
+                return (
+                  <button key={a.id} type="button" role="radio" aria-checked={on} aria-label={a.name} title={a.name} data-avatar-id={a.id} onClick={() => pick({ kind: 'interno', id: a.id })} className={cx(tile, on ? 'border-brand-500' : 'border-line')}>
+                    <img src={a.src} alt="" width={56} height={56} loading="lazy" decoding="async" className="h-14 w-14 rounded-full bg-surface-2 object-cover" />
+                    {on && <Selected />}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
       <p className="text-xs text-muted">Os avatares do Ofício ficam no próprio app e funcionam sem internet.</p>
     </div>

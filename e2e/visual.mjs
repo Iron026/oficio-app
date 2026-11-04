@@ -362,22 +362,33 @@ try {
         await page.getByRole('button', { name: /alterar imagem de perfil/i }).click();
         await page.getByRole('dialog', { name: /imagem de perfil/i }).waitFor();
         await capture(page, vp, theme, 'ajustes-imagem-de-perfil');
-        // Nomes da galeria: nada cortado nem transbordando do cartão.
-        const cut = await page.evaluate(() => [...document.querySelectorAll('[data-avatar-name]')]
-          .filter((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 || e.getBoundingClientRect().right > e.closest('button').getBoundingClientRect().right)
-          .map((e) => e.textContent));
-        if (cut.length) fail(`${vp.id}/${theme}: nomes cortados na galeria de avatares: ${cut.join(', ')}`);
-        // Fonte grande do Android (≈130%): a grade usa rem, então as colunas alargam e nada corta.
-        const cutBig = await page.evaluate(async () => {
-          document.documentElement.style.fontSize = '130%';
-          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-          const out = [...document.querySelectorAll('[data-avatar-name]')]
-            .filter((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 || e.getBoundingClientRect().right > e.closest('button').getBoundingClientRect().right)
-            .map((e) => e.textContent);
+        // Galeria (rodada 3): só imagens, nome no TalkBack. Cada cartão ≥ 48 px e a imagem inteira dentro dele,
+        // também com a fonte grande do Android (≈130%: a grade usa rem e as colunas alargam).
+        const tileProblems = () => page.evaluate(async () => {
+          const out = [];
+          for (const scale of ['', '130%']) {
+            document.documentElement.style.fontSize = scale;
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            for (const b of document.querySelectorAll('[data-avatar-id]')) {
+              const r = b.getBoundingClientRect();
+              const im = b.querySelector('img').getBoundingClientRect();
+              if (!b.getAttribute('aria-label')) out.push(`${b.dataset.avatarId}: sem nome acessível`);
+              if (r.width < 48 || r.height < 48) out.push(`${b.dataset.avatarId}: cartão ${Math.round(r.width)}px`);
+              if (im.left < r.left - 0.5 || im.right > r.right + 0.5 || im.top < r.top - 0.5 || im.bottom > r.bottom + 0.5) out.push(`${b.dataset.avatarId}: imagem cortada${scale ? ' (fonte 130%)' : ''}`);
+            }
+          }
           document.documentElement.style.fontSize = '';
           return out;
         });
-        if (cutBig.length) fail(`${vp.id}/${theme}: com fonte 130%, nomes cortados na galeria: ${cutBig.join(', ')}`);
+        for (const tab of ['personagens', 'icones']) {
+          if (tab === 'icones') {
+            await page.getByRole('radio', { name: /^ícones$/i }).click();
+            await capture(page, vp, theme, 'ajustes-galeria-icones');
+          }
+          const problems = await tileProblems();
+          if (problems.length) fail(`${vp.id}/${theme}: galeria (${tab}): ${problems.slice(0, 6).join(', ')}`);
+        }
+        await page.getByRole('radio', { name: /^personagens$/i }).click();
         // Galeria por dentro (a folha rola sozinha): meio e fim da lista de avatares.
         if (vp.id === 'celular-360') {
           for (const [frac, id] of [[0.45, 'ajustes-galeria-meio'], [1, 'ajustes-galeria-fim']]) {
