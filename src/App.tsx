@@ -3,7 +3,7 @@ import { HideValuesContext } from './ui/privacy';
 import { useApp, useAppearanceEffect, usePrefs, useThemeEffect, AppProvider } from './state/AppContext';
 import { decideBack } from './platform/backStack';
 import { hideSplash, minimizeApp, onAndroidBack, setupKeyboard } from './platform/native';
-import { navigate, useRoute, type Route } from './state/router';
+import { navigate, useLocation, type Route } from './state/router';
 import { AppService } from './state/service';
 import { createStorage, type StorageAdapter } from './storage';
 import { createCloud, type Cloud } from './cloud';
@@ -21,6 +21,7 @@ import { Evolution } from './screens/Evolution';
 import { Finance } from './screens/Finance';
 import { Onboarding } from './screens/Onboarding';
 import { Settings } from './screens/Settings';
+import { settingsTitle } from './screens/settings/pages';
 import { Logo, Shell } from './screens/Shell';
 
 type Boot = { service: AppService; persistent: boolean; sync: SyncEngine };
@@ -107,7 +108,7 @@ const TITLES: Record<Route, string> = {
 
 function Root() {
   const { data } = useApp();
-  const route = useRoute();
+  const { route, sub } = useLocation();
   const prefs = usePrefs();
   useThemeEffect(prefs.theme);
   useAppearanceEffect(data.settings, prefs);
@@ -119,7 +120,7 @@ function Root() {
   return (
     <HideValuesContext.Provider value={prefs.hideValues}>
       <CelebrationProvider>
-        <Shell route={route} title={TITLES[route]}>
+        <Shell route={route} pageKey={route === 'ajustes' && sub ? `${route}/${sub}` : route} title={route === 'ajustes' ? settingsTitle(sub) : TITLES[route]}>
           {screens[route]}
         </Shell>
       </CelebrationProvider>

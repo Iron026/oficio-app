@@ -1,16 +1,15 @@
 import { useState, type ReactNode } from 'react';
-import { AlertTriangle, Check, Cloud, CloudAlert, CloudCheck, CloudOff, CloudUpload, Database, Download, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, Check, Cloud, CloudAlert, CloudCheck, CloudOff, CloudUpload, Database, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2, UserRound } from 'lucide-react';
 import type { LinkAnalysis, LinkMode } from '../sync/engine';
 import type { SyncConflict, SyncStatus } from '../sync/types';
 import { formatMoney } from '../lib/money';
-import { useBackupExport } from './BackupExport';
 import { useApp, useErrorHandler } from '../state/AppContext';
 import { useCloud } from '../state/CloudContext';
 import { navigate } from '../state/router';
 import { Button, IconButton } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
 import { cx } from '../ui/cx';
-import { Card, SectionTitle } from '../ui/Misc';
+import { Card } from '../ui/Misc';
 import { sealsPhotoSyncEnabled } from '../sync/features';
 import { Sheet } from '../ui/Sheet';
 import { useToast } from '../ui/Toast';
@@ -99,7 +98,7 @@ export function SyncSheet({ open, onClose }: { open: boolean; onClose: () => voi
   const shown: SyncStatus = linked ? status : { state: 'desativado' };
   const { text, tone } = statusLabel(shown);
   const pending = linked ? sync.pendingCount : 0;
-  const goAccount = () => { onClose(); navigate('ajustes'); };
+  const goAccount = () => { onClose(); if (window.location.hash !== '#/ajustes/conta') navigate('ajustes', 'conta'); };
   async function syncNow() {
     setBusy(true);
     try { await sync.sync(); } catch (err) { onError(err); } finally { setBusy(false); }
@@ -152,7 +151,7 @@ export function SyncSheet({ open, onClose }: { open: boolean; onClose: () => voi
         </div>
         <div className="grid gap-2">
           {linked && <Button block icon={<RefreshCw size={18} className={busy ? 'animate-spin motion-reduce:animate-none' : undefined} />} disabled={busy || shown.state === 'sincronizando'} onClick={syncNow}>{shown.state === 'erro' ? 'Tentar novamente' : 'Sincronizar agora'}</Button>}
-          <Button block variant={linked ? 'secondary' : 'primary'} icon={<Database size={18} />} onClick={goAccount}>{linked ? 'Conta, backup e dados' : 'Conectar conta Google'}</Button>
+          <Button block variant={linked ? 'secondary' : 'primary'} icon={<Database size={18} />} onClick={goAccount}>{linked ? 'Conta e sincronização' : 'Conectar conta Google'}</Button>
         </div>
       </div>
     </Sheet>
@@ -368,13 +367,12 @@ export function AccountSection() {
         'Isto apaga permanentemente todos os dados do Ofício guardados na nuvem e o seu acesso ao Ofício com esta conta Google. Os dados deste aparelho serão mantidos (para apagá-los, use "Apagar todos os dados"). Esta ação não pode ser desfeita.',
       confirmLabel: 'Excluir permanentemente',
       danger: true,
+      requireText: 'EXCLUIR',
     });
     if (!ok || !account) return;
     await account.deleteAccount();
     toast({ title: 'Conta e dados na nuvem excluídos', tone: 'info' });
   });
-
-  const backup = useBackupExport();
 
   let body: ReactNode;
   if (!account) {
@@ -448,7 +446,6 @@ export function AccountSection() {
           <Button block onClick={flow.start} disabled={flow.busy}>Conectar os dados deste aparelho</Button>
         )}
         <div className="flex flex-col gap-2 border-t border-line pt-3">
-          <Button variant="secondary" block icon={<Download size={18} />} onClick={backup.start} disabled={busy || backup.busy}>Exportar backup</Button>
           <Button variant="secondary" block icon={<LogOut size={18} />} onClick={disconnect} disabled={busy}>Desconectar</Button>
           <Button variant="ghost" block className="text-red-600 dark:text-red-400" icon={<Trash2 size={18} />} onClick={remove} disabled={busy}>
             Excluir conta e dados na nuvem
@@ -460,10 +457,8 @@ export function AccountSection() {
 
   return (
     <>
-      <SectionTitle>Conta e sincronização</SectionTitle>
       <Card>{body}</Card>
       {flow.sheet}
-      {backup.sheet}
       <ConflictsSheet open={conflictsOpen} onClose={() => setConflictsOpen(false)} serviceLabel={profession.terms.service} />
     </>
   );

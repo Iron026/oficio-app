@@ -32,9 +32,9 @@ async function seedLocal(dbName: string) {
 }
 
 async function openSettings(t: ReturnType<typeof setup>) {
-  window.location.hash = '#/ajustes';
+  window.location.hash = '#/ajustes/conta';
   const view = render(<App storageFactory={t.storageFactory} cloudFactory={t.cloudFactory} />);
-  await screen.findByText('Conta e sincronização');
+  await screen.findByRole('heading', { name: 'Conta Google' });
   return view;
 }
 
@@ -152,7 +152,15 @@ describe('Conta Google e sincronização (interface)', () => {
     await user.click(screen.getByRole('button', { name: /excluir conta e dados na nuvem/i }));
     const confirm = await screen.findByRole('dialog', { name: /excluir conta/i });
     expect(within(confirm).getByText(/não pode ser desfeita/i)).toBeInTheDocument();
-    await user.click(within(confirm).getByRole('button', { name: /excluir permanentemente/i }));
+    // Proteção contra toque acidental: só libera depois de digitar EXCLUIR.
+    const ok = within(confirm).getByRole('button', { name: /excluir permanentemente/i });
+    expect(ok).toBeDisabled();
+    await user.click(ok);
+    expect(t.auth.deleted).toEqual([]);
+    await user.type(within(confirm).getByLabelText(/digite excluir/i), 'exclui');
+    expect(ok).toBeDisabled();
+    await user.type(within(confirm).getByLabelText(/digite excluir/i), 'r');
+    await user.click(ok);
     await waitFor(() => expect(t.auth.deleted).toEqual(['uid-ana']));
     expect(await t.remote.hasData('uid-ana')).toBe(false);
     window.location.hash = '#/clientes';
@@ -160,7 +168,7 @@ describe('Conta Google e sincronização (interface)', () => {
   });
 
   it('sem Firebase configurado: informa que os dados ficam só no aparelho', async () => {
-    window.location.hash = '#/ajustes';
+    window.location.hash = '#/ajustes/conta';
     const dbName = `acc-${Math.random()}`;
     await seedLocal(dbName);
     render(<App storageFactory={async () => ({ storage: await createIndexedDbAdapter(dbName), persistent: true })} />);
@@ -202,7 +210,7 @@ describe('auditoria: proteção na troca de conta e desconexão (interface)', ()
     await user.type(within(form).getByLabelText(/^nome/i), 'Sem rede');
     await user.click(within(form).getByRole('button', { name: /cadastrar cliente/i }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /novo cliente/i })).not.toBeInTheDocument());
-    window.location.hash = '#/ajustes';
+    window.location.hash = '#/ajustes/conta';
     await user.click(await screen.findByRole('button', { name: /^desconectar$/i }));
     const confirm = await screen.findByRole('dialog', { name: /desconectar conta/i });
     expect(within(confirm).getByText(/ainda não fo(i|ram) enviada/i)).toBeInTheDocument();
@@ -273,6 +281,8 @@ describe('Sincronização e nuvem (botão de nuvem do topo)', () => {
     const form = await screen.findByRole('dialog', { name: /novo cliente/i });
     await user.type(within(form).getByLabelText(/^nome/i), 'Cliente Novo');
     await user.click(within(form).getByRole('button', { name: /cadastrar cliente/i }));
+    // Espera o cadastro terminar (o formulário fecha) antes de encerrar o teste.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /novo cliente/i })).not.toBeInTheDocument());
     await waitFor(() => expect(screen.getByRole('button', { name: /sincronização e nuvem: (aguardando conexão|alterações pendentes)/i })).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /sincronização e nuvem: sincronizado/i })).not.toBeInTheDocument();
   });

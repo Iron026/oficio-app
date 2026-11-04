@@ -424,7 +424,7 @@ function Growth({ label, value, pct }: { label: string; value: string; pct: numb
   );
 }
 
-function GoalsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function GoalsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data, service, profession } = useApp();
   const feedback = useFeedback();
   const onError = useErrorHandler();

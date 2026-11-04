@@ -18,7 +18,8 @@
           if (/^[a-z]+$/.test(v.accent)) r.setAttribute('data-accent', v.accent);
           var dark = v.theme === 'dark' || (v.theme === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
           if (dark) r.classList.add('dark');
-          if (/^#[0-9a-f]{6}$/i.test(v.bar)) document.querySelector('meta[name="theme-color"]').setAttribute('content', v.bar);
+          var bar = v.bars && v.bars[v.accent + (dark ? ':dark' : ':light')];
+          if (/^#[0-9a-f]{6}$/i.test(bar)) document.querySelector('meta[name="theme-color"]').setAttribute('content', bar);
         } catch (e) { /* sem cópia: segue o padrão */ }
       })();
     </script>

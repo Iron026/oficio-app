@@ -295,7 +295,8 @@ try {
   });
 
   await step('Modo escuro', async () => {
-    await tap(page.getByRole('button', { name: /ajustes/i }));
+    await tap(page.getByRole('button', { name: /^ajustes$/i }));
+    await tap(page.getByRole('button', { name: /aparência e personalização/i }));
     await tap(page.getByRole('radio', { name: /escuro/i }));
     await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
     await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
@@ -309,8 +310,21 @@ try {
     await page.getByRole('dialog').waitFor({ state: 'detached' });
   });
 
+  await step('Central de Ajustes: Voltar do Android volta ao índice e depois ao Painel', async () => {
+    await tap(page.getByRole('button', { name: /^ajustes$/i }));
+    await tap(page.getByRole('button', { name: /sobre o ofício/i }));
+    await page.waitForFunction(() => location.hash === '#/ajustes/sobre');
+    await page.getByText(/compilação/i).waitFor(); // número real do APK instalado
+    shot('04c-ajustes-sobre');
+    back();
+    await page.waitForFunction(() => location.hash === '#/ajustes');
+    back();
+    await page.waitForFunction(() => location.hash === '#/painel');
+  });
+
   await step('Exportar backup: cancelar a janela "Salvar como" não salva nada', async () => {
-    await tap(page.getByRole('button', { name: /ajustes/i }));
+    await tap(page.getByRole('button', { name: /^ajustes$/i }));
+    await tap(page.getByRole('button', { name: /backup e dados/i }));
     await tap(page.getByRole('button', { name: /exportar backup/i }));
     const sheet = page.getByRole('dialog', { name: /exportar backup/i });
     await tap(sheet.getByRole('button', { name: /salvar no aparelho/i }));
@@ -382,7 +396,8 @@ try {
   await step('Importar backup (ex.: vindo da versão web)', async () => {
     const data = JSON.parse(backupJson);
     data.data.clients.push({ ...data.data.clients[0], id: 'importado-1', name: 'Cliente Importado' });
-    await tap(page.getByRole('button', { name: /ajustes/i }));
+    await tap(page.getByRole('button', { name: /^ajustes$/i }));
+    await tap(page.getByRole('button', { name: /backup e dados/i }));
     await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
     await tap(page.getByRole('button', { name: /^importar$/i }));
     await noteToast(page, /backup importado/i);

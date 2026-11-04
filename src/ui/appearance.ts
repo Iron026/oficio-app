@@ -13,9 +13,15 @@ export const APPEARANCE_CACHE_KEY = 'oficio:aparencia';
 export interface AppearanceCache {
   accent: AccentId;
   theme: ThemePreference;
-  /** Cor da barra do sistema (início do cabeçalho) já calculada. */
-  bar?: string;
+  /**
+   * Cor da barra do sistema (início do cabeçalho) medida no CSS aplicado, por paleta e tema:
+   * "petroleo:dark" → "#0f5c55". Cada cor fica ligada ao estado em que foi medida, então uma
+   * medição antiga nunca é usada no outro tema nem em outra paleta.
+   */
+  bars?: Record<string, string>;
 }
+
+export const barKey = (accent: string, dark: boolean) => `${accent}:${dark ? 'dark' : 'light'}`;
 
 export function readAppearanceCache(): Partial<AppearanceCache> | null {
   try {
@@ -28,8 +34,10 @@ export function readAppearanceCache(): Partial<AppearanceCache> | null {
 
 export function writeAppearanceCache(v: AppearanceCache): void {
   try {
-    const bar = v.bar ?? readAppearanceCache()?.bar;
-    localStorage.setItem(APPEARANCE_CACHE_KEY, JSON.stringify(bar ? { ...v, bar } : v));
+    // Mantém só as cores medidas da paleta atual (no máximo claro e escuro).
+    const old = v.bars ?? readAppearanceCache()?.bars ?? {};
+    const bars = Object.fromEntries(Object.entries(old).filter(([k, c]) => k.startsWith(`${v.accent}:`) && /^#[0-9a-f]{6}$/i.test(c)));
+    localStorage.setItem(APPEARANCE_CACHE_KEY, JSON.stringify({ accent: v.accent, theme: v.theme, ...(Object.keys(bars).length ? { bars } : {}) }));
   } catch {
     /* sem armazenamento local: só não há pré-aplicação */
   }
@@ -37,11 +45,15 @@ export function writeAppearanceCache(v: AppearanceCache): void {
 
 /** Cor da barra do sistema = início do cabeçalho da paleta (lida do CSS já aplicado). */
 export function syncThemeColorMeta(): void {
-  const hero = getComputedStyle(document.documentElement).getPropertyValue('--hero-1').trim();
+  const root = document.documentElement;
+  const hero = getComputedStyle(root).getPropertyValue('--hero-1').trim();
   if (!/^#[0-9a-f]{6}$/i.test(hero)) return;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', hero);
   const cur = readAppearanceCache();
-  if (cur?.accent && cur.theme && cur.bar !== hero) writeAppearanceCache({ accent: cur.accent, theme: cur.theme, bar: hero });
+  const accent = root.dataset.accent;
+  if (!cur?.accent || !cur.theme || accent !== cur.accent) return;
+  const key = barKey(accent, root.classList.contains('dark'));
+  if (cur.bars?.[key] !== hero) writeAppearanceCache({ accent: cur.accent, theme: cur.theme, bars: { ...cur.bars, [key]: hero } });
 }
 
 type VT = { startViewTransition?: (cb: () => void) => unknown };

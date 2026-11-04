@@ -38,7 +38,10 @@ const VIEWPORTS = [
   { id: 'tablet-820', width: 820, height: 1180, mobile: true },
   { id: 'computador-1280', width: 1280, height: 800, mobile: false },
 ];
-const THEMES = ['claro', 'escuro'];
+const THEMES = opt('themes', 'claro,escuro').split(',');
+// --section telas|experiente|paletas: roda só uma parte (depuração).
+const SECTION = opt('section', '');
+const runs = (name) => !SECTION || SECTION === name;
 const SELECTED = ONLY ? VIEWPORTS.filter((v) => ONLY.split(',').includes(v.id)) : VIEWPORTS;
 const SCREENS = [
   { id: 'painel', hash: '#/painel' },
@@ -272,7 +275,7 @@ async function capture(page, vp, theme, id, opts = {}) {
 
 // ---------------------------------------------------------------- execução
 try {
-  for (const vp of SELECTED) {
+  for (const vp of runs('telas') ? SELECTED : []) {
     for (const theme of THEMES) {
       console.log(`• ${vp.id} · ${theme}`);
       // Primeira abertura (sem dados).
@@ -303,6 +306,12 @@ try {
         if (vp.id === 'celular-360' && ['painel', 'evolucao', 'agenda'].includes(s.id)) {
           await capture(page, vp, theme, `${s.id}-inteira`, { full: true, skipChecks: true });
         }
+      }
+      // Central de Ajustes: páginas internas (rodada 5).
+      for (const sub of ['aparencia', 'aparencia/paleta', 'perfil', 'privacidade', 'conta', 'dados', 'sobre']) {
+        await page.goto(BASE + '#/ajustes/' + sub);
+        await page.getByRole('link', { name: /^(ajustes|aparência)$/i }).waitFor();
+        await capture(page, vp, theme, `ajustes-${sub.replace('/', '-')}`);
       }
       // Abas da Evolução (missões já foi capturada acima).
       await page.goto(BASE + '#/evolucao');
@@ -384,11 +393,13 @@ try {
         const img = saved[0];
         if (saved.length !== 1 || !img || !['image/webp', 'image/jpeg'].includes(img.mime) || img.bytes > 65536 || img.chars > 87384 || img.width !== 320) fail(`${vp.id}/${theme}: foto gravada fora dos limites ${JSON.stringify(saved)}`);
         else report.foto = report.foto ?? img;
+        await page.goto(BASE + '#/ajustes/perfil');
         await page.getByRole('button', { name: /selo em destaque/i }).click();
         await page.getByRole('dialog', { name: /selo em destaque/i }).waitFor();
         await capture(page, vp, theme, 'ajustes-selo-em-destaque');
         await page.keyboard.press('Escape');
         await page.getByRole('dialog').waitFor({ state: 'detached' });
+        await page.goto(BASE + '#/ajustes/privacidade');
         await page.getByRole('switch', { name: /ocultar valores/i }).click();
         await page.goto(BASE + '#/painel');
         await capture(page, vp, theme, 'painel-valores-ocultos');
@@ -397,7 +408,7 @@ try {
     }
   }
   // Profissional experiente: categorias altas e selos em vários estágios (via importação de backup).
-  for (const vp of SELECTED.filter((v) => v.id === 'celular-360' || v.id === 'computador-1280')) {
+  for (const vp of runs('experiente') ? SELECTED.filter((v) => v.id === 'celular-360' || v.id === 'computador-1280') : []) {
     for (const theme of THEMES) {
       console.log(`• ${vp.id} · ${theme} · experiente`);
       const { ctx, page } = await newPage(vp, theme);
@@ -408,8 +419,8 @@ try {
       await page.getByLabel(/seu nome/i).fill('Ana Souza');
       await page.getByRole('button', { name: /entrar no ofício/i }).click();
       await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
-      await page.goto(BASE + '#/ajustes');
-      await page.getByText('Conta e sincronização').waitFor();
+      await page.goto(BASE + '#/ajustes/dados');
+      await page.getByRole('button', { name: /exportar backup/i }).waitFor();
       await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(veteranBackup(theme === 'escuro' ? 'oceano' : 'petroleo')) });
       await page.getByRole('button', { name: /^importar$/i }).click();
       await page.getByText(/backup importado/i).first().waitFor();
@@ -451,6 +462,8 @@ try {
       await capture(page, vp, theme, 'experiente-ajustes');
       // R3: nível 26 → Diamante III (só visual).
       if (vp.id === 'celular-360') {
+        await page.goto(BASE + '#/ajustes/dados');
+        await page.getByRole('button', { name: /exportar backup/i }).waitFor();
         await page.locator('input[type=file]').first().setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(veteranBackup('petroleo', 32500 - 4244)) });
         await page.getByRole('button', { name: /^importar$/i }).click();
         await page.getByText(/backup importado/i).first().waitFor();
@@ -464,14 +477,14 @@ try {
   // Rodada 5: as 8 paletas nas telas principais, num formulário com erros e na reabertura
   // (sem piscar o Petróleo). Celular 360 (Galaxy S26), claro e escuro; axe em todas.
   const PALETTE_NAMES = { petroleo: 'Petróleo', oceano: 'Oceano', safira: 'Safira', indigo: 'Índigo', ameixa: 'Ameixa', vinho: 'Vinho', grafite: 'Grafite', oliva: 'Oliva' };
-  if (!ONLY || ONLY.split(',').includes('celular-360')) {
+  if (runs('paletas') && (!ONLY || ONLY.split(',').includes('celular-360'))) {
     const vp = VIEWPORTS[0];
     for (const theme of THEMES) {
       console.log(`• ${vp.id} · ${theme} · 8 paletas`);
       const { ctx, page } = await newPage(vp, theme);
       await seed(page);
       for (const [id, name] of Object.entries(PALETTE_NAMES)) {
-        await page.goto(BASE + '#/ajustes');
+        await page.goto(BASE + '#/ajustes/aparencia/paleta');
         await page.getByRole('radio', { name: new RegExp(`^${name}`) }).click();
         await page.waitForFunction((a) => document.documentElement.dataset.accent === a, id);
         for (const s of SCREENS) {
@@ -488,6 +501,7 @@ try {
         await capture(page, vp, theme, `paleta-${id}-formulario-erros`);
         await page.keyboard.press('Escape');
         await tx.waitFor({ state: 'detached' });
+        if (process.env.OFICIO_DEBUG_BAR) console.log('cache antes da reabertura', id, await page.evaluate(() => [localStorage.getItem('oficio:aparencia'), document.documentElement.className, getComputedStyle(document.documentElement).getPropertyValue('--hero-1')]));
         // Reabertura com o JavaScript do app bloqueado: só o script do <head> roda.
         await page.route(/\/assets\/index-[^/]+\.js$/, (r) => r.abort());
         await page.reload();
@@ -507,7 +521,7 @@ try {
         await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
       }
       // Volta ao padrão: a escolha do Petróleo também precisa funcionar.
-      await page.goto(BASE + '#/ajustes');
+      await page.goto(BASE + '#/ajustes/aparencia/paleta');
       await page.getByRole('radio', { name: /^Petróleo/ }).click();
       await page.waitForFunction(() => document.documentElement.dataset.accent === 'petroleo');
       await ctx.close();

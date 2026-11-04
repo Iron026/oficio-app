@@ -43,7 +43,7 @@ export function HeroSlot({ children, overlap }: { children: ReactNode; overlap?:
   return createPortal(children, ctx.node);
 }
 
-export function Shell({ route, title, children, action }: { route: Route; title: string; children: ReactNode; action?: ReactNode }) {
+export function Shell({ route, pageKey = route, title, children, action }: { route: Route; pageKey?: string; title: string; children: ReactNode; action?: ReactNode }) {
   const { service, persistent } = useApp();
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [overlap, setOverlap] = useState(false);
@@ -59,7 +59,7 @@ export function Shell({ route, title, children, action }: { route: Route; title:
     }
     window.scrollTo({ top: 0 });
     titleRef.current?.focus({ preventScroll: true });
-  }, [route]);
+  }, [pageKey]);
 
   return (
     <HeroCtx.Provider value={{ node: slot, setOverlap }}>
@@ -88,11 +88,11 @@ export function Shell({ route, title, children, action }: { route: Route; title:
             Este navegador bloqueou o armazenamento local. Os dados serão perdidos ao fechar a página.
           </div>
         )}
-        <main key={route} className={cx('relative animate-screen px-4 pb-[calc(9.5rem+var(--safe-bottom))]', overlap ? '-mt-10' : 'pt-4')}>
+        <main key={pageKey} className={cx('relative animate-screen px-4 pb-[calc(9.5rem+var(--safe-bottom))]', overlap ? '-mt-10' : 'pt-4')}>
           {service.hasDemoData() && (
             <button
               type="button"
-              onClick={() => navigate('ajustes')}
+              onClick={() => navigate('ajustes', 'dados')}
               className="press-soft mb-3 flex w-full items-center gap-2 rounded-xl border border-dashed border-violet-400 bg-surface p-3 text-left text-sm text-violet-800 shadow-sm dark:border-violet-400/60 dark:text-violet-200"
             >
               <FlaskConical size={16} className="shrink-0" aria-hidden="true" />

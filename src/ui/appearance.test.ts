@@ -26,7 +26,7 @@ describe('Aparência na primeira pintura (sem piscar a paleta padrão)', () => {
   });
 
   it('aplica paleta, tema escuro e cor da barra salvos', () => {
-    localStorage.setItem(APPEARANCE_CACHE_KEY, JSON.stringify({ accent: 'vinho', theme: 'dark', bar: '#7e2342' }));
+    localStorage.setItem(APPEARANCE_CACHE_KEY, JSON.stringify({ accent: 'vinho', theme: 'dark', bars: { 'vinho:light': '#a02c51', 'vinho:dark': '#7e2342' } }));
     runHead();
     const r = document.documentElement;
     expect(r.dataset.accent).toBe('vinho');
@@ -48,16 +48,26 @@ describe('Aparência na primeira pintura (sem piscar a paleta padrão)', () => {
     expect(document.documentElement.dataset.accent).toBeUndefined();
     localStorage.setItem(APPEARANCE_CACHE_KEY, '{quebrado');
     expect(() => runHead()).not.toThrow();
-    localStorage.setItem(APPEARANCE_CACHE_KEY, JSON.stringify({ accent: '"><script>', theme: 'dark', bar: 'red;x' }));
+    localStorage.setItem(APPEARANCE_CACHE_KEY, JSON.stringify({ accent: '"><script>', theme: 'dark', bars: { '"><script>:dark': 'red;x' } }));
     runHead();
     expect(document.documentElement.dataset.accent).toBeUndefined();
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0f7b71');
   });
 
-  it('a cópia guarda a última cor da barra mesmo quando só a paleta muda', () => {
-    writeAppearanceCache({ accent: 'oliva', theme: 'light', bar: '#666a25' });
+  it('a cor da barra fica ligada à paleta e ao tema em que foi medida', () => {
+    writeAppearanceCache({ accent: 'oliva', theme: 'system', bars: { 'oliva:light': '#666a25', 'oliva:dark': '#4f521f' } });
+    // Medida do claro não é usada no escuro.
+    document.documentElement.classList.add('dark');
+    localStorage.setItem(APPEARANCE_CACHE_KEY, JSON.stringify({ accent: 'oliva', theme: 'dark', bars: { 'oliva:light': '#666a25' } }));
+    runHead();
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0f7b71');
+    // Trocar de paleta descarta as cores medidas da paleta anterior.
+    writeAppearanceCache({ accent: 'oliva', theme: 'light', bars: { 'oliva:light': '#666a25', 'oliva:dark': '#4f521f' } });
     writeAppearanceCache({ accent: 'grafite', theme: 'light' });
-    expect(readAppearanceCache()).toEqual({ accent: 'grafite', theme: 'light', bar: '#666a25' });
+    expect(readAppearanceCache()).toEqual({ accent: 'grafite', theme: 'light' });
+    writeAppearanceCache({ accent: 'grafite', theme: 'dark', bars: { 'grafite:light': '#45555c' } });
+    writeAppearanceCache({ accent: 'grafite', theme: 'system' });
+    expect(readAppearanceCache()).toEqual({ accent: 'grafite', theme: 'system', bars: { 'grafite:light': '#45555c' } });
   });
 });
 

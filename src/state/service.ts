@@ -50,12 +50,19 @@ type PrefsListener = (prefs: DevicePrefs) => void;
  * Serviço de aplicação: concentra regras de negócio, persistência e gamificação.
  * A interface (React) apenas lê `data` e chama métodos.
  */
+export interface BackupCounts { clients: number; appointments: number; transactions: number }
+export interface BackupPreview { exportedAt: string | null; file: BackupCounts; current: BackupCounts }
+
+/** Chave (só neste aparelho) da data do último backup exportado. */
+export const LAST_EXPORT_KEY = 'export:lastBackup';
+
 export class AppService {
   private listeners = new Set<Listener>();
   private prefsListeners = new Set<PrefsListener>();
   private queue: Promise<unknown> = Promise.resolve();
   private _prefs: DevicePrefs = DEFAULT_DEVICE_PREFS;
   private _celebration: CelebrationRecord | null = null;
+  private _lastExport: string | null = null;
 
   constructor(
     private storage: StorageAdapter,
@@ -73,6 +80,8 @@ export class AppService {
     // Comemorações: na primeira abertura da versão nova, o que já foi conquistado não é comemorado de novo.
     service._celebration = readCelebration(await storage.kvGet<unknown>(CELEBRATION_KEY));
     if (!service._celebration && data.profile) await service.recordCelebration(true);
+    const last = await storage.kvGet<unknown>(LAST_EXPORT_KEY);
+    service._lastExport = typeof last === 'string' && !Number.isNaN(Date.parse(last)) ? last : null;
     return service;
   }
 
@@ -100,6 +109,20 @@ export class AppService {
     const next = reset ? nextCelebration(this.currentTier, null) : nextCelebration(this.currentTier, this._celebration);
     this._celebration = next;
     await this.storage.kvSet(CELEBRATION_KEY, next);
+  }
+
+  /** Data do último backup exportado deste aparelho (só neste aparelho; não sincroniza). */
+  get lastBackupExportAt(): string | null {
+    return this._lastExport;
+  }
+
+  /** Registra que um backup completo foi salvo ou compartilhado agora. Não altera os dados. */
+  noteBackupExported(): Promise<void> {
+    return this.run(async () => {
+      const at = this.now().toISOString();
+      await this.storage.kvSet(LAST_EXPORT_KEY, at);
+      this._lastExport = at;
+    });
   }
 
   /** Preferências deste aparelho (tema, densidade, ocultar valores, animações). */
@@ -490,6 +513,20 @@ export class AppService {
     return serializeBackup(this._data, this.now());
   }
 
+  /** Lê um arquivo de backup sem alterar nada: resumo do arquivo e dos dados atuais (para a confirmação). */
+  previewBackup(text: string): BackupPreview {
+    const parsed = parseBackup(text);
+    let exportedAt: string | null = null;
+    try {
+      const raw = JSON.parse(text) as { exportedAt?: unknown };
+      if (typeof raw.exportedAt === 'string' && !Number.isNaN(Date.parse(raw.exportedAt))) exportedAt = raw.exportedAt;
+    } catch {
+      /* parseBackup já validou o JSON */
+    }
+    const count = (d: AppData) => ({ clients: d.clients.length, appointments: d.appointments.length, transactions: d.transactions.length });
+    return { exportedAt, file: count(parsed), current: count(this._data) };
+  }
+
   importBackup(text: string): Promise<void> {
     return this.run(async () => {
       const parsed = parseBackup(text);
@@ -514,7 +551,9 @@ export class AppService {
       // "Apagar todos os dados" também volta as preferências do aparelho ao padrão.
       await this.storage.kvDelete(DEVICE_PREFS_KEY);
       await this.storage.kvDelete(CELEBRATION_KEY);
+      await this.storage.kvDelete(LAST_EXPORT_KEY);
       this._celebration = null;
+      this._lastExport = null;
       this._prefs = { ...DEFAULT_DEVICE_PREFS };
       this.prefsListeners.forEach((l) => l(this._prefs));
       this.set(emptyData());

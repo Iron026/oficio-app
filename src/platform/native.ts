@@ -51,3 +51,15 @@ export async function hapticSuccess(strong = false): Promise<void> {
   const { Haptics, ImpactStyle, NotificationType } = await import('@capacitor/haptics');
   await (strong ? Haptics.notification({ type: NotificationType.Success }) : Haptics.impact({ style: ImpactStyle.Light })).catch(() => undefined);
 }
+
+/** Versão e número de compilação reais do app instalado (Android); null no navegador. */
+export async function appBuildInfo(): Promise<{ version: string; build: string } | null> {
+  if (!isNative()) return null;
+  try {
+    const { App } = await import('@capacitor/app');
+    const info = await App.getInfo();
+    return { version: info.version, build: info.build };
+  } catch {
+    return null;
+  }
+}
