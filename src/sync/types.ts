@@ -1,16 +1,16 @@
 import type { Profile, Settings } from '../domain/types';
 
 /** Coleções sincronizadas, uma entrada por registro. */
-export const SYNC_COLLECTIONS = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages'] as const;
+export const SYNC_COLLECTIONS = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages', 'serviceTypes'] as const;
 export type SyncCollection = (typeof SYNC_COLLECTIONS)[number];
 
 /** Coleções sincronizadas desde a 0.3 (aceitas pelas regras publicadas). */
 export const BASE_SYNC_COLLECTIONS: readonly SyncCollection[] = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements'];
 /**
- * Coleções da 0.4 (selos permanentes e foto de perfil). Só sincronizam quando as
- * regras novas estiverem publicadas: até lá ficam apenas no aparelho.
+ * Coleções da 0.4 (selos permanentes, foto de perfil e tipos de serviço). Só sincronizam
+ * quando as regras novas estiverem publicadas: até lá ficam apenas no aparelho e no backup.
  */
-export const V04_SYNC_COLLECTIONS: readonly SyncCollection[] = ['sealAwards', 'profileImages'];
+export const V04_SYNC_COLLECTIONS: readonly SyncCollection[] = ['sealAwards', 'profileImages', 'serviceTypes'];
 
 /** Registros com valores financeiros: conflitos nunca são resolvidos em silêncio. */
 export const FINANCIAL_COLLECTIONS: readonly SyncCollection[] = ['appointments', 'transactions'];

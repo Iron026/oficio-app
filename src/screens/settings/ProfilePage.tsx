@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Award, Check, Pencil, Target, UserRound } from 'lucide-react';
+import { Award, Check, ListChecks, Pencil, Target, UserRound } from 'lucide-react';
 import { PROFESSION_LIST } from '../../domain/professions';
 import { avatarOf, featuredSealOf } from '../../domain/preferences';
 import type { ProfessionId, SealId } from '../../domain/types';
@@ -19,9 +19,10 @@ import { useHideValues } from '../../ui/privacy';
 import { Sheet } from '../../ui/Sheet';
 import { GoalsSheet } from '../Evolution';
 import { ProfileImageSheet } from '../ProfileImageSheet';
+import { ServiceTypesSheet } from '../ServiceTypesSheet';
 import { OptionRow, SettingsSubpage } from './shared';
 
-type ProfileSheetId = null | 'perfil' | 'profissao' | 'imagem' | 'selo' | 'metas';
+type ProfileSheetId = null | 'perfil' | 'profissao' | 'imagem' | 'selo' | 'metas' | 'servicos';
 
 export function ProfilePage() {
   const { data, profession } = useApp();
@@ -47,12 +48,19 @@ export function ProfilePage() {
           detail={`${profile.weeklyGoalServices} ${profession.terms.services.toLowerCase()} por semana · ${hidden ? 'R$ •••••' : formatMoney(profile.monthlyGoalRevenue)} por mês`}
           icon={<Target size={18} />}
         />
+        <OptionRow
+          onClick={() => setSheet('servicos')}
+          label="Tipos de serviço"
+          detail={data.serviceTypes.length ? `${data.serviceTypes.length} ${data.serviceTypes.length === 1 ? 'tipo' : 'tipos'} · ${data.serviceTypes.filter((s) => s.pinned).length} fixado(s)` : 'Atalhos de nome e valor para agendar'}
+          icon={<ListChecks size={18} />}
+        />
       </Card>
       <ProfileSheet open={sheet === 'perfil'} onClose={close} />
       <ProfessionSheet open={sheet === 'profissao'} onClose={close} />
       <ProfileImageSheet open={sheet === 'imagem'} onClose={close} />
       <FeaturedSealSheet open={sheet === 'selo'} seals={seals} onClose={close} />
       <GoalsSheet open={sheet === 'metas'} onClose={close} />
+      <ServiceTypesSheet open={sheet === 'servicos'} onClose={close} />
     </SettingsSubpage>
   );
 }

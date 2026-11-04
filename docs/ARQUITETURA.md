@@ -61,7 +61,14 @@ Ver [SINCRONIZACAO.md](SINCRONIZACAO.md). Resumo: `TrackedStorage` registra alte
 - `src/domain/preferences.ts`: preferências da conta (`settings`: destaque, avatar, selo em destaque) e do aparelho
   (`DevicePrefs` em `kv`: tema, densidade, ocultar valores, animações — não vão para a nuvem nem para o backup).
 - `src/domain/profileImage.ts` + `src/ui/photoEncode.ts`: limites e preparo da foto no aparelho (recorte, 320 px, ≤ 64 KiB).
-- IndexedDB v3 (stores `sealAwards`, `profileImages`). Backup continua na versão 1 (campos novos opcionais).
+- IndexedDB v4 (stores `sealAwards`, `profileImages` e, na rodada 3, `serviceTypes`). Cada versão só cria stores novos;
+  nada é apagado. Backup continua na versão 1 (campos novos opcionais).
+- `src/domain/serviceTypes.ts`: tipos de serviço personalizados (atalhos de nome e valor na agenda), com ordem,
+  fixação e nomes únicos (sem diferenciar acentos). Não dão XP. Regras em `AppService` (`saveServiceType`…).
+- `src/domain/statement.ts` + `src/lib/pdf.ts`/`statementPdf.ts`: extrato mensal em CSV (Excel pt-BR) e PDF
+  sem dependências (Helvetica/WinAnsi). Só leitura.
+- `src/styles/palettes.css` + `src/ui/palettes.ts`: 8 paletas (escala `brand-*` e `--hero-*`); testes de contraste
+  em `src/ui/palettes.test.ts`. Central de Ajustes em `src/screens/settings/` (rotas `#/ajustes/<página>`).
 
 ## Privacidade e segurança
 

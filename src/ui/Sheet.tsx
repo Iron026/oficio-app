@@ -13,6 +13,9 @@ interface SheetProps {
   footer?: ReactNode;
 }
 
+/** Painéis abertos, do mais antigo ao mais recente: só o de cima responde ao teclado. */
+const openSheets: symbol[] = [];
+
 /** Painel inferior (bottom sheet) acessível, usado para formulários. */
 export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
   const titleId = useId();
@@ -34,7 +37,11 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
     const touch = window.matchMedia?.('(pointer: coarse)').matches ?? false;
     const first = touch ? null : panel?.querySelector<HTMLElement>('input, select, textarea, button:not([data-close])');
     (first ?? panel)?.focus();
+    const token = Symbol('sheet');
+    openSheets.push(token);
     const onKey = (e: KeyboardEvent) => {
+      // Painel aberto por cima de outro (ex.: confirmação sobre um formulário): Esc fecha só o de cima.
+      if (openSheets[openSheets.length - 1] !== token) return;
       if (e.key === 'Escape') onCloseRef.current();
       if (e.key === 'Tab' && panel) {
         const items = [...panel.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => !el.hasAttribute('disabled'));
@@ -48,6 +55,7 @@ export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
     document.addEventListener('keydown', onKey);
     const removeBack = pushBackHandler(() => onCloseRef.current());
     return () => {
+      openSheets.splice(openSheets.indexOf(token), 1);
       removeBack();
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;

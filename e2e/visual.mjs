@@ -334,6 +334,27 @@ try {
       await capture(page, vp, theme, 'formulario-cliente');
       await page.keyboard.press('Escape');
       await page.getByRole('dialog').waitFor({ state: 'detached' });
+      // Agendamento: atalhos de serviço (quebram linha, nunca cortam) e painel "Tipos de serviço".
+      await page.goto(BASE + '#/painel');
+      await page.getByRole('button', { name: /^agendar$/i }).first().click();
+      const ag = page.getByRole('dialog');
+      await ag.waitFor();
+      await capture(page, vp, theme, 'formulario-agendar');
+      await ag.getByRole('button', { name: /gerenciar/i }).click();
+      const mgr = page.getByRole('dialog', { name: /tipos de serviço/i });
+      await mgr.waitFor();
+      await mgr.getByRole('button', { name: /adicionar tipo de serviço/i }).click();
+      await mgr.getByLabel(/nome do serviço/i).fill('Hora de trabalho (diária completa com deslocamento)');
+      await mgr.getByLabel(/valor sugerido/i).fill('480,00');
+      await mgr.getByRole('button', { name: /^adicionar$/i }).click();
+      await mgr.getByRole('button', { name: /^fixar hora de trabalho/i }).click();
+      await mgr.getByRole('button', { name: /^desafixar hora de trabalho/i }).waitFor();
+      await capture(page, vp, theme, 'tipos-de-servico');
+      await page.keyboard.press('Escape');
+      await mgr.waitFor({ state: 'detached' });
+      await capture(page, vp, theme, 'formulario-agendar-com-tipo');
+      await page.keyboard.press('Escape');
+      await page.getByRole('dialog').waitFor({ state: 'detached' });
 
       // Ajustes: imagem de perfil (avatares do pack), recorte de foto e selo em destaque.
       { // todos os tamanhos (galeria e foto)

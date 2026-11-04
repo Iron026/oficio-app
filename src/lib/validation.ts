@@ -64,6 +64,23 @@ export function validateTransaction(v: TransactionInput): Errors<TransactionInpu
   return e;
 }
 
+export interface ServiceTypeInput { name: string; price: string }
+
+/** Tipo de serviço: nome obrigatório (até 60); valor sugerido opcional e maior que zero. */
+export function validateServiceType(v: ServiceTypeInput): Errors<ServiceTypeInput> {
+  const e: Errors<ServiceTypeInput> = {};
+  const name = v.name.trim();
+  if (!name) e.name = 'Dê um nome ao serviço.';
+  else if (name.length > 60) e.name = 'Use no máximo 60 caracteres.';
+  if (v.price.trim()) {
+    const cents = parseMoney(v.price);
+    if (cents === null) e.price = 'Informe um valor válido. Ex.: 80,00';
+    else if (cents <= 0) e.price = 'O valor deve ser maior que zero (ou deixe em branco).';
+    else if (cents > 100_000_000) e.price = 'Valor muito alto.';
+  }
+  return e;
+}
+
 export interface ProfileInput { name: string; businessName: string }
 
 export function validateProfile(v: ProfileInput): Errors<ProfileInput> {

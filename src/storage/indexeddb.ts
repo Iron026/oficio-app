@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS, type AppData, type Profile, type Settings } from '../domain/types';
 import { ENTITY_STORES, type EntityStore, type EntityStoreName, type StorageAdapter } from './types';
 
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const META = 'meta';
 /** v2: armazenamento chave-valor auxiliar (sincronização, cópias de segurança). */
 const KV = 'kv';
@@ -34,6 +34,7 @@ export function openDatabase(name: string): Promise<IDBDatabase> {
       // v1 → v2: apenas cria o novo store; os dados existentes não são tocados.
       if (!db.objectStoreNames.contains(KV)) db.createObjectStore(KV);
       // v2 → v3 (0.4): stores `sealAwards` e `profileImages`, criados pelo laço acima; nada é apagado.
+      // v3 → v4 (0.4, rodada 3): store `serviceTypes`, criado pelo laço acima; nada é apagado.
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -112,6 +113,7 @@ export async function createIndexedDbAdapter(dbName = 'oficio'): Promise<Storage
     achievements: entityStore(db, 'achievements'),
     sealAwards: entityStore(db, 'sealAwards'),
     profileImages: entityStore(db, 'profileImages'),
+    serviceTypes: entityStore(db, 'serviceTypes'),
     async getProfile() {
       return (await getMeta<Profile>('profile')) ?? null;
     },
@@ -121,12 +123,12 @@ export async function createIndexedDbAdapter(dbName = 'oficio'): Promise<Storage
     },
     saveSettings: (s) => setMeta('settings', s),
     async loadAll(): Promise<AppData> {
-      const [profile, settings, clients, appointments, transactions, xpEvents, achievements, sealAwards, profileImages] = await Promise.all([
+      const [profile, settings, clients, appointments, transactions, xpEvents, achievements, sealAwards, profileImages, serviceTypes] = await Promise.all([
         adapter.getProfile(), adapter.getSettings(), adapter.clients.list(), adapter.appointments.list(),
         adapter.transactions.list(), adapter.xpEvents.list(), adapter.achievements.list(),
-        adapter.sealAwards.list(), adapter.profileImages.list(),
+        adapter.sealAwards.list(), adapter.profileImages.list(), adapter.serviceTypes.list(),
       ]);
-      return { profile, settings, clients, appointments, transactions, xpEvents, achievements, sealAwards, profileImages };
+      return { profile, settings, clients, appointments, transactions, xpEvents, achievements, sealAwards, profileImages, serviceTypes };
     },
     async replaceAll(data) {
       // Uma única transação: ou tudo é importado, ou nada muda.

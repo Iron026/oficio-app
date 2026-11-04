@@ -24,7 +24,7 @@ describe('IndexedDB', () => {
   it('replaceAll e clearAll', async () => {
     const a = await createIndexedDbAdapter(`test-${Math.random()}`);
     await a.clients.put(client('old'));
-    const data: AppData = { profile: null, settings: DEFAULT_SETTINGS, clients: [client('new')], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [] };
+    const data: AppData = { profile: null, settings: DEFAULT_SETTINGS, clients: [client('new')], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [], serviceTypes: [] };
     await a.replaceAll(data);
     expect((await a.clients.list()).map((c) => c.id)).toEqual(['new']);
     await a.clearAll();
@@ -34,7 +34,7 @@ describe('IndexedDB', () => {
 });
 
 describe('backup', () => {
-  const data: AppData = { profile: null, settings: DEFAULT_SETTINGS, clients: [client('1')], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [] };
+  const data: AppData = { profile: null, settings: DEFAULT_SETTINGS, clients: [client('1')], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [], serviceTypes: [] };
 
   it('exporta e importa sem perdas', () => {
     expect(parseBackup(serializeBackup(data))).toEqual(data);

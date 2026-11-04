@@ -10,7 +10,7 @@ const done = (id: string, clientId: string | null = null, isDemo = false): Appoi
   id, title: 'Corte', clientId, date: '2026-11-03', time: '', price: 5000, status: 'concluido', notes: '', completedAt: NOW.toISOString(), transactionId: null,
   createdAt: NOW.toISOString(), updatedAt: NOW.toISOString(), ...(isDemo ? { isDemo } : {}),
 });
-const base = (): AppData => ({ profile, settings: { theme: 'system' }, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [] });
+const base = (): AppData => ({ profile, settings: { theme: 'system' }, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [], serviceTypes: [] });
 
 describe('XP por ação', () => {
   it('não concede XP repetido para a mesma entidade', () => {

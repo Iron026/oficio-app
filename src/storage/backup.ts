@@ -1,4 +1,5 @@
 import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
+import { MAX_SERVICE_TYPES, isValidServiceType, uniqueById } from '../domain/serviceTypes';
 import { isProfessionId } from '../domain/professions';
 import { DEFAULT_SETTINGS, type AppData } from '../domain/types';
 
@@ -52,5 +53,7 @@ export function parseBackup(text: string): AppData {
     // 0.4 (opcionais: backups antigos não têm). Itens inválidos são descartados.
     sealAwards: Array.isArray(d.sealAwards) ? d.sealAwards.filter(isValidSealAward) : [],
     profileImages: Array.isArray(d.profileImages) ? d.profileImages.filter(isValidProfileImage).slice(0, 1) : [],
+    // Rodada 3 (opcional): tipos de serviço; inválidos e repetidos são descartados.
+    serviceTypes: Array.isArray(d.serviceTypes) ? uniqueById(d.serviceTypes.filter(isValidServiceType)).slice(0, MAX_SERVICE_TYPES) : [],
   };
 }

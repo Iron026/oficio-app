@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Pin, Settings2 } from 'lucide-react';
+import { serviceChoices } from '../../domain/serviceTypes';
 import type { Appointment } from '../../domain/types';
 import { todayKey } from '../../lib/dates';
 import { centsToInput, formatMoney } from '../../lib/money';
@@ -8,6 +10,8 @@ import { Button } from '../../ui/Button';
 import { SelectField, TextArea, TextField } from '../../ui/Field';
 import { Chip } from '../../ui/Misc';
 import { Sheet } from '../../ui/Sheet';
+import { useHideValues } from '../../ui/privacy';
+import { ServiceTypesSheet } from '../ServiceTypesSheet';
 
 interface Props { open: boolean; onClose: () => void; appointment?: Appointment; defaultClientId?: string }
 
@@ -33,6 +37,9 @@ function AppointmentForm({ appointment, defaultClientId, onDone }: { appointment
   );
   const [errors, setErrors] = useState<Errors<AppointmentInput>>({});
   const [saving, setSaving] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const hidden = useHideValues();
+  const choices = serviceChoices(data.serviceTypes, profession.serviceTemplates);
   const set = (k: keyof AppointmentInput) => (e: { target: { value: string } }) => setV((cur) => ({ ...cur, [k]: e.target.value }));
   const clients = [...data.clients].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
@@ -54,19 +61,26 @@ function AppointmentForm({ appointment, defaultClientId, onDone }: { appointment
   }
 
   return (
+    <>
     <form onSubmit={submit} noValidate className="space-y-4">
       <TextField label={`Descrição d${t.serviceArticle} ${t.service.toLowerCase()}`} value={v.title} onChange={set('title')} error={errors.title} maxLength={80} />
       {!appointment && (
         <div>
-          <p className="mb-2 text-sm text-muted">Sugestões para {profession.name.toLowerCase()}:</p>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            {profession.serviceTemplates.map((s) => (
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-sm text-muted">{data.serviceTypes.length ? 'Seus serviços e sugestões:' : `Sugestões para ${profession.name.toLowerCase()}:`}</p>
+            <button type="button" onClick={() => setManaging(true)} className="press-soft -my-2 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-brand-700 dark:text-brand-300">
+              <Settings2 size={16} aria-hidden="true" /> Gerenciar
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {choices.map((c) => (
               <Chip
-                key={s.name}
-                active={v.title === s.name}
-                onClick={() => setV((cur) => ({ ...cur, title: s.name, price: cur.price || centsToInput(s.suggestedPrice) }))}
+                key={`${c.source}-${c.name}`}
+                active={v.title === c.name}
+                onClick={() => setV((cur) => ({ ...cur, title: c.name, price: cur.price || (c.price ? centsToInput(c.price) : '') }))}
               >
-                {s.name} · {formatMoney(s.suggestedPrice)}
+                {c.pinned && <Pin size={13} className="shrink-0" aria-label="Fixado" />}
+                <span>{c.name}{c.price ? <> · {hidden ? 'R$ •••••' : formatMoney(c.price)}</> : null}</span>
               </Chip>
             ))}
           </div>
@@ -86,5 +100,8 @@ function AppointmentForm({ appointment, defaultClientId, onDone }: { appointment
       <TextArea label="Observações" value={v.notes} onChange={set('notes')} error={errors.notes} optional maxLength={500} />
       <Button type="submit" block size="lg" disabled={saving}>{appointment ? 'Salvar alterações' : 'Agendar'}</Button>
     </form>
+    {/* Fora do <form>: eventos do React atravessam portais e o envio do painel não pode enviar o agendamento. */}
+    <ServiceTypesSheet open={managing} onClose={() => setManaging(false)} />
+    </>
   );
 }

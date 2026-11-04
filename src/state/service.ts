@@ -1,6 +1,7 @@
 import { buildDemoData } from '../domain/demo';
 import { getProfession } from '../domain/professions';
-import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
+import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, ServiceType, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
+import { MAX_SERVICE_TYPES, moveServiceType, nextServiceOrder, serviceNameKey } from '../domain/serviceTypes';
 import { isValidProfileImage } from '../domain/profileImage';
 import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
 import { awardsToSave, mergeAward } from '../gamification/seals';
@@ -13,8 +14,8 @@ import { todayKey } from '../lib/dates';
 import { newId } from '../lib/id';
 import { parseMoney } from '../lib/money';
 import {
-  hasErrors, validateAppointment, validateClient, validateProfile, validateTransaction,
-  type AppointmentInput, type ClientInput, type Errors, type TransactionInput,
+  hasErrors, validateAppointment, validateClient, validateProfile, validateServiceType, validateTransaction,
+  type AppointmentInput, type ClientInput, type Errors, type ServiceTypeInput, type TransactionInput,
 } from '../lib/validation';
 import { parseBackup, serializeBackup } from '../storage/backup';
 import type { StorageAdapter } from '../storage/types';
@@ -40,7 +41,7 @@ export interface Feedback {
 const emptyFeedback = (): Feedback => ({ xpGained: 0, events: [], achievements: [], levelUp: null, seals: [], tierUp: null });
 
 export const emptyData = (): AppData => ({
-  profile: null, settings: { ...DEFAULT_SETTINGS }, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [],
+  profile: null, settings: { ...DEFAULT_SETTINGS }, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [], serviceTypes: [],
 });
 
 type Listener = (data: AppData) => void;
@@ -452,6 +453,69 @@ export class AppService {
       const label = transaction.type === 'receita' ? 'Receita registrada' : 'Despesa registrada';
       const feedback = existing ? await this.gamify() : await this.gamify({ type: 'transaction_created', id: transaction.id, label, isDemo: transaction.isDemo });
       return { transaction, feedback };
+    });
+  }
+
+  // ------------------------------------------------------------ tipos de serviço
+  // Atalhos da agenda. Não dão XP nem alteram valores já registrados.
+
+  saveServiceType(input: ServiceTypeInput, id?: string): Promise<ServiceType> {
+    return this.run(async () => {
+      const errors = validateServiceType(input);
+      const existing = id ? this._data.serviceTypes.find((t) => t.id === id) : undefined;
+      if (id && !existing) throw new Error('Tipo de serviço não encontrado');
+      const key = serviceNameKey(input.name);
+      if (!errors.name && this._data.serviceTypes.some((t) => t.id !== id && serviceNameKey(t.name) === key)) errors.name = 'Já existe um serviço com esse nome.';
+      if (hasErrors(errors)) throw new ValidationError(errors);
+      if (!existing && this._data.serviceTypes.length >= MAX_SERVICE_TYPES) throw new Error(`Limite de ${MAX_SERVICE_TYPES} tipos de serviço.`);
+      const stamp = this.stamp();
+      const type: ServiceType = {
+        id: existing?.id ?? newId(),
+        name: input.name.trim().replace(/\s+/g, ' '),
+        price: input.price.trim() ? parseMoney(input.price)! : null,
+        pinned: existing?.pinned ?? false,
+        order: existing?.order ?? nextServiceOrder(this._data.serviceTypes),
+        createdAt: existing?.createdAt ?? stamp,
+        updatedAt: stamp,
+      };
+      await this.storage.serviceTypes.put(type);
+      const serviceTypes = existing ? this._data.serviceTypes.map((t) => (t.id === type.id ? type : t)) : [...this._data.serviceTypes, type];
+      this.set({ ...this._data, serviceTypes });
+      return type;
+    });
+  }
+
+  setServiceTypePinned(id: string, pinned: boolean): Promise<void> {
+    return this.run(async () => {
+      const t = this._data.serviceTypes.find((x) => x.id === id);
+      if (!t || t.pinned === pinned) return;
+      // Ao fixar/desafixar, vai para o fim do novo grupo.
+      const group = this._data.serviceTypes.filter((x) => x.pinned === pinned);
+      const updated = { ...t, pinned, order: nextServiceOrder(group), updatedAt: this.stamp() };
+      await this.storage.serviceTypes.put(updated);
+      this.set({ ...this._data, serviceTypes: this._data.serviceTypes.map((x) => (x.id === id ? updated : x)) });
+    });
+  }
+
+  moveServiceType(id: string, dir: -1 | 1): Promise<void> {
+    return this.run(async () => {
+      const changes = moveServiceType(this._data.serviceTypes, id, dir);
+      if (!changes.length) return;
+      const stamp = this.stamp();
+      const byId = new Map(changes.map((c) => [c.id, c.order]));
+      const changed = this._data.serviceTypes.filter((t) => byId.has(t.id)).map((t) => ({ ...t, order: byId.get(t.id)!, updatedAt: stamp }));
+      await this.storage.serviceTypes.putMany(changed);
+      const map = new Map(changed.map((t) => [t.id, t]));
+      this.set({ ...this._data, serviceTypes: this._data.serviceTypes.map((t) => map.get(t.id) ?? t) });
+    });
+  }
+
+  /** Remove só o atalho: serviços já agendados com esse nome não mudam. */
+  deleteServiceType(id: string): Promise<void> {
+    return this.run(async () => {
+      if (!this._data.serviceTypes.some((t) => t.id === id)) return;
+      await this.storage.serviceTypes.remove(id);
+      this.set({ ...this._data, serviceTypes: this._data.serviceTypes.filter((t) => t.id !== id) });
     });
   }
 

@@ -43,6 +43,19 @@ service cloud.firestore {
           && r.data.createdAt is string && r.data.updatedAt is string));
     }
 
+    // 0.4 (rodada 3) — tipo de serviço personalizado: só os campos conhecidos, nome de 1 a 60
+    // caracteres, valor sugerido opcional (centavos, até R$ 1.000.000,00). Pode ser excluído.
+    function validServiceType() {
+      let r = request.resource.data;
+      return r.deleted == true || (
+        r.data.keys().hasOnly(['id', 'name', 'price', 'pinned', 'order', 'createdAt', 'updatedAt'])
+        && r.data.name is string && r.data.name.size() > 0 && r.data.name.size() <= 60
+        && (r.data.price == null || (r.data.price is int && r.data.price > 0 && r.data.price <= 100000000))
+        && r.data.pinned is bool
+        && r.data.order is int && r.data.order >= 0 && r.data.order <= 100000
+        && r.data.createdAt is string && r.data.updatedAt is string);
+    }
+
     // Revisão: criação começa em 1; atualização exige exatamente +1
     // (controle de concorrência: evita sobrescrever alterações de outro aparelho).
     function validRev() {
@@ -63,7 +76,7 @@ service cloud.firestore {
         && request.resource.data.deviceId.size() <= 64
         && validRev();
 
-      // Registros: clientes, serviços, lançamentos, XP e conquistas.
+      // Registros: clientes, serviços, lançamentos, XP, conquistas, selos, foto e tipos de serviço.
       match /records/{recordId} {
         allow read: if isOwner(uid);
         // Selo permanente não pode ser apagado sozinho (excluir e recriar baixaria o estágio).
@@ -72,7 +85,7 @@ service cloud.firestore {
           && (!recordId.matches('sealAwards__.*') || !exists(/databases/$(database)/documents/users/$(uid)));
         allow create, update: if isOwner(uid)
           && request.resource.data.keys().hasOnly(['collection', 'id', 'data', 'deleted', 'rev', 'updatedAt', 'deviceId'])
-          && request.resource.data.collection in ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages']
+          && request.resource.data.collection in ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages', 'serviceTypes']
           && request.resource.data.id is string
           && request.resource.data.id.size() <= 128
           && recordId == request.resource.data.collection + '__' + request.resource.data.id
@@ -85,7 +98,8 @@ service cloud.firestore {
           && request.resource.data.deviceId.size() <= 64
           && validRev()
           && (request.resource.data.collection != 'sealAwards' || validSealAward())
-          && (request.resource.data.collection != 'profileImages' || validProfileImage());
+          && (request.resource.data.collection != 'profileImages' || validProfileImage())
+          && (request.resource.data.collection != 'serviceTypes' || validServiceType());
       }
 
       // Direitos Premium (futuro): somente leitura pelo app. A gravação será feita

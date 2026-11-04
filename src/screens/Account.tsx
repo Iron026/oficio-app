@@ -146,8 +146,8 @@ export function SyncSheet({ open, onClose }: { open: boolean; onClose: () => voi
           <ul className="space-y-1.5">
             <li className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />Perfil, clientes, agenda, finanças, XP, missões e conquistas{linked ? '' : ' (quando você conectar a conta)'}</li>
             {sealsPhotoSyncEnabled()
-              ? <li className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />Foto de perfil e selos</li>
-              : <li className="flex gap-2 text-muted"><Smartphone size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Foto de perfil e selos: <b className="text-fg">só neste aparelho e no backup</b> nesta versão</span></li>}
+              ? <li className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />Foto de perfil, selos e tipos de serviço</li>
+              : <li className="flex gap-2 text-muted"><Smartphone size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Foto de perfil, selos e tipos de serviço: <b className="text-fg">só neste aparelho e no backup</b> nesta versão</span></li>}
           </ul>
         </div>
         <div className="grid gap-2">
@@ -262,7 +262,7 @@ function LinkSheet({ analysis, onDone }: { analysis: LinkAnalysis; onDone: () =>
           <p>
             Ao conectar, uma cópia dos seus dados do Ofício (perfil, clientes, serviços, receitas e despesas, metas, XP, missões e conquistas{sealsPhotoSyncEnabled() ? ', selos e foto de perfil' : ''}) passa a ser guardada na
             nuvem, vinculada à sua conta Google, para você recuperá-los em outro aparelho.
-            {!sealsPhotoSyncEnabled() && ' Nesta versão, selos e foto de perfil ficam só neste aparelho e no arquivo de backup.'}
+            {!sealsPhotoSyncEnabled() && ' Nesta versão, selos, foto de perfil e tipos de serviço ficam só neste aparelho e no arquivo de backup.'}
           </p>
         )}
         <div className="flex gap-2">

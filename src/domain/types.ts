@@ -143,6 +143,22 @@ export interface AppData {
   sealAwards: SealAward[];
   /** 0.4: foto de perfil (no máximo um registro, id "atual"). */
   profileImages: ProfileImage[];
+  /** 0.4 (rodada 3): tipos de serviço da pessoa (atalhos na agenda), editáveis e fixáveis. */
+  serviceTypes: ServiceType[];
+}
+
+/** Tipo de serviço personalizado: atalho de nome e valor sugerido no agendamento. */
+export interface ServiceType {
+  id: string;
+  name: string;
+  /** Valor sugerido em centavos (null = sem valor sugerido). */
+  price: number | null;
+  /** Fixado: aparece primeiro na agenda. */
+  pinned: boolean;
+  /** Ordem manual (menor primeiro). */
+  order: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = { theme: 'system' };

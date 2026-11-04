@@ -286,9 +286,46 @@ describe('regras 0.4: foto de perfil (profileImages)', () => {
   });
 });
 
+describe('regras 0.4: tipos de serviço (serviceTypes)', () => {
+  const st = (over: Record<string, unknown> = {}, data: Record<string, unknown> = {}) => ({
+    collection: 'serviceTypes', id: 's1', deleted: false, rev: 1, updatedAt: serverTimestamp(), deviceId: 'dev-1',
+    data: { id: 's1', name: 'Hora de trabalho', price: 8000, pinned: true, order: 0, createdAt: 'x', updatedAt: 'y', ...data },
+    ...over,
+  });
+  const ref = (uid: string | null, id = 's1') => doc(db(uid), `users/alice/records/serviceTypes__${id}`);
+
+  it('somente o dono lê e grava; visitante e outra conta não', async () => {
+    await assertSucceeds(setDoc(ref('alice'), st()));
+    await assertSucceeds(getDoc(ref('alice')));
+    await assertFails(getDoc(ref('bob')));
+    await assertFails(setDoc(ref('bob', 's2'), st({ id: 's2' }, { id: 's2' })));
+    await assertFails(getDoc(ref(null)));
+  });
+
+  it('aceita sem valor sugerido; recusa nome vazio ou longo, valor inválido e campos extras', async () => {
+    await assertSucceeds(setDoc(ref('alice'), st({}, { price: null })));
+    await env.clearFirestore();
+    for (const name of ['', 'x'.repeat(61), 42]) await assertFails(setDoc(ref('alice'), st({}, { name })));
+    for (const price of [0, -100, 100_000_001, 12.5, '80,00']) await assertFails(setDoc(ref('alice'), st({}, { price })));
+    await assertFails(setDoc(ref('alice'), st({}, { pinned: 'sim' })));
+    await assertFails(setDoc(ref('alice'), st({}, { order: -1 })));
+    await assertFails(setDoc(ref('alice'), st({}, { xp: 100 })));
+    await assertFails(setDoc(ref('alice'), st({}, { id: 'outro' }))); // id do dado diferente do registro
+  });
+
+  it('pode ser editado (revisão +1) e excluído pelo dono', async () => {
+    await assertSucceeds(setDoc(ref('alice'), st()));
+    await assertFails(setDoc(ref('alice'), st({ rev: 3 }, { name: 'Pulou revisão' })));
+    await assertSucceeds(setDoc(ref('alice'), st({ rev: 2 }, { name: 'Diária', pinned: false })));
+    await assertSucceeds(setDoc(ref('alice'), { ...st({ rev: 3 }), deleted: true, data: null }));
+    await assertFails(deleteDoc(doc(db('bob'), 'users/alice/records/serviceTypes__s1')));
+    await assertSucceeds(deleteDoc(ref('alice')));
+  });
+});
+
 describe('sincronização 0.4 real (emulador, coleções novas ativadas)', () => {
   const NOW = new Date(2026, 10, 4, 10);
-  const V04 = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages'] as const;
+  const V04 = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages', 'serviceTypes'] as const;
   async function device(uid: string) {
     const tracked = new TrackedStorage(createMemoryAdapter());
     const service = await AppService.load(tracked, () => NOW);
@@ -302,6 +339,9 @@ describe('sincronização 0.4 real (emulador, coleções novas ativadas)', () =>
     await a.service.completeOnboarding({ name: 'Alice', businessName: '', professionId: 'beleza' });
     for (let i = 0; i < 20; i++) await a.service.saveClient({ name: `C${i}`, phone: '', email: '', address: '', notes: '' });
     await a.service.setProfileImage(photo);
+    const hora = await a.service.saveServiceType({ name: 'Hora de trabalho', price: '80,00' });
+    await a.service.setServiceTypePinned(hora.id, true);
+    await a.service.saveServiceType({ name: 'Visita sem valor', price: '' });
     const xpBefore = totalXp(a.service.data.xpEvents);
     expect(a.service.data.sealAwards.find((s) => s.id === 'carteira')?.stage).toBe(1);
     await a.sync.setUser('alice');
@@ -314,6 +354,7 @@ describe('sincronização 0.4 real (emulador, coleções novas ativadas)', () =>
     expect(b.service.data.profileImages[0]?.hash).toBe('h1');
     expect(b.service.data.sealAwards.find((s) => s.id === 'carteira')?.stage).toBe(1);
     expect(totalXp(b.service.data.xpEvents)).toBe(xpBefore);
+    expect(b.service.data.serviceTypes.map((t) => [t.name, t.price, t.pinned]).sort()).toEqual([['Hora de trabalho', 8000, true], ['Visita sem valor', null, false]]);
 
     // Documento da foto: tamanho real no servidor (base64 + campos) fica abaixo de 90 KB.
     const snap = await getDoc(doc(db('alice'), 'users/alice/records/profileImages__atual'));

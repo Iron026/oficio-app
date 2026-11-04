@@ -1,4 +1,4 @@
-import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
+import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, ServiceType, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
 
 export interface EntityStore<T extends { id: string }> {
   list(): Promise<T[]>;
@@ -23,6 +23,7 @@ export interface StorageAdapter {
   achievements: EntityStore<UnlockedAchievement>;
   sealAwards: EntityStore<SealAward>;
   profileImages: EntityStore<ProfileImage>;
+  serviceTypes: EntityStore<ServiceType>;
   getProfile(): Promise<Profile | null>;
   saveProfile(profile: Profile): Promise<void>;
   getSettings(): Promise<Settings>;
@@ -41,5 +42,5 @@ export interface StorageAdapter {
   kvKeys(prefix?: string): Promise<string[]>;
 }
 
-export const ENTITY_STORES = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages'] as const;
+export const ENTITY_STORES = ['clients', 'appointments', 'transactions', 'xpEvents', 'achievements', 'sealAwards', 'profileImages', 'serviceTypes'] as const;
 export type EntityStoreName = (typeof ENTITY_STORES)[number];

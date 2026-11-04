@@ -1,3 +1,4 @@
+import { isValidServiceType } from '../domain/serviceTypes';
 import type { AppData } from '../domain/types';
 import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
 import { newId } from '../lib/id';
@@ -98,16 +99,17 @@ export function defaultSyncCollections(env: Record<string, string | boolean | un
   return sealsPhotoSyncEnabled(env) ? [...BASE_SYNC_COLLECTIONS, ...V04_SYNC_COLLECTIONS] : BASE_SYNC_COLLECTIONS;
 }
 
-/** Defesa extra (as regras do Firestore já validam): selo ou foto malformados vindos da nuvem são ignorados. */
+/** Defesa extra (as regras do Firestore já validam): selo, foto ou tipo de serviço malformados vindos da nuvem são ignorados. */
 function validRemote(r: RemoteRecord): boolean {
   if (r.data === null) return true;
   if (r.collection === 'sealAwards') return isValidSealAward(r.data);
   if (r.collection === 'profileImages') return isValidProfileImage(r.data);
+  if (r.collection === 'serviceTypes') return isValidServiceType(r.data);
   return true;
 }
 
 function remoteToData(records: RemoteRecord[], meta: RemoteMeta | null, fallbackSettings: AppData['settings']): AppData {
-  const data: AppData = { profile: meta?.data.profile ?? null, settings: meta?.data.settings ?? fallbackSettings, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [] };
+  const data: AppData = { profile: meta?.data.profile ?? null, settings: meta?.data.settings ?? fallbackSettings, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [], sealAwards: [], profileImages: [], serviceTypes: [] };
   for (const r of records) if (r.data) (data[r.collection] as unknown as Entity[]).push(clone(r.data));
   return data;
 }

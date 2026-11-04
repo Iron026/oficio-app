@@ -74,7 +74,7 @@ export function Chip({ children, onClick, active }: { children: ReactNode; onCli
       onClick={onClick}
       aria-pressed={active}
       className={cx(
-        'shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+        'inline-flex min-h-10 max-w-full shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-left text-sm font-medium transition-colors [overflow-wrap:anywhere]',
         active ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200' : 'border-line bg-surface text-fg hover:bg-surface-2',
       )}
     >
