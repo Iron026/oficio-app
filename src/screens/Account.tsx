@@ -38,7 +38,7 @@ const toneClass = {
   ok: 'text-brand-600 dark:text-brand-300',
   busy: 'text-sky-600 dark:text-sky-300',
   wait: 'text-amber-600 dark:text-amber-300',
-  error: 'text-red-600 dark:text-red-400',
+  error: 'text-red-700 dark:text-red-400',
   off: 'text-muted',
 };
 
@@ -432,7 +432,7 @@ export function AccountSection() {
                 {sync.lastSyncedAt ? `Último backup confirmado na nuvem: ${fmtDateTime(sync.lastSyncedAt)}` : 'Ainda não há backup confirmado na nuvem.'}
                 {sync.pendingCount > 0 && ` · ${sync.pendingCount} alteraç${sync.pendingCount === 1 ? 'ão pendente' : 'ões pendentes'}`}
               </p>
-              {status.state === 'erro' && <p className="mt-1 text-red-600 dark:text-red-400">{status.message}</p>}
+              {status.state === 'erro' && <p className="mt-1 text-red-700 dark:text-red-400">{status.message}</p>}
             </div>
             {sync.conflicts.length > 0 && (
               <button type="button" onClick={() => setConflictsOpen(true)} className="flex w-full items-center gap-2 rounded-xl bg-amber-50 p-3 text-left text-sm text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">

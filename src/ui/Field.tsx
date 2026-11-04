@@ -16,7 +16,7 @@ function FieldWrap({ label, error, hint, children, optional }: Wrap) {
       </label>
       {children({ id, describedBy: error || hint ? msgId : undefined, invalid: !!error })}
       {error ? (
-        <p id={msgId} role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p id={msgId} role="alert" className="text-sm text-red-700 dark:text-red-400">{error}</p>
       ) : hint ? (
         <p id={msgId} className="text-sm text-muted">{hint}</p>
       ) : null}

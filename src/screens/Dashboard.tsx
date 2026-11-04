@@ -46,9 +46,9 @@ export function Dashboard() {
   return (
     <div className="enter-stagger grid gap-[var(--gap-list)]">
       <HeroSlot overlap>
-        <p className="pt-1 text-sm text-white/85">{greeting},</p>
+        <p className="pt-1 text-sm text-on-hero-soft">{greeting},</p>
         <h2 className="font-display text-title-1 font-extrabold leading-tight [overflow-wrap:anywhere]">{firstName}</h2>
-        <p className="mt-0.5 text-sm text-white/80">{[profile.businessName, dateLine].filter(Boolean).join(' · ')}</p>
+        <p className="mt-0.5 text-sm text-on-hero-soft">{[profile.businessName, dateLine].filter(Boolean).join(' · ')}</p>
       </HeroSlot>
 
       <Card className="!p-5 shadow-md">

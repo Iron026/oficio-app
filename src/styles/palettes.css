@@ -1,0 +1,167 @@
+/*
+ * Paletas globais do Ofício (0.4, rodada 5 aprovada). Mesmos valores de src/ui/palettes.ts
+ * (o teste src/ui/palettes.test.ts confere os dois arquivos e o contraste WCAG).
+ * Cada paleta muda a marca inteira: escala brand-* (botões, abas, navegação, links, seleções,
+ * superfícies tonalizadas, foco) e o cabeçalho (--hero-*), no claro e no escuro.
+ * NÃO mudam: receita, despesa, XP, alertas, medalhões de categoria, molduras e selos.
+ */
+:root, :root[data-accent="petroleo"] {
+  --color-brand-50: #effcf9;
+  --color-brand-100: #c9f5ec;
+  --color-brand-200: #94e9d9;
+  --color-brand-300: #57d4c0;
+  --color-brand-400: #2cb9a6;
+  --color-brand-500: #15998a;
+  --color-brand-600: #0f7b71;
+  --color-brand-700: #0f625b;
+  --color-brand-800: #114f4a;
+  --color-brand-900: #12413e;
+  --hero-1: #0f7b71;
+  --hero-2: #0d4f4a;
+  --hero-glow: rgb(87 212 192 / 0.35);
+}
+:root.dark, :root.dark[data-accent="petroleo"] {
+  --hero-1: #0f5c55;
+  --hero-2: #0a2b29;
+  --hero-glow: rgb(87 212 192 / 0.18);
+}
+:root[data-accent="oceano"] {
+  --color-brand-50: #ecf8fb;
+  --color-brand-100: #cdeef6;
+  --color-brand-200: #9fdcec;
+  --color-brand-300: #62c2dc;
+  --color-brand-400: #2ea3c4;
+  --color-brand-500: #1488aa;
+  --color-brand-600: #0f6d8c;
+  --color-brand-700: #105872;
+  --color-brand-800: #11485e;
+  --color-brand-900: #103c4f;
+  --hero-1: #0f6d8c;
+  --hero-2: #0c4a60;
+  --hero-glow: rgb(98 194 220 / 0.35);
+}
+:root.dark[data-accent="oceano"] {
+  --hero-1: #0d5670;
+  --hero-2: #08283a;
+  --hero-glow: rgb(98 194 220 / 0.18);
+}
+:root[data-accent="safira"] {
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #dbe3fe;
+  --color-brand-200: #bccbfc;
+  --color-brand-300: #93a9f8;
+  --color-brand-400: #6a83f0;
+  --color-brand-500: #4a63e4;
+  --color-brand-600: #3a4cc9;
+  --color-brand-700: #313fa3;
+  --color-brand-800: #2c3882;
+  --color-brand-900: #283268;
+  --hero-1: #3a4cc9;
+  --hero-2: #232c7a;
+  --hero-glow: rgb(147 169 248 / 0.35);
+}
+:root.dark[data-accent="safira"] {
+  --hero-1: #2c3a9c;
+  --hero-2: #141b4a;
+  --hero-glow: rgb(147 169 248 / 0.18);
+}
+:root[data-accent="indigo"] {
+  --color-brand-50: #f0f0fd;
+  --color-brand-100: #e0dffb;
+  --color-brand-200: #c6c3f6;
+  --color-brand-300: #aaa4f0;
+  --color-brand-400: #8a82e6;
+  --color-brand-500: #6c63d6;
+  --color-brand-600: #5249b8;
+  --color-brand-700: #433c94;
+  --color-brand-800: #373277;
+  --color-brand-900: #2e2a60;
+  --hero-1: #5249b8;
+  --hero-2: #2f2a70;
+  --hero-glow: rgb(170 164 240 / 0.35);
+}
+:root.dark[data-accent="indigo"] {
+  --hero-1: #3f3891;
+  --hero-2: #1b1844;
+  --hero-glow: rgb(170 164 240 / 0.18);
+}
+:root[data-accent="ameixa"] {
+  --color-brand-50: #faf1fb;
+  --color-brand-100: #f3def6;
+  --color-brand-200: #e7bdee;
+  --color-brand-300: #d593e0;
+  --color-brand-400: #bd68cb;
+  --color-brand-500: #a04bb0;
+  --color-brand-600: #843b93;
+  --color-brand-700: #6c3278;
+  --color-brand-800: #582b61;
+  --color-brand-900: #49254f;
+  --hero-1: #843b93;
+  --hero-2: #4a1f55;
+  --hero-glow: rgb(213 147 224 / 0.35);
+}
+:root.dark[data-accent="ameixa"] {
+  --hero-1: #682e75;
+  --hero-2: #2a1131;
+  --hero-glow: rgb(213 147 224 / 0.18);
+}
+:root[data-accent="vinho"] {
+  --color-brand-50: #fdf2f5;
+  --color-brand-100: #fbe1e8;
+  --color-brand-200: #f6c2d0;
+  --color-brand-300: #ee96ad;
+  --color-brand-400: #e06386;
+  --color-brand-500: #c93f67;
+  --color-brand-600: #a92f55;
+  --color-brand-700: #8c2849;
+  --color-brand-800: #742440;
+  --color-brand-900: #622139;
+  --hero-1: #a02c51;
+  --hero-2: #5a1830;
+  --hero-glow: rgb(238 150 173 / 0.35);
+}
+:root.dark[data-accent="vinho"] {
+  --hero-1: #7e2342;
+  --hero-2: #330c1b;
+  --hero-glow: rgb(238 150 173 / 0.18);
+}
+:root[data-accent="grafite"] {
+  --color-brand-50: #f3f6f7;
+  --color-brand-100: #e3e9eb;
+  --color-brand-200: #c9d3d6;
+  --color-brand-300: #a7b5ba;
+  --color-brand-400: #7f9096;
+  --color-brand-500: #5f7178;
+  --color-brand-600: #4a5a61;
+  --color-brand-700: #3c4a50;
+  --color-brand-800: #323e43;
+  --color-brand-900: #2a3438;
+  --hero-1: #45555c;
+  --hero-2: #252f34;
+  --hero-glow: rgb(167 181 186 / 0.35);
+}
+:root.dark[data-accent="grafite"] {
+  --hero-1: #36444a;
+  --hero-2: #161d20;
+  --hero-glow: rgb(167 181 186 / 0.18);
+}
+:root[data-accent="oliva"] {
+  --color-brand-50: #f7f8ec;
+  --color-brand-100: #edefd1;
+  --color-brand-200: #dcdfa6;
+  --color-brand-300: #c3c771;
+  --color-brand-400: #a7ab48;
+  --color-brand-500: #8a8e31;
+  --color-brand-600: #6e7226;
+  --color-brand-700: #575a21;
+  --color-brand-800: #47491f;
+  --color-brand-900: #3c3e1d;
+  --hero-1: #666a25;
+  --hero-2: #383a17;
+  --hero-glow: rgb(195 199 113 / 0.35);
+}
+:root.dark[data-accent="oliva"] {
+  --hero-1: #4f521f;
+  --hero-2: #21220d;
+  --hero-glow: rgb(195 199 113 / 0.18);
+}

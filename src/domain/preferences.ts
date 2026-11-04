@@ -23,7 +23,7 @@ export interface DevicePrefs {
 }
 
 export const DEVICE_PREFS_KEY = 'prefs:device:v1';
-export const ACCENTS: readonly AccentId[] = ['petroleo', 'oceano', 'indigo', 'grafite'];
+export const ACCENTS: readonly AccentId[] = ['petroleo', 'oceano', 'safira', 'indigo', 'ameixa', 'vinho', 'grafite', 'oliva'];
 const THEMES: readonly ThemePreference[] = ['system', 'light', 'dark'];
 
 export const DEFAULT_DEVICE_PREFS: DevicePrefs = { version: 1, theme: 'system', density: 'confortavel', hideValues: false, motion: 'sistema' };

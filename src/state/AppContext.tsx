@@ -1,4 +1,5 @@
 import { useCelebration } from '../ui/celebrationContext';
+import { syncThemeColorMeta, writeAppearanceCache } from '../ui/appearance';
 import { getSeal, ROMAN } from '../gamification/seals';
 import { createContext, useCallback, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { getProfession, type ProfessionModule } from '../domain/professions';
@@ -47,7 +48,10 @@ export function useAppearanceEffect(settings: Settings, prefs: DevicePrefs) {
     el.dataset.density = prefs.density;
     if (prefs.motion === 'reduzir') el.dataset.motion = 'reduce';
     else delete el.dataset.motion;
-  }, [accent, prefs.density, prefs.motion]);
+    // Cópia de exibição para a próxima abertura já começar com a paleta e o tema certos.
+    writeAppearanceCache({ accent, theme: prefs.theme });
+    syncThemeColorMeta();
+  }, [accent, prefs.density, prefs.motion, prefs.theme]);
 }
 
 /** Converte o resultado da gamificação em feedback visual (toasts). */
@@ -125,7 +129,7 @@ export function useThemeEffect(theme: DevicePrefs['theme']) {
       } else {
         void setSystemBarsDark(systemBarsShouldBeDark(dark, systemDark, inset));
       }
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b1316' : '#0f7b71');
+      syncThemeColorMeta();
     };
     apply();
     // O Capacitor injeta as áreas seguras após o carregamento: reavalia depois.

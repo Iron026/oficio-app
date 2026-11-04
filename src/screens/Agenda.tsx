@@ -37,7 +37,7 @@ export function Agenda() {
   return (
     <div>
       <HeroSlot>
-        <p className="pt-1 text-sm text-white/85">{todayLine}</p>
+        <p className="pt-1 text-sm text-on-hero-soft">{todayLine}</p>
         <div className="mt-3">
           <Segmented
             onHero

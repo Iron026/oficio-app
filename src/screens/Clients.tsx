@@ -42,17 +42,17 @@ export function Clients() {
   return (
     <div>
       <HeroSlot>
-        <p className="pt-1 text-sm text-white/85">{data.clients.length} {data.clients.length === 1 ? t.client.toLowerCase() : t.clients.toLowerCase()} na carteira</p>
+        <p className="pt-1 text-sm text-on-hero-soft">{data.clients.length} {data.clients.length === 1 ? t.client.toLowerCase() : t.clients.toLowerCase()} na carteira</p>
         {data.clients.length > 0 && (
           <label className="relative mt-3 block">
             <span className="sr-only">Buscar cliente</span>
-            <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/80" aria-hidden="true" />
+            <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-on-hero-soft" aria-hidden="true" />
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar por nome ou telefone"
-              className="h-12 w-full rounded-xl border border-white/25 bg-white/12 pl-10 pr-3 text-base text-white placeholder:text-white/75 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/40"
+              className="h-12 w-full rounded-xl border border-white/30 bg-on-hero-fill pl-10 pr-3 text-base text-white placeholder:text-on-hero-soft focus:border-white focus:outline-none focus:ring-2 focus:ring-white/40"
             />
           </label>
         )}

@@ -11,7 +11,7 @@ import { cx } from '../ui/cx';
 export function Logo({ size = 32, onHero }: { size?: number; onHero?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label="Ofício">
-      <rect width="64" height="64" rx="16" fill={onHero ? 'rgb(255 255 255 / 0.16)' : '#0f7b71'} />
+      <rect width="64" height="64" rx="16" fill={onHero ? 'rgb(255 255 255 / 0.16)' : 'var(--color-brand-600)'} />
       <path d="M18 42 32 18l14 24" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="32" cy="44" r="4" fill="#fbbf24" />
     </svg>

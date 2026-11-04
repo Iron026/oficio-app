@@ -461,6 +461,58 @@ try {
       await ctx.close();
     }
   }
+  // Rodada 5: as 8 paletas nas telas principais, num formulário com erros e na reabertura
+  // (sem piscar o Petróleo). Celular 360 (Galaxy S26), claro e escuro; axe em todas.
+  const PALETTE_NAMES = { petroleo: 'Petróleo', oceano: 'Oceano', safira: 'Safira', indigo: 'Índigo', ameixa: 'Ameixa', vinho: 'Vinho', grafite: 'Grafite', oliva: 'Oliva' };
+  if (!ONLY || ONLY.split(',').includes('celular-360')) {
+    const vp = VIEWPORTS[0];
+    for (const theme of THEMES) {
+      console.log(`• ${vp.id} · ${theme} · 8 paletas`);
+      const { ctx, page } = await newPage(vp, theme);
+      await seed(page);
+      for (const [id, name] of Object.entries(PALETTE_NAMES)) {
+        await page.goto(BASE + '#/ajustes');
+        await page.getByRole('radio', { name: new RegExp(`^${name}`) }).click();
+        await page.waitForFunction((a) => document.documentElement.dataset.accent === a, id);
+        for (const s of SCREENS) {
+          await page.goto(BASE + s.hash);
+          await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+          await capture(page, vp, theme, `paleta-${id}-${s.id}`);
+        }
+        // Formulário com erros de validação (campos, mensagens, botão desabilitado ao salvar).
+        await page.goto(BASE + '#/financas');
+        await page.getByRole('button', { name: /^receita$/i }).first().click();
+        const tx = page.getByRole('dialog');
+        await tx.getByRole('button', { name: /registrar/i }).click();
+        await tx.getByRole('alert').first().waitFor();
+        await capture(page, vp, theme, `paleta-${id}-formulario-erros`);
+        await page.keyboard.press('Escape');
+        await tx.waitFor({ state: 'detached' });
+        // Reabertura com o JavaScript do app bloqueado: só o script do <head> roda.
+        await page.route(/\/assets\/index-[^/]+\.js$/, (r) => r.abort());
+        await page.reload();
+        const first = await page.evaluate(() => ({
+          accent: document.documentElement.dataset.accent,
+          dark: document.documentElement.classList.contains('dark'),
+          hero: getComputedStyle(document.documentElement).getPropertyValue('--hero-1').trim(),
+          bar: document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
+        }));
+        await page.unroute(/\/assets\/index-[^/]+\.js$/);
+        if (first.accent !== id) fail(`${theme}/${id}: reabertura pinta com a paleta "${first.accent ?? 'padrão'}" antes do app carregar`);
+        if (first.dark !== (theme === 'escuro')) fail(`${theme}/${id}: reabertura pinta com o tema errado antes do app carregar`);
+        if (first.bar !== first.hero) fail(`${theme}/${id}: barra do sistema ${first.bar} difere do cabeçalho ${first.hero} na reabertura`);
+        report.reabertura = report.reabertura ?? [];
+        report.reabertura.push({ tema: theme, paleta: id, ...first });
+        await page.reload();
+        await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      }
+      // Volta ao padrão: a escolha do Petróleo também precisa funcionar.
+      await page.goto(BASE + '#/ajustes');
+      await page.getByRole('radio', { name: /^Petróleo/ }).click();
+      await page.waitForFunction(() => document.documentElement.dataset.accent === 'petroleo');
+      await ctx.close();
+    }
+  }
 } finally {
   await browser.close();
   stopServer();

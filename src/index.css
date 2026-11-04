@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import './styles/palettes.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -106,6 +107,9 @@
   --line: #d8e1e3;
   --income: #147a3a;
   --expense: #b3401a;
+  /* Texto secundário e campos sobre o cabeçalho (--hero-*): contraste ≥ 4,5:1 nas 8 paletas. */
+  --on-hero-soft: rgb(255 255 255 / 0.95);
+  --on-hero-fill: rgb(0 0 0 / 0.16);
   color-scheme: light;
 }
 .dark {
@@ -117,6 +121,7 @@
   --line: #2a3d43;
   --income: #4ade80;
   --expense: #f4846a;
+  --on-hero-soft: rgb(255 255 255 / 0.85);
   color-scheme: dark;
 }
 
@@ -129,6 +134,8 @@
   --color-line: var(--line);
   --color-income: var(--income);
   --color-expense: var(--expense);
+  --color-on-hero-soft: var(--on-hero-soft);
+  --color-on-hero-fill: var(--on-hero-fill);
 }
 
 html {
@@ -184,34 +191,12 @@ input, select, textarea, button { font: inherit; }
 
 /* ---------------------------------------------------------------- 0.4: identidade global */
 
-/* Cores de destaque: só a marca muda. Receita, despesa, XP, logo e cabeçalho não mudam. */
-:root[data-accent="oceano"] {
-  --color-brand-50: #eff6ff; --color-brand-100: #dbeafe; --color-brand-200: #bfdbfe; --color-brand-300: #8cbcf2; --color-brand-400: #5b9ae6;
-  --color-brand-500: #2f78d0; --color-brand-600: #1d5fa8; --color-brand-700: #174d89; --color-brand-800: #163f6e; --color-brand-900: #15355b;
-}
-:root[data-accent="indigo"] {
-  --color-brand-50: #f0f0fd; --color-brand-100: #e0dffb; --color-brand-200: #c6c3f6; --color-brand-300: #aaa4f0; --color-brand-400: #8a82e6;
-  --color-brand-500: #6c63d6; --color-brand-600: #4f46b5; --color-brand-700: #3f3891; --color-brand-800: #342f74; --color-brand-900: #2c285e;
-}
-:root[data-accent="grafite"] {
-  --color-brand-50: #f3f6f7; --color-brand-100: #e3e9eb; --color-brand-200: #c9d3d6; --color-brand-300: #b7c6cc; --color-brand-400: #8fa1a8;
-  --color-brand-500: #64767e; --color-brand-600: #3d4d55; --color-brand-700: #2d3a40; --color-brand-800: #232e33; --color-brand-900: #1b2428;
-}
-
-/* Cabeçalho de identidade: sempre verde-petróleo (é a marca), com brilho suave no canto. */
+/* Cabeçalho (--hero-*) e escala da marca vêm da paleta escolhida (styles/palettes.css). */
 :root {
-  --hero-1: #0f7b71;
-  --hero-2: #0d4f4a;
-  --hero-glow: rgb(87 212 192 / 0.35);
   /* Densidade (Ajustes › Aparência): só espaçamentos; áreas de toque continuam ≥ 44 px. */
   --gap-list: 0.625rem;
   --gap-section: 1.5rem;
   --pad-card: 1rem;
-}
-.dark {
-  --hero-1: #0f5c55;
-  --hero-2: #0a2b29;
-  --hero-glow: rgb(87 212 192 / 0.18);
 }
 :root[data-density="compacta"] {
   --gap-list: 0.375rem;
@@ -288,4 +273,15 @@ input, select, textarea, button { font: inherit; }
   0% { opacity: 0; transform: scale(0.4); }
   60% { opacity: 1; transform: scale(1.12); }
   100% { transform: scale(1); }
+}
+
+/* Troca de paleta (rodada 5): esmaecimento único de 240 ms; sem View Transitions, cor só durante a troca. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 240ms; animation-timing-function: var(--ease-standard); }
+.palette-switching, .palette-switching * {
+  transition: background-color 240ms var(--ease-standard), color 240ms var(--ease-standard), border-color 240ms var(--ease-standard), fill 240ms var(--ease-standard), stroke 240ms var(--ease-standard) !important;
+}
+:root[data-motion="reduce"]::view-transition-old(root), :root[data-motion="reduce"]::view-transition-new(root) { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  .palette-switching, .palette-switching * { transition: none !important; }
 }

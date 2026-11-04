@@ -24,7 +24,7 @@ export interface Profile {
 }
 
 /** Cores de destaque (0.4). Mudam só a marca; receita, despesa e XP não mudam. */
-export type AccentId = 'petroleo' | 'oceano' | 'indigo' | 'grafite';
+export type AccentId = 'petroleo' | 'oceano' | 'safira' | 'indigo' | 'ameixa' | 'vinho' | 'grafite' | 'oliva';
 
 /** Imagem do perfil escolhida (a foto em si fica em `profileImages`). */
 export type AvatarChoice = { kind: 'iniciais' } | { kind: 'interno'; id: string } | { kind: 'foto' };

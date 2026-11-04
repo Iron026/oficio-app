@@ -56,18 +56,18 @@ export function Evolution() {
             <span className="absolute -bottom-1 -right-2 drop-shadow-[0_2px_3px_rgb(0_0_0/0.35)]"><CategoryMedal tier={tier} size={40} decorative /></span>
           </span>
           <div className="min-w-0">
-            <p className="font-display text-xs font-bold uppercase tracking-[0.1em] text-white/85">{tier.name} · Nível</p>
+            <p className="font-display text-xs font-bold uppercase tracking-[0.1em] text-on-hero-soft">{tier.name} · Nível</p>
             <h2 className="flex flex-wrap items-baseline gap-x-2 leading-none">
               <span className="num font-display text-[2.5rem] font-extrabold">{lv.level}</span>
               <span className="font-display text-lg font-bold leading-tight">{lv.title}</span>
             </h2>
-            <p className="mt-1 text-sm text-white/85"><span className="num">{fmt(lv.totalXp)}</span> XP acumulados</p>
+            <p className="mt-1 text-sm text-on-hero-soft"><span className="num">{fmt(lv.totalXp)}</span> XP acumulados</p>
           </div>
         </div>
         <div role="progressbar" aria-label="Progresso para o próximo nível" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(lv.progress * 100)} className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-white/20">
           <div className="bar-fill h-full w-full rounded-full bg-gradient-to-r from-xp-400 to-xp-500" style={{ transform: `scaleX(${Math.min(1, Math.max(0, lv.progress))})` }} />
         </div>
-        <p className="mt-1.5 flex justify-between gap-3 text-[0.8125rem] text-white/90">
+        <p className="mt-1.5 flex justify-between gap-3 text-[0.8125rem] text-on-hero-soft">
           <span className="num">{fmt(lv.xpIntoLevel)} / {fmt(lv.xpForNext)} XP</span>
           <span>nível <span className="num">{lv.level + 1}</span> em <span className="num">{fmt(totalXpForLevel(lv.level + 1))}</span> XP</span>
         </p>
@@ -115,7 +115,7 @@ function TierTrail({ current, level, onReplay }: { current: Tier; level: number;
   return (
     <div className="relative px-0.5 pt-1">
       <div aria-hidden="true" className="absolute left-6 right-6 top-[1.6rem] h-1 rounded-full bg-line">
-        <div className="bar-fill h-full w-full rounded-full bg-brand-500" style={{ transform: `scaleX(${idx / (TIERS.length - 1)})` }} />
+        <div className="bar-fill h-full w-full rounded-full bg-brand-500 dark:bg-brand-400" style={{ transform: `scaleX(${idx / (TIERS.length - 1)})` }} />
       </div>
       <ol aria-label={`Categorias: ${tierLabel(current)}`} className="relative flex justify-between">
         {TIERS.map((t, i) => {
@@ -335,7 +335,7 @@ function HistoryTab() {
           {history.map((h) => (
             <div key={h.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
               <div className="flex h-full w-full items-end justify-center gap-0.5">
-                <div className="bar-rise h-full w-1/3 rounded-t bg-brand-500" style={{ transform: `scaleY(${barScale(h.income, maxBar)})` }} />
+                <div className="bar-rise h-full w-1/3 rounded-t bg-brand-500 dark:bg-brand-400" style={{ transform: `scaleY(${barScale(h.income, maxBar)})` }} />
                 <div className="bar-rise h-full w-1/3 rounded-t bg-orange-400" style={{ transform: `scaleY(${barScale(h.expense, maxBar)})` }} />
               </div>
               <span className="text-xs capitalize text-muted">{monthLabel(h.month, true)}</span>
@@ -343,7 +343,7 @@ function HistoryTab() {
           ))}
         </div>
         <div className="mt-3 flex gap-4 text-xs text-muted">
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-500" />Receitas</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-500 dark:bg-brand-400" />Receitas</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-400" />Despesas</span>
         </div>
       </Card>

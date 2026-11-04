@@ -8,6 +8,20 @@
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>Ofício</title>
+    <script>
+      // Aparência antes do app carregar (cópia de exibição; ver src/ui/appearance.ts).
+      (function () {
+        try {
+          var v = JSON.parse(localStorage.getItem('oficio:aparencia') || 'null');
+          if (!v) return;
+          var r = document.documentElement;
+          if (/^[a-z]+$/.test(v.accent)) r.setAttribute('data-accent', v.accent);
+          var dark = v.theme === 'dark' || (v.theme === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) r.classList.add('dark');
+          if (/^#[0-9a-f]{6}$/i.test(v.bar)) document.querySelector('meta[name="theme-color"]').setAttribute('content', v.bar);
+        } catch (e) { /* sem cópia: segue o padrão */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

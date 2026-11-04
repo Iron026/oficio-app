@@ -3,7 +3,7 @@ import { Award, Camera, Check, Crown, Database, Download, ExternalLink, FlaskCon
 import { isNative, platformName } from '../platform/native';
 import { PROFESSION_LIST } from '../domain/professions';
 import { accentOf, avatarOf, featuredSealOf } from '../domain/preferences';
-import type { AccentId, ProfessionId, SealId, ThemePreference } from '../domain/types';
+import type { ProfessionId, SealId, ThemePreference } from '../domain/types';
 import { ROMAN, type SealProgress } from '../gamification/seals';
 import { hasErrors, validateProfile, type Errors, type ProfileInput } from '../lib/validation';
 import { CATEGORY_LABEL, FEATURES } from '../monetization/catalog';
@@ -22,6 +22,8 @@ import { SealMedal } from '../ui/SealMedal';
 import { useProfile } from '../state/useProfile';
 import { ProfileImageSheet } from './ProfileImageSheet';
 import { HeroSlot } from './Shell';
+import { PALETTES } from '../ui/palettes';
+import { applyAccentWithTransition } from '../ui/appearance';
 import { sealsPhotoSyncEnabled } from '../sync/features';
 import { Sheet } from '../ui/Sheet';
 import { AccountSection } from './Account';
@@ -35,12 +37,7 @@ export const APP_VERSION = __APP_VERSION__;
 export const PRIVACY_POLICY_URL = 'https://github.com/Iron026/oficio-app/blob/main/docs/PRIVACIDADE.md';
 
 /** Amostras das cores de destaque (tons 500 e 700 de cada paleta em index.css). */
-const ACCENT_OPTIONS: { id: AccentId; label: string; c1: string; c2: string }[] = [
-  { id: 'petroleo', label: 'Petróleo', c1: '#15998a', c2: '#0d4f4a' },
-  { id: 'oceano', label: 'Oceano', c1: '#2f78d0', c2: '#174d89' },
-  { id: 'indigo', label: 'Índigo', c1: '#6c63d6', c2: '#3f3891' },
-  { id: 'grafite', label: 'Grafite', c1: '#64767e', c2: '#2d3a40' },
-];
+const ACCENT_OPTIONS = PALETTES.map((p) => ({ id: p.id, label: p.name, c1: p.scale[5]!, c2: p.hero[1] }));
 
 export function Settings() {
   const { data, service, profession, persistent } = useApp();
@@ -121,13 +118,13 @@ export function Settings() {
         <div className="flex items-center gap-4 pt-1">
           <span className="relative shrink-0">
             <ProfileAvatar data={data} tier={tier} size={76} seal={featured ? { id: featured.def.id, stage: featured.stage } : null} onHero />
-            <button type="button" onClick={() => setSheet('imagem')} aria-label="Alterar imagem de perfil" title="Alterar imagem de perfil" className="press absolute -bottom-1 -left-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--hero-1)] bg-white text-[#0d4f4a] shadow">
+            <button type="button" onClick={() => setSheet('imagem')} aria-label="Alterar imagem de perfil" title="Alterar imagem de perfil" className="press absolute -bottom-1 -left-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--hero-1)] bg-white text-[var(--hero-2)] shadow">
               <Camera size={16} aria-hidden="true" />
             </button>
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-title-2 font-extrabold leading-tight [overflow-wrap:anywhere]">{profile.name}</h2>
-            <p className="mt-0.5 text-sm text-white/85 [overflow-wrap:anywhere]">{[profile.businessName, profession.name].filter(Boolean).join(' · ')}</p>
+            <p className="mt-0.5 text-sm text-on-hero-soft [overflow-wrap:anywhere]">{[profile.businessName, profession.name].filter(Boolean).join(' · ')}</p>
             <TierChip tier={tier} onHero className="mt-1.5" />
           </div>
         </div>
@@ -179,7 +176,7 @@ export function Settings() {
                   type="button"
                   role="radio"
                   aria-checked={active}
-                  onClick={() => service.updateSettings({ accent: a.id }).catch(onError)}
+                  onClick={() => { applyAccentWithTransition(a.id, prefs.motion === 'reduzir' || matchMedia('(prefers-reduced-motion: reduce)').matches); service.updateSettings({ accent: a.id }).catch(onError); }}
                   className={cx('press flex min-h-12 items-center gap-2.5 rounded-xl border-2 px-3 text-left text-sm font-medium', active ? 'border-brand-500' : 'border-line')}
                 >
                   <span className="flex shrink-0 -space-x-1.5" aria-hidden="true">
@@ -192,7 +189,7 @@ export function Settings() {
               );
             })}
           </div>
-          <p className="mt-2 text-xs text-muted">A cor de destaque acompanha sua conta. O topo das telas mantém o verde-petróleo do Ofício; receitas, despesas e XP não mudam de cor.</p>
+          <p className="mt-2 text-xs text-muted">A paleta acompanha sua conta e muda o topo, os botões, a navegação e as seleções. Receitas, despesas, XP, alertas e medalhões de categoria mantêm as cores próprias.</p>
         </div>
         <div>
           <p className="mb-2 text-sm font-semibold">Densidade das listas</p>
