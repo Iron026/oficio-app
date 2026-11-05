@@ -30,11 +30,15 @@ logcat.stdout.pipe(logcatFile);
 logcat.on('error', () => {});
 process.on('exit', () => { try { logcat.kill(); } catch { /* já encerrado */ } });
 const HOST_LOG = `${OUT}/maquina-ci.log`;
+/** Carga de 1 min dentro do Android (2 núcleos no CI); "?" se o aparelho não responder em 3 s. */
+const guestLoad = () => {
+  try { return execFileSync('adb', ['shell', 'cat', '/proc/loadavg'], { encoding: 'utf8', timeout: 3000 }).split(' ')[0]; } catch { return '?'; }
+};
 const sampleHost = () => {
   const mem = sh("free -m | awk '/^Mem:/{print \"usada=\"$3\"MB livre=\"$4\"MB disp=\"$7\"MB\"} /^Swap:/{print \"swap=\"$3\"MB\"}' | tr '\\n' ' '");
   const emu = sh("ps -C qemu-system-x86_64 -o pid=,rss=,pcpu= | awk '{print \"emulador pid=\"$1\" rss=\"int($2/1024)\"MB cpu=\"$3\"%\"}'") || 'emulador: processo ausente';
   const load = sh('cut -d" " -f1-3 /proc/loadavg');
-  appendFileSync(HOST_LOG, `${new Date().toISOString()} ${mem}| ${emu} | carga ${load}\n`);
+  appendFileSync(HOST_LOG, `${new Date().toISOString()} ${mem}| ${emu} | carga ${load} | carga do Android ${guestLoad()}\n`);
 };
 sampleHost();
 const sampler = setInterval(sampleHost, 5000);
@@ -255,6 +259,20 @@ try {
     adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP');
     adb('shell', 'wm', 'dismiss-keyguard');
     await wait(15_000); // deixa o launcher terminar de iniciar
+    // O emulador do CI congelava ~2,5 min depois do boot, quando o teste coincidia com o trabalho
+    // de primeiro boot do Android e do Google Play Services (CPU da máquina saturada). Antes das
+    // etapas, espera o sistema se acalmar: carga do Android ≤ 2,0 em 3 leituras seguidas (5 s).
+    // Limite de 6 min; se não estabilizar, segue assim mesmo e registra. Não muda nenhuma etapa.
+    const start = Date.now();
+    const loads = [];
+    let calm = 0;
+    while (calm < 3 && Date.now() - start < 360_000) {
+      await wait(5000);
+      const load = Number.parseFloat(guestLoad());
+      loads.push(Number.isFinite(load) ? load : null);
+      calm = load <= 2.0 ? calm + 1 : 0;
+    }
+    console.log(`\n  carga do Android após o boot (5 s): ${loads.join(' ')} → ${calm >= 3 ? 'estável' : 'não estabilizou'} em ${Math.round((Date.now() - start) / 1000)} s`);
     adb('shell', 'am', 'broadcast', '-a', 'android.intent.action.CLOSE_SYSTEM_DIALOGS');
   });
 
