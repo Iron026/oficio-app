@@ -26,6 +26,9 @@ computador · 6 acessibilidade, desempenho e entrega. Ver `docs/DESIGN.md`.
 - 0.4.0-beta.6: tela de abertura nativa do Android com a logo A (Android 12+ e anteriores); o aviso com
   "Desfazer" sai ao trocar de tela (em telas pequenas ele podia ficar sobre controles de outra tela);
   checagem automática de toques através dos avisos em 360×640.
+  CI Android: o emulador passou a usar `-gpu swangle` (o `swiftshader_indirect` é obsoleto desde o
+  emulador 36.4.9 e congelava o emulador com qualquer APK, inclusive os anteriores à beta.5); o teste
+  espera o Android se acalmar após o boot e registra memória/CPU da máquina e logcat contínuo.
 
 ## 0.3.1 (manutenção — branch `fix/v0.3.1-maintenance`, aguardando aprovação)
 - Exportar backup no Android: “Salvar no aparelho” pela janela “Salvar como” (Storage Access
