@@ -4,8 +4,8 @@
  * Uso: node e2e/android.e2e.mjs caminho/para/app.apk
  * Requer `adb` no PATH e um emulador/dispositivo conectado.
  */
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync, execSync, spawn } from 'node:child_process';
+import { appendFileSync, createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
 import { _android as android } from 'playwright-core';
 
 const PKG = 'io.github.iron026.oficio';
@@ -13,6 +13,45 @@ const OUT = 'e2e-results';
 const apk = process.argv[2];
 if (!apk) throw new Error('Informe o caminho do APK.');
 mkdirSync(OUT, { recursive: true });
+
+/*
+ * Diagnóstico do emulador que "some" no meio do teste (sem mensagem de erro do emulador).
+ * - logcat contínuo num arquivo: fica o registro do aparelho até o instante da queda;
+ * - a cada 5 s, memória da máquina do CI e memória/CPU do processo do emulador;
+ * - na falha, o log do kernel da máquina (OOM killer, segfault) e se o processo ainda existe.
+ * Nada disso altera o teste nem os tempos limite.
+ */
+const sh = (cmd) => {
+  try { return execSync(cmd, { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim(); } catch (e) { return `(${String(e?.message ?? e).split('\n')[0]})`; }
+};
+const logcatFile = createWriteStream(`${OUT}/logcat-continuo.txt`);
+const logcat = spawn('adb', ['logcat', '-v', 'time'], { stdio: ['ignore', 'pipe', 'ignore'] });
+logcat.stdout.pipe(logcatFile);
+logcat.on('error', () => {});
+process.on('exit', () => { try { logcat.kill(); } catch { /* já encerrado */ } });
+const HOST_LOG = `${OUT}/maquina-ci.log`;
+const sampleHost = () => {
+  const mem = sh("free -m | awk '/^Mem:/{print \"usada=\"$3\"MB livre=\"$4\"MB disp=\"$7\"MB\"} /^Swap:/{print \"swap=\"$3\"MB\"}' | tr '\\n' ' '");
+  const emu = sh("ps -C qemu-system-x86_64 -o pid=,rss=,pcpu= | awk '{print \"emulador pid=\"$1\" rss=\"int($2/1024)\"MB cpu=\"$3\"%\"}'") || 'emulador: processo ausente';
+  const load = sh('cut -d" " -f1-3 /proc/loadavg');
+  appendFileSync(HOST_LOG, `${new Date().toISOString()} ${mem}| ${emu} | carga ${load}\n`);
+};
+sampleHost();
+const sampler = setInterval(sampleHost, 5000);
+sampler.unref();
+const hostDiagnostics = (tag) => {
+  sampleHost();
+  const report = [
+    `== ${tag} ${new Date().toISOString()}`,
+    '-- processo do emulador:', sh('pgrep -a -f qemu-system || echo ausente'),
+    '-- memória:', sh('free -m'),
+    '-- kernel (OOM, kill, segfault):', sh("{ sudo -n dmesg -T 2>/dev/null || echo 'dmesg indisponível'; } | grep -iE 'oom|killed process|out of memory|segfault|qemu|emulator|indisponível' | tail -40; true") || 'nenhuma mensagem de OOM, kill ou segfault',
+    '-- arquivos de falha do emulador:', sh('ls -la /tmp/android-runner/ 2>/dev/null | tail -20 || echo nenhum'),
+    '-- adb:', sh('adb devices -l'),
+  ].join('\n');
+  appendFileSync(`${OUT}/diagnostico-maquina.txt`, report + '\n\n');
+  console.log(report.split('\n').map((l) => `  ${l}`).join('\n'));
+};
 
 const adb = (...args) => execFileSync('adb', args, { encoding: 'utf8' });
 const shot = (name) => {
@@ -49,6 +88,7 @@ const step = async (name, fn) => {
     const tela = await describeScreen();
     results.push({ name, ok: false, error: String(err?.message ?? err), tela });
     console.log('FALHOU\n', err, '\n  tela:', JSON.stringify(tela));
+    hostDiagnostics(`falha na etapa ${results.length}`);
     // Captura e log do aparelho ANTES de encerrar (cada um com tempo limite próprio).
     shot(`falha-${results.length}`);
     try {
