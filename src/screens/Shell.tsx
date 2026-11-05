@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarDays, LayoutDashboard, Settings, TrendingUp, Users, Wallet, TriangleAlert, FlaskConical } from 'lucide-react';
 import { useApp } from '../state/AppContext';
@@ -6,14 +6,27 @@ import { navigate, type Route } from '../state/router';
 import { IconButton } from '../ui/Button';
 import { SyncIndicator } from './Account';
 import { cx } from '../ui/cx';
+import { LOGO } from '../ui/brand';
 
-/** Logo do Ofício: sempre verde-petróleo (não acompanha a cor de destaque). */
+/**
+ * Logo do Ofício — opção A, "Arco refinado" (beta.5). Geometria em ui/brand.ts. Fora do cabeçalho,
+ * o fundo usa a escala da marca da paleta escolhida; no cabeçalho, um véu branco translúcido.
+ */
 export function Logo({ size = 32, onHero }: { size?: number; onHero?: boolean }) {
+  const g = `logo-${useId().replace(/:/g, '')}`;
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label="Ofício">
-      <rect width="64" height="64" rx="16" fill={onHero ? 'rgb(255 255 255 / 0.16)' : 'var(--color-brand-600)'} />
-      <path d="M18 42 32 18l14 24" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="32" cy="44" r="4" fill="#fbbf24" />
+      {!onHero && (
+        <defs>
+          <linearGradient id={g} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style={{ stopColor: 'var(--color-brand-500)' }} />
+            <stop offset="1" style={{ stopColor: 'var(--color-brand-700)' }} />
+          </linearGradient>
+        </defs>
+      )}
+      <path d={LOGO.squircle} fill={onHero ? 'rgb(255 255 255 / 0.16)' : `url(#${g})`} />
+      <path d={LOGO.arch} fill="none" stroke="#fff" strokeWidth={LOGO.archWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={LOGO.dot.cx} cy={LOGO.dot.cy} r={LOGO.dot.r} fill={LOGO.gold} />
     </svg>
   );
 }

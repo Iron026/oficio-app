@@ -91,3 +91,18 @@ claro e escuro, relógio fixo, dados criados pela interface) e falha com:
 transbordo horizontal, erro de JavaScript, violação do axe (WCAG 2.1 AA) e, com `--strict`,
 contraste abaixo de 4,5:1; também falha se o botão flutuante cobrir um cartão no fim da lista.
 No CI, o job **Capturas visuais e acessibilidade** roda em modo estrito e publica as capturas.
+
+## Identidade (0.4.0-beta.5, aprovada)
+
+- **Logomarca — opção A, "Arco refinado":** squircle, arco com traço 5 e ponto dourado assentado
+  entre as pernas. Geometria única em `src/ui/brand.ts`; favicon (`public/icon.svg`) e ícones do
+  Android (`mipmap-*`) gerados por `scripts/icone-app.mjs` (`src/ui/brand.test.ts` confere).
+- **Conquistas:** medalhas redondas com desenho próprio por conquista (`src/ui/medals.tsx`).
+  Bloqueada mostra o mesmo desenho apagado, com cadeado.
+- **Selos:** hexágono de cantos arredondados, verde-petróleo fixo. Estágio em três sinais ao mesmo
+  tempo: 1 a 4 pontos acesos na base, aro interno a partir do II e aro/pontos dourados no IV. Em
+  40 px ou menos o desenho encolhe e os pontos crescem (legível em 32 px). Para o TalkBack, o texto
+  ao lado diz "Estágio III de IV"; sozinho, o medalhão aceita `label`.
+- **Não mudam:** navegação inferior, círculos de receita e despesa e demais ícones da 0.4.
+- **Avisos (beta.5):** no máximo dois; não capturam toques, só o botão "Desfazer" (44 px, nome
+  "Desfazer: <ação>", tempo pausa com foco). Novidades de gamificação num único aviso.

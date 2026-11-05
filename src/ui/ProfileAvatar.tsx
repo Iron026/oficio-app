@@ -157,7 +157,7 @@ export function ProfileAvatar({ data, tier, size, seal, onHero, className }: {
     }
   }, [key]);
   const def = seal ? getSeal(seal.id) : undefined;
-  const label = `Imagem de perfil de ${data.profile?.name ?? 'você'} (${describe(data)}), moldura ${tier.name}${def && seal ? `, selo ${def.name} estágio ${ROMAN[seal.stage]}` : ''}`;
+  const label = `Imagem de perfil de ${data.profile?.name ?? 'você'} (${describe(data)}), moldura ${tier.name}${def && seal ? `, selo ${def.name} estágio ${ROMAN[seal.stage]} de IV` : ''}`;
   const gap = onHero ? 'var(--hero-1)' : 'var(--surface)';
   return (
     <span role="img" aria-label={label} className={cx('relative inline-block shrink-0', className)} style={{ width: size, height: size }}>

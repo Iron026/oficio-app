@@ -170,7 +170,7 @@ function FeaturedSealSheet({ open, seals, onClose }: { open: boolean; seals: Sea
               <SealMedal id={p.def.id} stage={p.stage} size={40} />
               <span className="flex-1">
                 <span className="block font-semibold">{p.def.name}</span>
-                <span className="block text-sm text-muted">{locked ? 'Ainda não conquistado' : `Estágio ${ROMAN[p.stage]} · ${p.def.unit(p.value)}`}</span>
+                <span className="block text-sm text-muted">{locked ? 'Ainda não conquistado' : <>Estágio {ROMAN[p.stage]}<span className="sr-only"> de IV</span> · {p.def.unit(p.value)}</>}</span>
               </span>
               {active && <Check size={20} className="text-brand-600" aria-hidden="true" />}
             </button>

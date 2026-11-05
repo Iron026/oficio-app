@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, CircleCheck, Lock, Minus, Pencil } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, CircleCheck, Minus, Pencil } from 'lucide-react';
 import { growthPercent } from '../domain/finance';
 import { monthlyHistory } from '../domain/insights';
 import { featuredSealOf } from '../domain/preferences';
@@ -16,7 +16,7 @@ import { useProfile } from '../state/useProfile';
 import { Button, IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { TextField } from '../ui/Field';
-import { AchievementIcon } from '../ui/icons';
+import { AchievementMedal } from '../ui/medals';
 import { Card, ProgressBar, SectionTitle, Segmented } from '../ui/Misc';
 import { ProfileAvatar } from '../ui/ProfileAvatar';
 import { CategoryMedal } from '../ui/CategoryMedal';
@@ -227,7 +227,7 @@ function SealsTab({ seals, featuredId, owned }: { seals: SealProgress[]; feature
                   </span>
                   <span className="flex items-center gap-2 text-sm text-muted">
                     <StagePips stage={p.stage} />
-                    {p.stage > 0 ? `Estágio ${ROMAN[p.stage]}` : 'Ainda não conquistado'}
+                    {p.stage > 0 ? <>Estágio {ROMAN[p.stage]}<span className="sr-only"> de IV</span></> : 'Ainda não conquistado'}
                   </span>
                   <ProgressBar value={Math.max(0, Math.min(1, frac))} label={`${p.def.name}: progresso para o ${p.next === null ? 'último estágio' : `estágio ${ROMAN[p.stage + 1]}`}`} className="!h-2" />
                   <span className="text-xs text-muted">{p.next === null ? `Estágio máximo · ${p.def.unit(p.value)}` : `${p.def.unit(p.value)} · próximo: ${target}`}</span>
@@ -311,10 +311,8 @@ function AchievementsTab() {
           const at = unlocked.get(a.id);
           return (
             <li key={a.id} className={cx('rounded-2xl border p-3.5', at ? 'border-xp-400/60 bg-xp-100/40 dark:bg-xp-500/10' : 'border-line bg-surface')}>
-              <div className={cx('mb-2 flex h-10 w-10 items-center justify-center rounded-xl', at ? 'bg-xp-400 text-xp-950' : 'bg-surface-2 text-muted')}>
-                {at ? <AchievementIcon icon={a.icon} size={20} /> : <Lock size={18} aria-hidden="true" />}
-              </div>
-              <p className="text-sm font-semibold leading-snug">{a.title(t)}</p>
+              <div className="mb-2"><AchievementMedal achievement={a} unlocked={!!at} size={44} /></div>
+              <p className="text-sm font-semibold leading-snug">{a.title(t)}<span className="sr-only">{at ? ' (desbloqueada)' : ' (bloqueada)'}</span></p>
               <p className="mt-0.5 text-xs leading-snug text-muted">{a.description(t)}</p>
               <p className="mt-1.5 text-xs font-semibold text-xp-700 dark:text-xp-400">{at ? `Desbloqueada em ${new Date(at).toLocaleDateString('pt-BR')}` : `+${a.xp} XP`}</p>
             </li>
