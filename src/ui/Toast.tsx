@@ -64,6 +64,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     schedule(id, t.action ? 8000 : t.tone === 'achievement' ? 5000 : 3200);
   }, [schedule]);
 
+  // O "Desfazer" vale para a tela onde a ação aconteceu: ao trocar de tela, o aviso com ação sai.
+  // Assim ele nunca fica sobre controles de outra tela (em telas pequenas, um toque em um botão
+  // por baixo podia acionar o Desfazer sem querer). Avisos sem ação não capturam toques e ficam.
+  useEffect(() => {
+    const onRoute = () => setItems((cur) => {
+      const gone = cur.filter((x) => x.action);
+      if (!gone.length) return cur;
+      for (const g of gone) { clearTimeout(timers.current.get(g.id)); timers.current.delete(g.id); }
+      return cur.filter((x) => !x.action);
+    });
+    window.addEventListener('hashchange', onRoute);
+    return () => window.removeEventListener('hashchange', onRoute);
+  }, []);
+
   useEffect(() => {
     const pending = timers.current;
     return () => {

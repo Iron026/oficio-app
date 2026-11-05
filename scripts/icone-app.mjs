@@ -1,8 +1,9 @@
-// Gera o favicon (public/icon.svg) e os ícones do Android (mipmap-*) da logomarca opção A.
+// Gera o favicon (public/icon.svg), os ícones do Android (mipmap-*) e as telas de abertura
+// (drawable*/splash.png, Android 11 e anteriores) da logomarca opção A.
 // A geometria é a de src/ui/brand.ts (src/ui/brand.test.ts confere que continuam iguais).
 // Uso: node scripts/icone-app.mjs   (precisa do Chromium do Playwright)
 import { createRequire } from 'node:module';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 const { chromium } = createRequire(import.meta.url)('playwright-core');
 
 const L = {
@@ -38,5 +39,29 @@ for (const [density, px] of Object.entries(SIZES)) {
     await p.close();
   }
 }
+
+// Telas de abertura: petróleo (#0F7B71, o mesmo de capacitor.config.ts e @color/splash_background),
+// símbolo no centro e o nome em Manrope logo abaixo. Mantém o tamanho de cada arquivo existente.
+const SPLASH_BG = '#0f7b71';
+const font = readFileSync('node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2').toString('base64');
+const RES = 'android/app/src/main/res';
+const splashes = readdirSync(RES).filter((d) => d.startsWith('drawable') && existsSync(`${RES}/${d}/splash.png`));
+for (const dir of splashes) {
+  const file = `${RES}/${dir}/splash.png`;
+  const head = readFileSync(file).subarray(16, 24);
+  const w = head.readUInt32BE(0), h = head.readUInt32BE(4);
+  const unit = Math.min(w, h);
+  const mark = Math.round(unit * 0.3); // símbolo (área 64) ocupa 30% do lado menor
+  const p = await b.newPage({ viewport: { width: w, height: h } });
+  await p.setContent(`<html><head><style>@font-face{font-family:M;src:url(data:font/woff2;base64,${font}) format('woff2');font-weight:200 800}</style></head>
+    <body style="margin:0;width:${w}px;height:${h}px;background:${SPLASH_BG};display:grid;place-items:center">
+    <div style="display:grid;justify-items:center;gap:${Math.round(unit * 0.005)}px">
+      <svg width="${mark}" height="${mark}" viewBox="0 0 64 64">${glyph}</svg>
+      <span style="font:800 ${Math.round(unit * 0.085)}px M,sans-serif;color:#fff;letter-spacing:-0.02em;margin-top:-${Math.round(mark * 0.27)}px">Ofício</span>
+    </div></body></html>`);
+  await p.evaluate(() => document.fonts.ready);
+  await p.screenshot({ path: file });
+  await p.close();
+}
 await b.close();
-console.log('Ícones gerados.');
+console.log(`Ícones e ${splashes.length} telas de abertura gerados.`);

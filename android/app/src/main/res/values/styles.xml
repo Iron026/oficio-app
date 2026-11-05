@@ -19,9 +19,13 @@
     </style>
 
 
-    <!-- Tela de abertura (padrão do Capacitor): Android 12+ mostra o ícone do
-         app; versões anteriores usam a imagem @drawable/splash. -->
+    <!-- Tela de abertura (beta.5, logomarca A): Android 12+ mostra o símbolo
+         @drawable/splash_logo sobre @color/splash_background (o mesmo petróleo do
+         ícone e da splash do Capacitor); versões anteriores usam @drawable/splash,
+         gerada por scripts/icone-app.mjs. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
     </style>
 </resources>

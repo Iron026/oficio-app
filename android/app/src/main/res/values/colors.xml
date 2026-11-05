@@ -4,4 +4,6 @@
     <color name="colorPrimaryDark">#0F625B</color>
     <color name="colorAccent">#FBBF24</color>
     <color name="app_background">#F5F7F8</color>
+    <!-- Fundo da tela de abertura: igual ao backgroundColor do SplashScreen em capacitor.config.ts. -->
+    <color name="splash_background">#0F7B71</color>
 </resources>

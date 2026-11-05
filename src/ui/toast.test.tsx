@@ -91,4 +91,12 @@ describe('ToastProvider — temporizadores', () => {
     expect(screen.queryByText('Concluído')).not.toBeInTheDocument();
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('beta.5: ao trocar de tela, o aviso com Desfazer sai (não fica sobre controles de outra tela); os outros ficam', () => {
+    renderWith([{ title: 'Concluído', action: { label: 'Desfazer', onClick: () => undefined } }, { title: 'Conquista', tone: 'achievement' }]);
+    act(() => { window.dispatchEvent(new HashChangeEvent('hashchange')); });
+    expect(screen.queryByText('Concluído')).not.toBeInTheDocument();
+    expect(screen.getByText('Conquista')).toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(1);
+  });
 });

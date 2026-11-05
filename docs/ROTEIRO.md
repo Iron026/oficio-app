@@ -20,8 +20,12 @@ computador · 6 acessibilidade, desempenho e entrega. Ver `docs/DESIGN.md`.
   deixa o atendimento concluído "sem receita lançada", com "Lançar receita" (sem duplicar nem XP novo);
   "Desfazer" após concluir, reabrir/cancelar, excluir lançamento e lançar receita; vibração desligada
   por padrão (preferência em Privacidade e acessibilidade, respeita o Android); degradê do cabeçalho
-  mais suave; comemorações em etapas com pausa; trilha da Evolução sem sobreposição. Logo, conquistas
-  e selos novos só em proposta, aguardando aprovação.
+  mais suave; comemorações em etapas com pausa; trilha da Evolução sem sobreposição. Nova identidade
+  aprovada: logo A (Arco refinado), medalhas redondas nas conquistas e medalhões hexagonais nos selos;
+  avisos sem bloquear controles (no máximo 2, um resumo das novidades).
+- 0.4.0-beta.6: tela de abertura nativa do Android com a logo A (Android 12+ e anteriores); o aviso com
+  "Desfazer" sai ao trocar de tela (em telas pequenas ele podia ficar sobre controles de outra tela);
+  checagem automática de toques através dos avisos em 360×640.
 
 ## 0.3.1 (manutenção — branch `fix/v0.3.1-maintenance`, aguardando aprovação)
 - Exportar backup no Android: “Salvar no aparelho” pela janela “Salvar como” (Storage Access

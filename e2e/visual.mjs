@@ -534,6 +534,66 @@ try {
   // Rodada 5: as 8 paletas nas telas principais, num formulário com erros e na reabertura
   // (sem piscar o Petróleo). Celular 360 (Galaxy S26), claro e escuro; axe em todas.
   const PALETTE_NAMES = { petroleo: 'Petróleo', oceano: 'Oceano', safira: 'Safira', indigo: 'Índigo', ameixa: 'Ameixa', vinho: 'Vinho', grafite: 'Grafite', oliva: 'Oliva' };
+  // beta.5: avisos em tela pequena (360×640). Com avisos na tela, um toque num controle que fica
+  // por baixo deles precisa chegar ao controle; o "Desfazer" continua tocável e há no máximo 2.
+  if (runs('telas') && (!ONLY || ONLY.split(',').includes('celular-360'))) {
+    for (const theme of THEMES) {
+      console.log(`• celular-360x640 · ${theme} · avisos sobre controles`);
+      const small = { id: 'celular-360x640', width: 360, height: 640, mobile: true };
+      const { ctx, page } = await newPage(small, theme);
+      await page.goto(BASE);
+      await page.getByRole('button', { name: /começar/i }).click();
+      await page.getByRole('radio', { name: /beleza/i }).click();
+      await page.getByRole('button', { name: /continuar/i }).click();
+      await page.getByLabel(/seu nome/i).fill('Ana Souza');
+      await page.getByRole('button', { name: /entrar no ofício/i }).click();
+      await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      await page.getByRole('button', { name: /^agendar$/i }).click();
+      const form = page.getByRole('dialog', { name: /agendar/i });
+      await form.getByLabel(/descrição/i).fill('Corte');
+      await form.getByLabel(/^valor/i).fill('60,00');
+      await form.getByRole('button', { name: /^agendar$/i }).click();
+      await form.waitFor({ state: 'detached' });
+      await page.goto(BASE + '#/agenda');
+      await page.getByRole('button', { name: /corte/i }).first().click();
+      await page.getByRole('dialog', { name: 'Corte' }).getByRole('button', { name: /concluir atendimento/i }).click();
+      // 1) Na tela da ação: o "Desfazer" aparece, tem 44 px, recebe o toque e funciona.
+      const undo = page.getByRole('button', { name: /^desfazer/i });
+      if (!(await undo.waitFor({ timeout: 5000 }).then(() => true, () => false))) fail(`360x640/${theme}: "Desfazer" não apareceu depois de concluir`);
+      else {
+        const box = await undo.boundingBox();
+        const hitsUndo = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('button')?.textContent?.match(/desfazer/i), { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+        if (!hitsUndo) fail(`360x640/${theme}: o toque no "Desfazer" não chega ao botão`);
+        if (box.height < 44 || box.width < 44) fail(`360x640/${theme}: "Desfazer" menor que 44 px (${Math.round(box.width)}×${Math.round(box.height)})`);
+        await undo.click();
+        await page.getByText('Ação desfeita').waitFor();
+      }
+      // 2) Outra tela com avisos ainda visíveis: nenhum "Desfazer" sobra, e um toque num controle
+      //    coberto por aviso chega ao controle.
+      await page.goto(BASE + '#/ajustes/aparencia');
+      const compacta = page.getByRole('radio', { name: /^compacta$/i });
+      await compacta.waitFor();
+      const t = await compacta.boundingBox(); // o controle visível (não um que ainda esteja saindo da tela)
+      const m = await page.evaluate((target) => {
+        const toasts = [...document.querySelectorAll('[data-toast]')];
+        const covered = toasts.map((x) => x.getBoundingClientRect()).some((r) => r.top < target.y + target.height && r.bottom > target.y && r.left < target.x + target.width && r.right > target.x);
+        return { avisos: toasts.length, comAcao: toasts.filter((x) => x.getAttribute('data-toast') === 'acao').length, coberto: covered, x: target.x + target.width / 2, y: target.y + target.height / 2 };
+      }, t);
+      if (m.avisos > 2) fail(`360x640/${theme}: ${m.avisos} avisos empilhados (máximo 2)`);
+      if (m.comAcao > 0) fail(`360x640/${theme}: aviso com Desfazer ficou sobre outra tela`);
+      if (!m.coberto) warn(`360x640/${theme}: nenhum aviso cobria o controle de teste (checagem menos exigente)`);
+      await page.screenshot({ path: `${OUT}/celular-360x640-${theme}-avisos-sobre-controles.png` });
+      report.capturas.push({ arquivo: `celular-360x640-${theme}-avisos-sobre-controles.png`, viewport: small.id, tema: theme, tela: 'avisos-sobre-controles' });
+      // Toque real (coordenadas), como o dedo: precisa mudar a densidade mesmo com o aviso por cima.
+      await page.mouse.click(m.x, m.y);
+      // A preferência é gravada no aparelho (assíncrono): espera até 2 s pela mudança.
+      await page.waitForFunction(() => document.documentElement.dataset.density === 'compacta', null, { timeout: 2000 }).catch(() => undefined);
+      const densidade = await page.evaluate(() => document.documentElement.dataset.density);
+      if (densidade !== 'compacta') fail(`360x640/${theme}: o toque em "Compacta"${m.coberto ? ' sob um aviso' : ''} não chegou ao controle (densidade: ${densidade})`);
+      await ctx.close();
+    }
+  }
+
   if (runs('paletas') && (!ONLY || ONLY.split(',').includes('celular-360'))) {
     const vp = VIEWPORTS[0];
     for (const theme of THEMES) {

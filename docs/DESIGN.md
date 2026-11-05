@@ -104,5 +104,9 @@ No CI, o job **Capturas visuais e acessibilidade** roda em modo estrito e public
   40 px ou menos o desenho encolhe e os pontos crescem (legível em 32 px). Para o TalkBack, o texto
   ao lado diz "Estágio III de IV"; sozinho, o medalhão aceita `label`.
 - **Não mudam:** navegação inferior, círculos de receita e despesa e demais ícones da 0.4.
-- **Avisos (beta.5):** no máximo dois; não capturam toques, só o botão "Desfazer" (44 px, nome
-  "Desfazer: <ação>", tempo pausa com foco). Novidades de gamificação num único aviso.
+- **Avisos (beta.5/6):** no máximo dois; não capturam toques, só o botão "Desfazer" (44 px, nome
+  "Desfazer: <ação>", tempo pausa com foco). Novidades de gamificação num único aviso. O aviso com
+  "Desfazer" vale só na tela da ação e sai ao trocar de tela.
+- **Tela de abertura (beta.6):** Android 12+ mostra o símbolo da logo A (`drawable/splash_logo.xml`)
+  sobre o petróleo `#0F7B71`; Android 11 e anteriores usam `drawable*/splash.png`, gerados por
+  `scripts/icone-app.mjs` com o símbolo e o nome.
