@@ -272,7 +272,7 @@ jobs:
           arch: x86_64
           profile: pixel_7
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim
           script: node e2e/android.e2e.mjs "$(ls apk/*.apk | head -1)"
       - uses: actions/upload-artifact@v6
         if: always()
