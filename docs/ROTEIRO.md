@@ -16,6 +16,12 @@ computador · 6 acessibilidade, desempenho e entrega. Ver `docs/DESIGN.md`.
 - 0.4.0-beta.4: compatibilidade com a 0.5 — edições preservam campos desconhecidos; pagamentos e estornos da
   0.5 nunca são removidos ao reabrir, cancelar, excluir ou sincronizar; concluir lança só o que falta; backup
   de versão mais nova é avisado e conferido. Sem mudança visual. Ver `docs/COMPATIBILIDADE-0.5.md`.
+- 0.4.0-beta.5: correções do teste no S26 — sugestões de serviço atualizam o valor; receita excluída
+  deixa o atendimento concluído "sem receita lançada", com "Lançar receita" (sem duplicar nem XP novo);
+  "Desfazer" após concluir, reabrir/cancelar, excluir lançamento e lançar receita; vibração desligada
+  por padrão (preferência em Privacidade e acessibilidade, respeita o Android); degradê do cabeçalho
+  mais suave; comemorações em etapas com pausa; trilha da Evolução sem sobreposição. Logo, conquistas
+  e selos novos só em proposta, aguardando aprovação.
 
 ## 0.3.1 (manutenção — branch `fix/v0.3.1-maintenance`, aguardando aprovação)
 - Exportar backup no Android: “Salvar no aparelho” pela janela “Salvar como” (Storage Access
