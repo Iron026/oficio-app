@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.ref }}-${{ github.event_name }}
+  group: android-${{ github.ref }}-${{ github.event_name }}-${{ inputs.apk_run_id }}
   cancel-in-progress: true
 
 env:
