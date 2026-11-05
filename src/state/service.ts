@@ -37,7 +37,28 @@ export interface Feedback {
   seals: SealAward[];
   /** Nova categoria visual (ou novo grau de Diamante) alcançada nesta operação. */
   tierUp: Tier | null;
+  /** Ação reversível (beta.5): a interface oferece "Desfazer" com este bilhete. */
+  undo?: UndoTicket;
 }
+
+/** Bilhete para desfazer a última ação reversível (válido por {@link UNDO_TTL_MS}). */
+export interface UndoTicket { id: number; label: string }
+export const UNDO_TTL_MS = 30_000;
+
+type UndoCollection = 'appointments' | 'transactions';
+type UndoRecord = Appointment | Transaction;
+/**
+ * Estado antes e depois de uma ação, por registro afetado (null = não existia). Desfazer só
+ * acontece se cada registro ainda estiver exatamente como a ação o deixou; então o estado
+ * anterior é regravado pelo armazenamento (sincroniza como qualquer alteração, inclusive offline).
+ */
+interface UndoEntry {
+  id: number;
+  label: string;
+  at: number;
+  changes: { collection: UndoCollection; id: string; before: UndoRecord | null; after: UndoRecord | null }[];
+}
+const sameRecord = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 const emptyFeedback = (): Feedback => ({ xpGained: 0, events: [], achievements: [], levelUp: null, seals: [], tierUp: null });
 
@@ -72,6 +93,8 @@ export class AppService {
   private _prefs: DevicePrefs = DEFAULT_DEVICE_PREFS;
   private _celebration: CelebrationRecord | null = null;
   private _lastExport: string | null = null;
+  private _undo: UndoEntry | null = null;
+  private undoSeq = 0;
 
   constructor(
     private storage: StorageAdapter,
@@ -412,7 +435,14 @@ export class AppService {
       await this.storage.appointments.put(updated);
       this.set({ ...this._data, transactions, appointments: this._data.appointments.map((x) => (x.id === id ? updated : x)) });
       const terms = getProfession(this._data.profile?.professionId).terms;
-      return this.gamify({ type: 'appointment_completed', id, label: `${terms.service} ${terms.completedLabel}`, isDemo: a.isDemo });
+      const created = transactionId !== a.transactionId ? transactions.find((t) => t.id === transactionId) ?? null : null;
+      const undo = this.recordUndo(`${terms.service} ${terms.completedLabel}`, [
+        { collection: 'appointments', id, before: a, after: updated },
+        ...(created ? [{ collection: 'transactions' as const, id: created.id, before: null, after: created }] : []),
+      ]);
+      // XP de conclusão: uma vez por serviço (chave por id). Desfazer não o retira, e concluir de novo não o repete.
+      const fb = await this.gamify({ type: 'appointment_completed', id, label: `${terms.service} ${terms.completedLabel}`, isDemo: a.isDemo });
+      return { ...fb, undo };
     });
   }
 
@@ -420,7 +450,7 @@ export class AppService {
    * Muda o status (reabrir/cancelar). Remove a receita automática lançada ao concluir, se houver
    * (a interface confirma antes). Pagamentos registrados pela 0.5 nunca são removidos aqui.
    */
-  setAppointmentStatus(id: string, status: 'agendado' | 'cancelado'): Promise<void> {
+  setAppointmentStatus(id: string, status: 'agendado' | 'cancelado'): Promise<UndoTicket> {
     return this.run(async () => {
       const a = this._data.appointments.find((x) => x.id === id);
       if (!a) throw new Error('Agendamento não encontrado');
@@ -433,6 +463,44 @@ export class AppService {
       const updated: Appointment = { ...a, status, completedAt: null, transactionId: null, updatedAt: this.stamp() };
       await this.storage.appointments.put(updated);
       this.set({ ...this._data, transactions, appointments: this._data.appointments.map((x) => (x.id === id ? updated : x)) });
+      return this.recordUndo(status === 'agendado' ? 'Reaberto' : 'Cancelado', [
+        { collection: 'appointments', id, before: a, after: updated },
+        ...(auto ? [{ collection: 'transactions' as const, id: auto.id, before: auto, after: null }] : []),
+      ]);
+    });
+  }
+
+  /**
+   * Lança a receita de um serviço já concluído que está sem lançamento (receita excluída em
+   * Finanças ou "Lançar receita" desmarcado ao concluir). Não reabre o serviço e não dá XP: o XP
+   * de conclusão já foi concedido e receitas vinculadas não dão o XP de lançamento. Lança só o que
+   * falta (preço − pago, compatível com pagamentos da 0.5); se já houver receita automática
+   * vinculada ou nada faltar, não faz nada — chamar duas vezes nunca duplica.
+   */
+  registerAppointmentIncome(id: string): Promise<{ transaction: Transaction | null; undo?: UndoTicket }> {
+    return this.run(async () => {
+      const a = this._data.appointments.find((x) => x.id === id);
+      if (!a) throw new Error('Agendamento não encontrado');
+      if (a.status !== 'concluido') throw new Error('Só é possível lançar a receita de um serviço concluído.');
+      const linked = a.transactionId ? this._data.transactions.find((t) => t.id === a.transactionId) : undefined;
+      const due = Math.max(0, a.price - paidForAppointment(a.id, this._data.transactions));
+      if (linked || due === 0) return { transaction: null };
+      const stamp = this.stamp();
+      const profession = getProfession(this._data.profile?.professionId);
+      const tx: Transaction = {
+        id: newId(), createdAt: stamp, updatedAt: stamp, ...(a.isDemo ? { isDemo: true } : {}),
+        type: 'receita', amount: due, description: a.title, category: profession.incomeCategories[0]!,
+        date: a.date > todayKey(this.now()) ? todayKey(this.now()) : a.date, appointmentId: a.id,
+      };
+      const updated: Appointment = { ...a, transactionId: tx.id, updatedAt: stamp };
+      await this.storage.transactions.put(tx);
+      await this.storage.appointments.put(updated);
+      this.set({ ...this._data, transactions: [...this._data.transactions, tx], appointments: this._data.appointments.map((x) => (x.id === id ? updated : x)) });
+      const undo = this.recordUndo('Receita lançada', [
+        { collection: 'transactions', id: tx.id, before: null, after: tx },
+        { collection: 'appointments', id, before: a, after: updated },
+      ]);
+      return { transaction: tx, undo };
     });
   }
 
@@ -546,19 +614,71 @@ export class AppService {
     });
   }
 
-  deleteTransaction(id: string): Promise<void> {
+  /**
+   * Exclui o lançamento. Se era a receita de um serviço concluído, o serviço continua concluído,
+   * só fica sem lançamento financeiro (pode lançar de novo pelo próprio serviço). Reversível.
+   */
+  deleteTransaction(id: string): Promise<UndoTicket | null> {
     return this.run(async () => {
       const t = this._data.transactions.find((x) => x.id === id);
-      if (!t) return;
+      if (!t) return null;
       let appointments = this._data.appointments;
       const linked = appointments.find((a) => a.transactionId === id);
+      let linkedAfter: Appointment | null = null;
       if (linked) {
-        const updated = { ...linked, transactionId: null, updatedAt: this.stamp() };
-        await this.storage.appointments.put(updated);
-        appointments = appointments.map((a) => (a.id === linked.id ? updated : a));
+        linkedAfter = { ...linked, transactionId: null, updatedAt: this.stamp() };
+        await this.storage.appointments.put(linkedAfter);
+        appointments = appointments.map((a) => (a.id === linked.id ? linkedAfter! : a));
       }
       await this.storage.transactions.remove(id);
       this.set({ ...this._data, appointments, transactions: this._data.transactions.filter((x) => x.id !== id) });
+      return this.recordUndo('Lançamento excluído', [
+        { collection: 'transactions', id, before: t, after: null },
+        ...(linked ? [{ collection: 'appointments' as const, id: linked.id, before: linked, after: linkedAfter }] : []),
+      ]);
+    });
+  }
+
+  // ------------------------------------------------------------ desfazer
+
+  private recordUndo(label: string, changes: UndoEntry['changes']): UndoTicket {
+    const entry: UndoEntry = { id: ++this.undoSeq, label, at: this.now().getTime(), changes: structuredClone(changes) };
+    this._undo = entry;
+    return { id: entry.id, label };
+  }
+
+  /**
+   * Desfaz a ação do bilhete, se ainda for a última ação reversível, estiver dentro do prazo e os
+   * registros afetados não tiverem mudado depois (outra edição, sincronização ou restauração).
+   * Caso contrário, nada é alterado e um erro explica o motivo.
+   */
+  undo(ticket: UndoTicket): Promise<void> {
+    return this.run(async () => {
+      const e = this._undo;
+      if (!e || e.id !== ticket.id || this.now().getTime() - e.at > UNDO_TTL_MS) throw new Error('Não é mais possível desfazer esta ação.');
+      for (const c of e.changes) {
+        const cur = (this._data[c.collection] as UndoRecord[]).find((x) => x.id === c.id) ?? null;
+        if (!sameRecord(cur, c.after)) {
+          this._undo = null;
+          throw new Error('Não foi possível desfazer: o registro foi alterado depois.');
+        }
+      }
+      const stamp = this.stamp();
+      let data = this._data;
+      for (const c of e.changes) {
+        const store = this.storage[c.collection] as unknown as { put(x: UndoRecord): Promise<void>; remove(id: string): Promise<void> };
+        const list = data[c.collection] as UndoRecord[];
+        if (c.before) {
+          const restored = { ...c.before, updatedAt: stamp };
+          await store.put(restored);
+          data = { ...data, [c.collection]: list.some((x) => x.id === c.id) ? list.map((x) => (x.id === c.id ? restored : x)) : [...list, restored] };
+        } else {
+          await store.remove(c.id);
+          data = { ...data, [c.collection]: list.filter((x) => x.id !== c.id) };
+        }
+      }
+      this._undo = null;
+      this.set(data);
     });
   }
 
@@ -625,6 +745,7 @@ export class AppService {
   importBackup(text: string): Promise<void> {
     return this.run(async () => {
       const parsed = parseBackup(text);
+      this._undo = null; // restaurar substitui tudo: nada anterior pode ser desfeito
       // Selos são permanentes: um backup mais antigo nunca reduz o estágio já alcançado.
       const byId = new Map(parsed.sealAwards.map((a) => [a.id, a]));
       for (const cur of this._data.sealAwards) {
@@ -642,6 +763,7 @@ export class AppService {
 
   resetAll(): Promise<void> {
     return this.run(async () => {
+      this._undo = null;
       await this.storage.clearAll();
       // "Apagar todos os dados" também volta as preferências do aparelho ao padrão.
       await this.storage.kvDelete(DEVICE_PREFS_KEY);

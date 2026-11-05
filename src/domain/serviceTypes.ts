@@ -1,3 +1,4 @@
+import { centsToInput } from '../lib/money';
 import type { ServiceType } from './types';
 
 /** Limites dos tipos de serviço personalizados. */
@@ -77,4 +78,13 @@ export function moveServiceType(types: readonly ServiceType[], id: string, dir: 
   const reordered = [...sorted];
   [reordered[i], reordered[j]] = [reordered[j]!, reordered[i]!];
   return reordered.map((t, k) => ({ id: t.id, order: k })).filter((c) => types.find((t) => t.id === c.id)!.order !== c.order);
+}
+
+/**
+ * Escolher um tipo de serviço ou sugestão no agendamento: a descrição e o valor passam a ser os
+ * do serviço escolhido (beta.5 — antes o valor antigo ou editado à mão era mantido ao trocar de
+ * sugestão). Sem valor sugerido, o campo fica vazio. Depois a pessoa pode editar os dois livremente.
+ */
+export function applyServiceChoice<T extends { title: string; price: string }>(input: T, choice: { name: string; price: number | null }): T {
+  return { ...input, title: choice.name, price: choice.price ? centsToInput(choice.price) : '' };
 }

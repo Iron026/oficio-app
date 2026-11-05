@@ -4,7 +4,7 @@ import type { Transaction, TransactionType } from '../../domain/types';
 import { todayKey } from '../../lib/dates';
 import { centsToInput } from '../../lib/money';
 import { hasErrors, validateTransaction, type Errors, type TransactionInput } from '../../lib/validation';
-import { useApp, useErrorHandler, useFeedback } from '../../state/AppContext';
+import { useApp, useErrorHandler, useFeedback, useUndoAction } from '../../state/AppContext';
 import { Button } from '../../ui/Button';
 import { useConfirm } from '../../ui/Confirm';
 import { TextField } from '../../ui/Field';
@@ -24,11 +24,12 @@ export function TransactionFormSheet({ open, onClose, transaction, defaultType =
 }
 
 function TransactionForm({ transaction, defaultType, onDone }: { transaction?: Transaction; defaultType: TransactionType; onDone: () => void }) {
-  const { service, profession } = useApp();
+  const { service, profession, data } = useApp();
   const feedback = useFeedback();
   const onError = useErrorHandler();
   const confirm = useConfirm();
   const toast = useToast();
+  const undoAction = useUndoAction();
   const [v, setV] = useState<TransactionInput>(
     transaction
       ? { type: transaction.type, amount: centsToInput(transaction.amount), description: transaction.description, category: transaction.category, date: transaction.date }
@@ -59,11 +60,17 @@ function TransactionForm({ transaction, defaultType, onDone }: { transaction?: T
 
   async function remove() {
     if (!transaction) return;
-    const ok = await confirm({ title: 'Excluir lançamento?', message: `"${transactionLabel(transaction)}" será removido permanentemente.`, confirmLabel: 'Excluir', danger: true });
+    const linked = data.appointments.find((x) => x.transactionId === transaction.id && x.status === 'concluido');
+    const ok = await confirm({
+      title: 'Excluir lançamento?',
+      message: `"${transactionLabel(transaction)}" será removido de Finanças.${linked ? ` ${profession.terms.service} “${linked.title}” continua ${profession.terms.completedLabel}, sem lançamento financeiro; você pode lançar a receita de novo por ele.` : ''}`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    });
     if (!ok) return;
     try {
-      await service.deleteTransaction(transaction.id);
-      toast({ title: 'Lançamento excluído', tone: 'info' });
+      const undo = await service.deleteTransaction(transaction.id);
+      toast({ title: 'Lançamento excluído', tone: 'info', action: undoAction(undo) });
       onDone();
     } catch (err) {
       onError(err);

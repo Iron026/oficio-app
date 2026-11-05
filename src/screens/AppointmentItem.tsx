@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Ban, Check, MessageCircle, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
+import { Ban, Check, CircleDollarSign, MessageCircle, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
 import { paidForAppointment, paymentsOf, removableAutoIncome } from '../domain/compat';
 import type { Appointment } from '../domain/types';
 import { formatDateShort, isFutureDateKey, relativeDayLabel, todayKey } from '../lib/dates';
 import { formatMoney } from '../lib/money';
-import { useApp, useErrorHandler, useFeedback } from '../state/AppContext';
+import { useApp, useErrorHandler, useFeedback, useUndoAction } from '../state/AppContext';
 import { Button } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
 import { cx } from '../ui/cx';
@@ -30,9 +30,18 @@ function StatusPill({ a }: { a: Appointment }) {
   return overdue ? <StatusBadge tone="warning">Pendente</StatusBadge> : <StatusBadge tone="info">Agendado</StatusBadge>;
 }
 
+/**
+ * Serviço concluído com valor e sem nenhuma receita vinculada (receita excluída em Finanças ou
+ * "Lançar receita" desmarcado ao concluir). Continua concluído; só falta o lançamento.
+ */
+export function missingIncome(a: Appointment, transactions: Parameters<typeof paidForAppointment>[1]): boolean {
+  return a.status === 'concluido' && a.price > 0 && paidForAppointment(a.id, transactions) === 0;
+}
+
 /** Item de agendamento clicável, com painel de ações. */
 export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: boolean }) {
   const { data } = useApp();
+  const noIncome = missingIncome(a, data.transactions);
   const [open, setOpen] = useState(false);
   const client = data.clients.find((c) => c.id === a.clientId);
   const cancelled = a.status === 'cancelado';
@@ -68,6 +77,7 @@ export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: bo
           <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span className="flex flex-wrap items-center gap-2">
               <StatusPill a={a} />
+              {noIncome && <StatusBadge tone="warning">Sem receita lançada</StatusBadge>}
               {a.isDemo && <DemoBadge />}
             </span>
             {a.price > 0 && <span className={cx('num text-base font-bold', cancelled && 'text-muted line-through')}>{formatMoney(a.price)}</span>}
@@ -92,7 +102,9 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
   const onError = useErrorHandler();
   const confirm = useConfirm();
   const toast = useToast();
+  const undoAction = useUndoAction();
   const [registerIncome, setRegisterIncome] = useState(true);
+  const [launching, setLaunching] = useState(false);
   const [editing, setEditing] = useState(false);
   const client = data.clients.find((c) => c.id === a.clientId);
   const wa = client ? whatsappLink(client.phone) : null;
@@ -132,13 +144,25 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
       if (!ok) return;
     }
     try {
-      await service.setAppointmentStatus(a.id, status);
-      toast({ title: status === 'agendado' ? 'Reaberto' : 'Cancelado', tone: 'info' });
+      const undo = await service.setAppointmentStatus(a.id, status);
+      toast({ title: status === 'agendado' ? 'Reaberto' : 'Cancelado', tone: 'info', action: undoAction(undo) });
       onClose();
     } catch (err) {
       onError(err);
     }
   }
+  async function launchIncome() {
+    setLaunching(true);
+    try {
+      const res = await service.registerAppointmentIncome(a.id);
+      if (res.transaction) toast({ title: `Receita de ${formatMoney(res.transaction.amount)} lançada`, description: 'Sem XP novo: o XP da conclusão já foi contado.', tone: 'success', action: undoAction(res.undo) });
+    } catch (err) {
+      onError(err);
+    } finally {
+      setLaunching(false);
+    }
+  }
+
   async function remove() {
     const ok = await confirm({
       title: `Excluir ${t.service.toLowerCase()}?`,
@@ -188,6 +212,19 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
               <p className="rounded-xl bg-surface-2 p-3 text-sm text-muted">Já recebido: <strong className="num text-fg">{formatMoney(paid)}</strong>. Nenhuma receita nova será lançada.</p>
             )}
             <Button block size="lg" icon={<Check size={20} />} onClick={complete}>{t.completeVerb}</Button>
+          </div>
+        )}
+        {a.status === 'concluido' && a.price > 0 && due > 0 && (
+          <div className="mb-3 space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-500/40 dark:bg-amber-500/10" data-testid="sem-receita">
+            <p>
+              <strong className="block">{paid > 0 ? 'Lançamento financeiro incompleto' : 'Sem lançamento financeiro'}</strong>
+              <span className="text-muted">
+                {paid > 0 ? `${formatMoney(paid)} recebidos de ${formatMoney(a.price)}.` : `Este ${t.service.toLowerCase()} continua ${t.completedLabel}, mas nenhuma receita está lançada em Finanças.`}
+              </span>
+            </p>
+            <Button block variant="secondary" icon={<CircleDollarSign size={18} />} onClick={launchIncome} disabled={launching}>
+              Lançar receita de <span className="num">{formatMoney(due)}</span>
+            </Button>
           </div>
         )}
         <div className="grid grid-cols-2 gap-2">

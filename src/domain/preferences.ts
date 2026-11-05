@@ -9,7 +9,7 @@ import type { AccentId, AvatarChoice, SealId, Settings, ThemePreference } from '
  *
  * Aparelho (DevicePrefs, StorageAdapter.kv "prefs:device:v1"; nunca vai para a
  * nuvem nem para o backup; trocar de conta não muda):
- *   tema, densidade, ocultar valores e reduzir animações.
+ *   tema, densidade, ocultar valores, reduzir animações e vibração.
  */
 export type Density = 'confortavel' | 'compacta';
 export type MotionPref = 'sistema' | 'reduzir';
@@ -20,13 +20,18 @@ export interface DevicePrefs {
   density: Density;
   hideValues: boolean;
   motion: MotionPref;
+  /**
+   * Vibração ao confirmar ações (beta.5): desligada por padrão. Mesmo ligada, só vibra se o
+   * "feedback tátil" do Android estiver ativo (o sistema decide, ver platform/native.ts).
+   */
+  haptics: boolean;
 }
 
 export const DEVICE_PREFS_KEY = 'prefs:device:v1';
 export const ACCENTS: readonly AccentId[] = ['petroleo', 'oceano', 'safira', 'indigo', 'ameixa', 'vinho', 'grafite', 'oliva'];
 const THEMES: readonly ThemePreference[] = ['system', 'light', 'dark'];
 
-export const DEFAULT_DEVICE_PREFS: DevicePrefs = { version: 1, theme: 'system', density: 'confortavel', hideValues: false, motion: 'sistema' };
+export const DEFAULT_DEVICE_PREFS: DevicePrefs = { version: 1, theme: 'system', density: 'confortavel', hideValues: false, motion: 'sistema', haptics: false };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -43,6 +48,8 @@ export function readDevicePrefs(stored: unknown, legacyTheme: ThemePreference | 
     density: stored.density === 'compacta' ? 'compacta' : 'confortavel',
     hideValues: stored.hideValues === true,
     motion: stored.motion === 'reduzir' ? 'reduzir' : 'sistema',
+    // Só `true` explícito liga: quem atualiza de versões anteriores fica sem vibração.
+    haptics: stored.haptics === true,
   };
 }
 

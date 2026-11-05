@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pin, Settings2 } from 'lucide-react';
-import { serviceChoices } from '../../domain/serviceTypes';
+import { applyServiceChoice, serviceChoices } from '../../domain/serviceTypes';
 import type { Appointment } from '../../domain/types';
 import { todayKey } from '../../lib/dates';
 import { centsToInput, formatMoney } from '../../lib/money';
@@ -77,7 +77,7 @@ function AppointmentForm({ appointment, defaultClientId, onDone }: { appointment
               <Chip
                 key={`${c.source}-${c.name}`}
                 active={v.title === c.name}
-                onClick={() => setV((cur) => ({ ...cur, title: c.name, price: cur.price || (c.price ? centsToInput(c.price) : '') }))}
+                onClick={() => setV((cur) => applyServiceChoice(cur, c))}
               >
                 {c.pinned && <Pin size={13} className="shrink-0" aria-label="Fixado" />}
                 <span>{c.name}{c.price ? <> · {hidden ? 'R$ •••••' : formatMoney(c.price)}</> : null}</span>

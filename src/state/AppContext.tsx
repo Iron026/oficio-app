@@ -9,7 +9,7 @@ import type { AppData, Settings } from '../domain/types';
 import { useToast } from '../ui/Toast';
 import { friendlyError } from '../lib/errors';
 import { hapticSuccess, setSystemBarsDark } from '../platform/native';
-import type { AppService, Feedback } from './service';
+import type { AppService, Feedback, UndoTicket } from './service';
 
 interface Ctx { service: AppService; persistent: boolean }
 
@@ -54,14 +54,33 @@ export function useAppearanceEffect(settings: Settings, prefs: DevicePrefs) {
   }, [accent, prefs.density, prefs.motion, prefs.theme]);
 }
 
+/**
+ * Ação "Desfazer" para um aviso: reverte de verdade pelo serviço (dados, vínculos e totais,
+ * sincronizando como qualquer alteração). Se não der mais para desfazer, explica o motivo.
+ */
+export function useUndoAction() {
+  const ctx = useContext(AppCtx);
+  const toast = useToast();
+  const onError = useErrorHandler();
+  return useCallback(
+    (ticket: UndoTicket | null | undefined) =>
+      ticket && ctx
+        ? { label: 'Desfazer', onClick: () => void ctx.service.undo(ticket).then(() => toast({ title: 'Ação desfeita', description: ticket.label, tone: 'info' }), onError) }
+        : undefined,
+    [ctx, toast, onError],
+  );
+}
+
 /** Converte o resultado da gamificação em feedback visual (toasts). */
 export function useFeedback() {
   const toast = useToast();
   const celebrate = useCelebration();
+  const prefs = usePrefs();
+  const undoAction = useUndoAction();
   return useCallback(
     (message: string, feedback?: Feedback, description?: string) => {
-      toast({ title: message, description, tone: 'success', xp: feedback?.xpGained || undefined });
-      void hapticSuccess(!!feedback && (feedback.achievements.length > 0 || !!feedback.levelUp || (feedback.seals?.length ?? 0) > 0));
+      toast({ title: message, description, tone: 'success', xp: feedback?.xpGained || undefined, action: undoAction(feedback?.undo) });
+      void hapticSuccess(prefs.haptics, !!feedback && (feedback.achievements.length > 0 || !!feedback.levelUp || (feedback.seals?.length ?? 0) > 0));
       if (!feedback) return;
       for (const e of feedback.events) {
         if (e.category === 'missao' || e.category === 'meta') toast({ title: e.label, tone: 'xp', xp: e.xp });
@@ -82,7 +101,7 @@ export function useFeedback() {
         if (def) toast({ title: `Selo ${def.name} · estágio ${ROMAN[a.stage]}`, description: def.unit(def.thresholds[a.stage - 1]!), tone: 'achievement' });
       }
     },
-    [toast, celebrate],
+    [toast, celebrate, prefs.haptics, undoAction],
   );
 }
 

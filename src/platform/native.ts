@@ -45,11 +45,21 @@ export async function setupKeyboard(): Promise<void> {
   });
 }
 
-/** Vibração curta de confirmação (somente no app). */
-export async function hapticSuccess(strong = false): Promise<void> {
-  if (!isNative()) return;
-  const { Haptics, ImpactStyle, NotificationType } = await import('@capacitor/haptics');
-  await (strong ? Haptics.notification({ type: NotificationType.Success }) : Haptics.impact({ style: ImpactStyle.Light })).catch(() => undefined);
+interface OficioHapticsPlugin { perform(opts: { strong: boolean }): Promise<{ performed: boolean }> }
+let haptics: OficioHapticsPlugin | null = null;
+
+/**
+ * Toque curto de confirmação (somente no app, e só se a pessoa ligou em Ajustes).
+ * Usa o feedback tátil do próprio Android (View.performHapticFeedback), que respeita o ajuste
+ * do sistema "Vibração e tátil › Feedback tátil": desligado lá, nada vibra aqui.
+ */
+export async function hapticSuccess(enabled: boolean, strong = false): Promise<void> {
+  if (!enabled || !isNative()) return;
+  if (!haptics) {
+    const { registerPlugin } = await import('@capacitor/core');
+    haptics = registerPlugin<OficioHapticsPlugin>('OficioHaptics');
+  }
+  await haptics.perform({ strong }).catch(() => undefined);
 }
 
 /** Versão e número de compilação reais do app instalado (Android); null no navegador. */

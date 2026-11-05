@@ -19,6 +19,16 @@ export function PrivacyPage() {
       <Group title="Animações" hint="“Reduzir” mostra comemorações, transições e a troca de paleta sem movimento neste aparelho.">
         <Segmented label="Animações" value={prefs.motion} onChange={(v) => service.updateDevicePrefs({ motion: v }).catch(onError)} options={[{ value: 'sistema', label: 'Seguir o sistema' }, { value: 'reduzir', label: 'Reduzir' }]} />
       </Group>
+      <Card className="!py-1">
+        <Switch
+          checked={prefs.haptics}
+          onChange={(v) => service.updateDevicePrefs({ haptics: v }).catch(onError)}
+          label="Vibração"
+          description={isNative()
+            ? 'Toque curto ao concluir ações. Desligada por padrão; também segue o feedback tátil do Android.'
+            : 'Toque curto ao concluir ações, só no app Android. Desligada por padrão.'}
+        />
+      </Card>
       <p className="text-sm text-muted">
         <Type size={15} className="mr-1 inline align-[-2px]" aria-hidden="true" />
         O tamanho do texto acompanha o ajuste de fonte do aparelho{isNative() ? ' (Configurações do Android › Tela › Tamanho da fonte)' : ''}.

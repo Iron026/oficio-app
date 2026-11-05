@@ -68,3 +68,36 @@ describe('Tipos de serviço na agenda', () => {
     expect((await reload(dbName)).data.serviceTypes).toHaveLength(1);
   });
 });
+
+describe('beta.5: troca de sugestões no agendamento (regressão do teste no S26)', () => {
+  it('cada sugestão escolhida atualiza descrição e preço, mesmo depois de editar o preço; a edição manual continua livre', async () => {
+    const { dbName, user } = await open('#/painel');
+    await user.click(await screen.findByRole('button', { name: /^agendar$/i }));
+    const form = await screen.findByRole('dialog', { name: /agendar/i });
+    const title = within(form).getByLabelText(/descrição/i);
+    const price = within(form).getByLabelText(/^valor/i);
+
+    await user.click(within(form).getByRole('button', { name: /^corte/i }));
+    expect(title).toHaveValue('Corte');
+    expect(price).toHaveValue('60,00');
+
+    await user.clear(price);
+    await user.type(price, '75,00'); // editado à mão
+    await user.click(within(form).getByRole('button', { name: /^escova/i }));
+    expect(title).toHaveValue('Escova');
+    expect(price).toHaveValue('50,00'); // antes da correção ficava 75,00
+
+    await user.click(within(form).getByRole('button', { name: /^manicure e pedicure/i }));
+    expect(title).toHaveValue('Manicure e pedicure');
+    expect(price).toHaveValue('55,00');
+
+    await user.clear(price);
+    await user.type(price, '58,00');
+    await user.type(title, ' com esmaltação');
+    await user.click(within(form).getByRole('button', { name: /^agendar$/i }));
+    await waitFor(async () => {
+      const s = await reload(dbName);
+      expect(s.data.appointments.map((a) => [a.title, a.price])).toEqual([['Manicure e pedicure com esmaltação', 5_800]]);
+    });
+  });
+});

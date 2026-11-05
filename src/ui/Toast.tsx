@@ -3,7 +3,14 @@ import { CircleCheck, Info, Sparkles, Trophy, TriangleAlert } from 'lucide-react
 import { cx } from './cx';
 
 export type ToastTone = 'success' | 'info' | 'error' | 'xp' | 'achievement';
-export interface ToastInput { title: string; description?: string; tone?: ToastTone; xp?: number }
+export interface ToastInput {
+  title: string;
+  description?: string;
+  tone?: ToastTone;
+  xp?: number;
+  /** Ação do aviso (ex.: "Desfazer"). Avisos com ação ficam mais tempo na tela. */
+  action?: { label: string; onClick: () => void };
+}
 interface ToastItem extends ToastInput { id: number }
 
 const Ctx = createContext<(t: ToastInput) => void>(() => undefined);
@@ -32,7 +39,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((t: ToastInput) => {
     const id = nextId.current++;
     setItems((cur) => [...cur.slice(-2), { ...t, id }]);
-    timers.current.set(id, setTimeout(() => dismiss(id), t.tone === 'achievement' ? 5000 : 3200));
+    // Com ação (Desfazer): 8 s, tempo para alcançar o botão também com leitor de tela.
+    timers.current.set(id, setTimeout(() => dismiss(id), t.action ? 8000 : t.tone === 'achievement' ? 5000 : 3200));
   }, [dismiss]);
 
   useEffect(() => {
@@ -61,6 +69,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               {t.description && <p className="text-sm text-muted">{t.description}</p>}
             </div>
             {!!t.xp && <span className="shrink-0 rounded-full bg-xp-100 px-2.5 py-1 text-sm font-bold text-xp-700">+{t.xp} XP</span>}
+            {t.action && (
+              <button
+                type="button"
+                className="press-soft -my-1 min-h-11 shrink-0 rounded-xl px-3 text-sm font-bold text-brand-700 underline-offset-2 hover:underline dark:text-brand-300"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dismiss(t.id);
+                  t.action!.onClick();
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>
