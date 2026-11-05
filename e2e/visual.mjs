@@ -490,7 +490,8 @@ try {
       await page.waitForTimeout(250);
       await page.screenshot({ path: `${OUT}/${vp.id}-${theme}-experiente-comemoracao.png` });
       report.capturas.push({ arquivo: `${vp.id}-${theme}-experiente-comemoracao.png`, viewport: vp.id, tema: theme, tela: 'experiente-comemoracao' });
-      await page.locator('[data-celebration]').click();
+      // A camada não captura toques (beta.5): um toque em qualquer ponto a fecha.
+      await page.mouse.click(8, Math.round((vp.height ?? 780) / 2));
       await page.locator('[data-celebration]').waitFor({ state: 'detached' });
       await page.getByRole('radio', { name: /^selos$/i }).click();
       await capture(page, vp, theme, 'experiente-selos');
