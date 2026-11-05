@@ -46,7 +46,8 @@ const hostDiagnostics = (tag) => {
     '-- processo do emulador:', sh('pgrep -a -f qemu-system || echo ausente'),
     '-- memória:', sh('free -m'),
     '-- kernel (OOM, kill, segfault):', sh("{ sudo -n dmesg -T 2>/dev/null || echo 'dmesg indisponível'; } | grep -iE 'oom|killed process|out of memory|segfault|qemu|emulator|indisponível' | tail -40; true") || 'nenhuma mensagem de OOM, kill ou segfault',
-    '-- arquivos de falha do emulador:', sh('ls -la /tmp/android-runner/ 2>/dev/null | tail -20 || echo nenhum'),
+    '-- arquivos de falha do emulador:', sh("find /tmp/android-runner -type f -printf '%TT %10s %p\\n' 2>/dev/null | sort | tail -30; true") || 'nenhum',
+    '-- minidumps copiados:', sh(`mkdir -p ${OUT}/emulador && find /tmp/android-runner -type f \\( -name '*.dmp' -o -name '*.txt' -o -name '*.log' \\) -exec cp -t ${OUT}/emulador/ {} + 2>/dev/null; ls ${OUT}/emulador; true`) || 'nenhum',
     '-- adb:', sh('adb devices -l'),
   ].join('\n');
   appendFileSync(`${OUT}/diagnostico-maquina.txt`, report + '\n\n');
