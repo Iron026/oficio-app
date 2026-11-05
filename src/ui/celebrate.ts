@@ -2,7 +2,13 @@
  * Comemorações exclusivas de cada categoria (rodada 4 aprovada). Web Animations API:
  * transform e opacity; o desenho de contornos usa stroke-dashoffset em poucos traços.
  * Roda uma vez por chamada e devolve a duração (ms). Com `reduce`, só um esmaecer curto.
+ *
+ * beta.5: andamento mais calmo. As mesmas etapas de cada categoria rodam {@link TEMPO}× mais
+ * devagar, para cada fase ser percebida, e a camada (Celebration.tsx) mostra os textos depois
+ * de montado o medalhão e faz uma pausa para contemplá-lo (ver {@link celebrationTiming}).
  */
+export const TEMPO = 1.75;
+let tempo = 1;
 const E = { out: 'cubic-bezier(.2,0,0,1)', back: 'cubic-bezier(.34,1.5,.64,1)', soft: 'cubic-bezier(.4,0,.2,1)' };
 
 type Kf = Keyframe[];
@@ -11,7 +17,7 @@ const one = (svg: Element, s: string) => svg.querySelector<SVGElement>(s);
 const num = (el: Element, attr: string) => Number(el.getAttribute(attr) ?? 0);
 
 function run(el: Element | null, kf: Kf, delay: number, duration: number, easing = E.out) {
-  el?.animate(kf, { delay, duration, easing, fill: 'both' });
+  el?.animate(kf, { delay: delay * tempo, duration: duration * tempo, easing, fill: 'both' });
 }
 /** Origem da transformação no centro do medalhão (coordenadas do viewBox). */
 function center(el: SVGElement | null, cx: number, cy: number) {
@@ -120,14 +126,38 @@ const TIERS: Record<string, (svg: SVGSVGElement) => number> = {
 };
 
 export function celebrate(svg: SVGSVGElement, opts: { reduce: boolean }): number {
-  svg.getAnimations({ subtree: true }).forEach((a) => a.cancel());
+  svg.getAnimations?.({ subtree: true }).forEach((a) => a.cancel());
   if (opts.reduce || typeof svg.animate !== 'function') {
     svg.animate?.([{ opacity: 0.4 }, { opacity: 1 }], { duration: 160 });
     return 160;
   }
   const fn = TIERS[svg.dataset.tier ?? ''];
-  return fn ? fn(svg) : 0;
+  if (!fn) return 0;
+  tempo = TEMPO;
+  try {
+    return Math.round(fn(svg) * TEMPO);
+  } finally {
+    tempo = 1;
+  }
 }
 
-/** Duração prevista (para testes e para o tempo de exibição da camada). */
-export const CELEBRATION_MS: Record<string, number> = { inicial: 700, bronze: 1260, prata: 1580, ouro: 1700, platina: 1780, diamante: 2430 };
+/** Duração da montagem do medalhão no andamento normal (sem o {@link TEMPO}). */
+const BASE_MS: Record<string, number> = { inicial: 700, bronze: 1260, prata: 1580, ouro: 1700, platina: 1780, diamante: 2430 };
+const DIAMOND_RANK_MS = [2430, 2600, 2770, 2940];
+/** Pausa para contemplar o medalhão pronto: cresce com a categoria. */
+const HOLD_MS: Record<string, number> = { inicial: 1400, bronze: 1500, prata: 1600, ouro: 1750, platina: 1900, diamante: 2100 };
+
+/** Duração prevista da montagem (ms), já no andamento da beta.5. */
+export const CELEBRATION_MS: Record<string, number> = Object.fromEntries(Object.entries(BASE_MS).map(([k, v]) => [k, Math.round(v * TEMPO)]));
+
+/**
+ * Linha do tempo da camada: montagem do medalhão, entrada do título (perto do fim da montagem),
+ * pausa e saída. Com "Reduzir animações": sem movimento, só um esmaecer, e o mesmo tempo de leitura.
+ */
+export function celebrationTiming(tier: { id: string; rank: number }, reduce: boolean): { build: number; textAt: number; hold: number; total: number } {
+  if (reduce) return { build: 160, textAt: 0, hold: 2200, total: 160 + 2200 };
+  const base = tier.id === 'diamante' ? (DIAMOND_RANK_MS[tier.rank - 1] ?? DIAMOND_RANK_MS[3]!) : (BASE_MS[tier.id] ?? 700);
+  const build = Math.round(base * TEMPO);
+  const hold = (HOLD_MS[tier.id] ?? 1400) + (tier.id === 'diamante' ? 150 * (tier.rank - 1) : 0);
+  return { build, textAt: Math.round(build * 0.72), hold, total: build + hold };
+}

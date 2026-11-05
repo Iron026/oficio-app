@@ -245,9 +245,28 @@ async function checks(page, tag) {
       }
     }
     window.scrollTo(0, 0);
-    return { overflow, fabOverlap };
+    // beta.5: trilha da Evolução — nenhum medalhão (com o anel do atual) encosta no vizinho
+    // nem sai do cartão.
+    const trail = [];
+    const box = document.querySelector('[data-trail]');
+    if (box) {
+      const area = box.getBoundingClientRect();
+      const items = [...box.querySelectorAll('[data-trail-item]')].map((btn) => {
+        const r = btn.getBoundingClientRect();
+        const ring = btn.dataset.trailItem === 'cur' ? 5 : 0;
+        // O desenho do medalhão fica dentro do círculo do botão (94%); o atual soma o anel de 5 px.
+        return { left: r.left - ring, right: r.right + ring, state: btn.dataset.trailItem };
+      });
+      items.forEach((it, i) => {
+        const n = items[i + 1];
+        if (n && it.right + 1 > n.left) trail.push(`${it.state}#${i} encosta no vizinho (${Math.round(it.right - n.left + 1)}px)`);
+        if (it.left < area.left - 0.5 || it.right > area.right + 0.5) trail.push(`#${i} sai do cartão`);
+      });
+    }
+    return { overflow, fabOverlap, trail };
   });
   if (m.overflow > 0) fail(`${tag}: transbordo horizontal de ${m.overflow}px`);
+  if (m.trail.length) fail(`${tag}: trilha da Evolução: ${m.trail.join(', ')}`);
   if (m.fabOverlap > 0) fail(`${tag}: botão flutuante cobre o último item da lista (${m.fabOverlap}px²)`);
 
   await page.addScriptTag({ content: axeSource });

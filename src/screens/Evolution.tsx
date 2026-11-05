@@ -109,34 +109,51 @@ export function Evolution() {
   );
 }
 
-/** Trilha das 6 categorias: conquistadas, atual (ampliada), próxima e bloqueadas. */
+/**
+ * Trilha das 6 categorias: conquistadas, atual (ampliada), próxima e bloqueadas.
+ * beta.5: o medalhão atual tem uma coluna própria mais larga, e os tamanhos acompanham a largura do
+ * cartão (unidades de contêiner), então o anel do atual nunca encosta nos vizinhos, de 320 px a
+ * tablets. A linha liga o centro do primeiro ao centro do último e se preenche até o atual.
+ */
+const CUR_WEIGHT = 1.45;
 function TierTrail({ current, level, onReplay }: { current: Tier; level: number; onReplay: (t: Tier) => void }) {
   const idx = TIERS.findIndex((t) => t.id === current.id);
+  const weights = TIERS.map((_, i) => (i === idx ? CUR_WEIGHT : 1));
+  const total = weights.reduce((a, b) => a + b, 0);
+  const centers = weights.map((w, i) => (weights.slice(0, i).reduce((a, b) => a + b, 0) + w / 2) / total);
+  const first = centers[0]!;
+  const last = centers[centers.length - 1]!;
+  const fill = (centers[idx]! - first) / (last - first);
+  const col = (w: number) => `calc(100cqw * ${w} / ${total})`;
   return (
-    <div className="relative px-0.5 pt-1">
-      <div aria-hidden="true" className="absolute left-6 right-6 top-[1.6rem] h-1 rounded-full bg-line">
-        <div className="bar-fill h-full w-full rounded-full bg-brand-500 dark:bg-brand-400" style={{ transform: `scaleX(${idx / (TIERS.length - 1)})` }} />
+    <div className="relative [container-type:inline-size]" data-trail="">
+      <div aria-hidden="true" className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-line" style={{ left: `${first * 100}%`, right: `${(1 - last) * 100}%` }}>
+        <div className="bar-fill h-full w-full rounded-full bg-brand-500 dark:bg-brand-400" style={{ transform: `scaleX(${fill})` }} />
       </div>
-      <ol aria-label={`Categorias: ${tierLabel(current)}`} className="relative flex justify-between">
+      <ol aria-label={`Categorias: ${tierLabel(current)}`} className="relative grid h-[4.5rem] items-center" style={{ gridTemplateColumns: weights.map((w) => `${w}fr`).join(' ') }}>
         {TIERS.map((t, i) => {
           const state = i < idx ? 'done' : i === idx ? 'cur' : i === idx + 1 ? 'next' : 'lock';
           const shown = i === idx ? current : t;
           const label = state === 'done' ? 'conquistada' : state === 'cur' ? 'você está aqui' : `a partir do nível ${t.minLevel}`;
+          // Atual: até 52 px + anel de 5 px; demais: até 40 px. Sempre com folga dentro da coluna.
+          const size = state === 'cur' ? `min(3.25rem, calc(${col(CUR_WEIGHT)} - 16px))` : `min(2.5rem, calc(${col(1)} - 6px))`;
           return (
-            <li key={t.id} aria-current={state === 'cur' ? 'step' : undefined}>
+            <li key={t.id} aria-current={state === 'cur' ? 'step' : undefined} className="flex min-w-0 justify-center">
               <button
                 type="button"
                 disabled={state === 'next' || state === 'lock'}
                 onClick={() => onReplay(shown)}
                 aria-label={`${shown.name}: ${label}${state === 'done' || state === 'cur' ? '. Toque para rever a comemoração' : ''}`}
+                data-trail-item={state}
+                style={{ width: size, height: size }}
                 className={cx(
-                  'press grid h-12 w-12 place-items-center rounded-full bg-surface disabled:cursor-default',
-                  state === 'cur' && 'scale-110 shadow-[0_0_0_3px_var(--surface),0_0_0_5px_var(--color-brand-500)]',
+                  'press relative grid shrink-0 place-items-center rounded-full bg-surface disabled:cursor-default',
+                  state === 'cur' && 'z-10 shadow-[0_0_0_3px_var(--surface),0_0_0_5px_var(--color-brand-500)]',
                   state === 'next' && 'opacity-80 grayscale-[.6]',
                   state === 'lock' && 'opacity-45 grayscale',
                 )}
               >
-                <CategoryMedal tier={shown} size={46} decorative />
+                <CategoryMedal tier={shown} decorative className="h-[94%] w-[94%]" />
               </button>
             </li>
           );

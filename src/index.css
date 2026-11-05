@@ -204,11 +204,31 @@ input, select, textarea, button { font: inherit; }
   --pad-card: 0.75rem;
 }
 
+/*
+ * Cabeçalho (beta.5): degradê suave. O topo é exatamente --hero-1 em toda a largura (igual à
+ * barra fixa acima, sem emenda); a transição até --hero-2 é vertical, interpolada em oklab com
+ * paradas em curva suave (sem faixas visíveis), e o brilho fica abaixo da emenda e se dissolve
+ * aos poucos. Só gradientes CSS: nada de filtros, imagens ou animação.
+ */
 @utility hero {
   color: #fff;
-  background:
-    radial-gradient(120% 90% at 100% 0%, var(--hero-glow), transparent 60%),
-    linear-gradient(160deg, var(--hero-1), var(--hero-2));
+  background: linear-gradient(180deg, var(--hero-1), var(--hero-2));
+  background-color: var(--hero-2);
+  background-image:
+    radial-gradient(120% 140% at 96% 88%,
+      color-mix(in srgb, var(--hero-glow) 70%, transparent) 0%,
+      color-mix(in srgb, var(--hero-glow) 44%, transparent) 24%,
+      color-mix(in srgb, var(--hero-glow) 20%, transparent) 46%,
+      color-mix(in srgb, var(--hero-glow) 6%, transparent) 60%,
+      transparent 70%),
+    linear-gradient(180deg,
+      var(--hero-1) 0%,
+      color-mix(in oklab, var(--hero-1) 92%, var(--hero-2)) 14%,
+      color-mix(in oklab, var(--hero-1) 74%, var(--hero-2)) 34%,
+      color-mix(in oklab, var(--hero-1) 50%, var(--hero-2)) 54%,
+      color-mix(in oklab, var(--hero-1) 27%, var(--hero-2)) 74%,
+      color-mix(in oklab, var(--hero-1) 9%, var(--hero-2)) 90%,
+      var(--hero-2) 100%);
 }
 
 /* Barras de progresso: preenchimento por transform (600 ms) e animação ao aparecer. */
