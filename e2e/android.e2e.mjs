@@ -49,7 +49,14 @@ const step = async (name, fn) => {
     const tela = await describeScreen();
     results.push({ name, ok: false, error: String(err?.message ?? err), tela });
     console.log('FALHOU\n', err, '\n  tela:', JSON.stringify(tela));
+    // Captura e log do aparelho ANTES de encerrar (cada um com tempo limite próprio).
     shot(`falha-${results.length}`);
+    try {
+      writeFileSync(`${OUT}/falha-${results.length}-logcat.txt`, execFileSync('adb', ['logcat', '-d', '-t', '2000'], { encoding: 'utf8', timeout: 30_000 }));
+    } catch (e) {
+      console.log(`  (logcat indisponível: ${String(e?.message ?? e).split('\n')[0]})`);
+    }
+    writeFileSync(`${OUT}/resultado.json`, JSON.stringify(results, null, 2));
     // Nunca fica parado depois de uma falha: encerra em até 2 min mesmo se o aparelho não responder.
     setTimeout(() => {
       writeFileSync(`${OUT}/resultado.json`, JSON.stringify(results, null, 2));
@@ -315,6 +322,15 @@ try {
     await tap(page.getByRole('button', { name: /concluir atendimento/i }));
     await tap(page.getByRole('dialog', { name: 'Data futura' }).getByRole('button', { name: /concluir mesmo assim/i }));
     await noteToast(page, /atendimento concluído/i);
+    // beta.5: os avisos não capturam toques fora do botão Desfazer, e há no máximo dois.
+    const avisos = await page.evaluate(() => [...document.querySelectorAll('[data-toast]')].map((t) => {
+      const r = t.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + 12, r.top + r.height / 2);
+      return { tipo: t.getAttribute('data-toast'), bloqueia: !!hit && t.contains(hit) };
+    }));
+    console.log(`\n  avisos na tela: ${JSON.stringify(avisos)}`);
+    assert(avisos.length <= 2, `mais de 2 avisos empilhados (${avisos.length})`);
+    assert(avisos.every((a) => !a.bloqueia), 'um aviso está capturando toques fora do botão Desfazer');
     // Prova durável: serviço concluído e UMA receita vinculada gravados.
     await eventually(async () => {
       const ap = (await readStore(page, 'appointments')).find((a) => a.title === 'Corte antecipado');
@@ -338,7 +354,10 @@ try {
   await step('Modo escuro', async () => {
     await tap(page.getByRole('button', { name: /^ajustes$/i }));
     await tap(page.getByRole('button', { name: /aparência e personalização/i }));
-    await tap(page.getByRole('radio', { name: /escuro/i }));
+    const escuro = page.getByRole('radio', { name: /escuro/i });
+    await tap(escuro);
+    // Duas provas separadas: o toque chegou ao seletor (marcado) e o tema foi aplicado.
+    await eventually(async () => (await escuro.getAttribute('aria-checked')) === 'true', 'o toque em "Escuro" não chegou ao seletor de tema');
     await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
     await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
     await wait(1000);

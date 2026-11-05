@@ -43,11 +43,52 @@ describe('ToastProvider — temporizadores', () => {
     errors.mockRestore();
   });
 
-  it('fechar com toque cancela o temporizador daquele aviso', () => {
-    renderWith([{ title: 'Toque para fechar' }]);
-    expect(vi.getTimerCount()).toBe(1);
-    act(() => screen.getByText('Toque para fechar').click());
-    expect(screen.queryByText('Toque para fechar')).not.toBeInTheDocument();
+  it('beta.5: o aviso não captura toques (só o botão de ação); tocar nele não o fecha', () => {
+    renderWith([{ title: 'Salvo' }, { title: 'Concluído', action: { label: 'Desfazer', onClick: () => undefined } }]);
+    const info = document.querySelector('[data-toast="info"]')!;
+    const acao = document.querySelector('[data-toast="acao"]')!;
+    expect(info.className).toMatch(/pointer-events-none/);
+    expect(acao.className).toMatch(/pointer-events-none/);
+    const btn = screen.getByRole('button', { name: 'Desfazer: Concluído' });
+    expect(btn.className).toMatch(/pointer-events-auto/);
+    expect(btn.className).toMatch(/min-h-11/); // área de toque de 44 px
+    act(() => (info as HTMLElement).click());
+    expect(screen.getByText('Salvo')).toBeInTheDocument();
+  });
+
+  it('beta.5: no máximo 2 avisos; o "Desfazer" fica e sai primeiro o mais antigo sem ação', () => {
+    renderWith([
+      { title: 'Concluído', action: { label: 'Desfazer', onClick: () => undefined } },
+      { title: 'Conquista', tone: 'achievement' },
+      { title: 'Nível 2', tone: 'achievement' },
+    ]);
+    expect(document.querySelectorAll('[data-toast]')).toHaveLength(2);
+    expect(screen.getByText('Concluído')).toBeInTheDocument();
+    expect(screen.queryByText('Conquista')).not.toBeInTheDocument();
+    expect(screen.getByText('Nível 2')).toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(2); // o temporizador do aviso que saiu foi cancelado
+  });
+
+  it('beta.5: com o "Desfazer" em foco (teclado ou TalkBack) o aviso não some; ao sair do foco, mais 4 s', () => {
+    const onClick = vi.fn();
+    renderWith([{ title: 'Concluído', action: { label: 'Desfazer', onClick } }]);
+    const btn = screen.getByRole('button', { name: /^desfazer/i });
+    act(() => btn.focus());
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(screen.getByText('Concluído')).toBeInTheDocument();
+    act(() => btn.blur());
+    act(() => vi.advanceTimersByTime(3999));
+    expect(screen.getByText('Concluído')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByText('Concluído')).not.toBeInTheDocument();
+  });
+
+  it('beta.5: tocar em Desfazer executa a ação e fecha o aviso', () => {
+    const onClick = vi.fn();
+    renderWith([{ title: 'Concluído', action: { label: 'Desfazer', onClick } }]);
+    act(() => screen.getByRole('button', { name: /^desfazer/i }).click());
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Concluído')).not.toBeInTheDocument();
     expect(vi.getTimerCount()).toBe(0);
   });
 });

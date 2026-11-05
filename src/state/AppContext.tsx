@@ -10,6 +10,7 @@ import { useToast } from '../ui/Toast';
 import { friendlyError } from '../lib/errors';
 import { hapticSuccess, setSystemBarsDark } from '../platform/native';
 import type { AppService, Feedback, UndoTicket } from './service';
+import { summarizeFeedback } from './feedbackSummary';
 
 interface Ctx { service: AppService; persistent: boolean }
 
@@ -82,24 +83,15 @@ export function useFeedback() {
       toast({ title: message, description, tone: 'success', xp: feedback?.xpGained || undefined, action: undoAction(feedback?.undo) });
       void hapticSuccess(prefs.haptics, !!feedback && (feedback.achievements.length > 0 || !!feedback.levelUp || (feedback.seals?.length ?? 0) > 0));
       if (!feedback) return;
-      for (const e of feedback.events) {
-        if (e.category === 'missao' || e.category === 'meta') toast({ title: e.label, tone: 'xp', xp: e.xp });
-      }
-      for (const e of feedback.events.filter((x) => x.category === 'conquista')) {
-        toast({ title: 'Conquista desbloqueada!', description: e.label.replace('Conquista: ', ''), tone: 'achievement', xp: e.xp });
-      }
-      if (feedback.levelUp) {
-        const tier = feedback.tierUp;
-        if (tier) {
-          toast({ title: tier.id === 'diamante' && tier.rank > 1 ? `Novo grau: ${tier.name}` : `Nova categoria: ${tier.name}`, description: `Nível ${feedback.levelUp} · ${tier.title}. Sua moldura de perfil mudou.`, tone: 'achievement' });
-          celebrate(tier, feedback.levelUp);
-        }
-        else toast({ title: `Você chegou ao nível ${feedback.levelUp}!`, description: 'Continue evoluindo no seu ofício.', tone: 'achievement' });
-      }
-      for (const a of feedback.seals ?? []) {
-        const def = getSeal(a.id);
-        if (def) toast({ title: `Selo ${def.name} · estágio ${ROMAN[a.stage]}`, description: def.unit(def.thresholds[a.stage - 1]!), tone: 'achievement' });
-      }
+      // Um único aviso com as novidades (beta.5): no máximo dois avisos por ação.
+      const extra = summarizeFeedback({
+        events: feedback.events,
+        levelUp: feedback.levelUp,
+        tierUp: feedback.tierUp,
+        seals: (feedback.seals ?? []).flatMap((a) => { const def = getSeal(a.id); return def ? [{ name: def.name, stage: ROMAN[a.stage]! }] : []; }),
+      });
+      if (extra) toast({ ...extra, tone: 'achievement' });
+      if (feedback.levelUp && feedback.tierUp) celebrate(feedback.tierUp, feedback.levelUp);
     },
     [toast, celebrate, prefs.haptics, undoAction],
   );

@@ -46,7 +46,7 @@ describe('beta.5: atendimento concluído sem receita', () => {
     expect(s.data.transactions.map((t) => t.amount)).toEqual([30_000]);
     expect(s.data.appointments[0]).toMatchObject({ status: 'concluido', transactionId: s.data.transactions[0]!.id });
 
-    await user.click(screen.getByRole('button', { name: 'Desfazer' }));
+    await user.click(screen.getByRole('button', { name: /^desfazer/i }));
     expect(await screen.findByText('Ação desfeita')).toBeInTheDocument();
     s = await reload();
     expect(s.data.transactions).toEqual([]);
@@ -63,7 +63,7 @@ describe('beta.5: atendimento concluído sem receita', () => {
     const dlg = await screen.findByRole('dialog', { name: /excluir lançamento/i });
     expect(dlg).toHaveTextContent(/continua concluído, sem lançamento financeiro/);
     await user.click(within(dlg).getByRole('button', { name: /^excluir$/i }));
-    await user.click(await screen.findByRole('button', { name: 'Desfazer' }));
+    await user.click(await screen.findByRole('button', { name: /^desfazer/i }));
     await screen.findByText('Ação desfeita');
     const s = await reload();
     expect(s.data.transactions.map((t) => t.amount)).toEqual([5_000]);
@@ -77,7 +77,13 @@ describe('beta.5: atendimento concluído sem receita', () => {
     await user.click(await screen.findByRole('button', { name: /corte/i }));
     const sheet = await screen.findByRole('dialog', { name: 'Corte' });
     await user.click(within(sheet).getByRole('button', { name: /concluir atendimento/i }));
-    await user.click(await screen.findByRole('button', { name: 'Desfazer' }));
+    // Primeira conclusão: conquista e nível novos chegam num aviso só (no máximo 2 avisos).
+    await screen.findByText(/conquista: primeiro atendimento/i);
+    const toasts = document.querySelectorAll('[data-toast]');
+    expect(toasts).toHaveLength(2);
+    expect(toasts[0]).toHaveTextContent(/\+\d+ XP/);
+    expect(toasts[1]).not.toHaveTextContent(/XP/);
+    await user.click(await screen.findByRole('button', { name: /^desfazer/i }));
     await screen.findByText('Ação desfeita');
     const s = await reload();
     expect(s.data.appointments[0]).toMatchObject({ status: 'agendado', transactionId: null });
