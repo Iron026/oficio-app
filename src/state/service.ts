@@ -1,6 +1,7 @@
 import { buildDemoData } from '../domain/demo';
 import { getProfession } from '../domain/professions';
 import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, ServiceType, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
+import { compareVersions, paidForAppointment, removableAutoIncome } from '../domain/compat';
 import { MAX_SERVICE_TYPES, moveServiceType, nextServiceOrder, serviceNameKey } from '../domain/serviceTypes';
 import { isValidProfileImage } from '../domain/profileImage';
 import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
@@ -52,7 +53,14 @@ type PrefsListener = (prefs: DevicePrefs) => void;
  * A interface (React) apenas lê `data` e chama métodos.
  */
 export interface BackupCounts { clients: number; appointments: number; transactions: number }
-export interface BackupPreview { exportedAt: string | null; appVersion: string | null; file: BackupCounts; current: BackupCounts }
+export interface BackupPreview {
+  exportedAt: string | null;
+  appVersion: string | null;
+  /** O arquivo foi exportado por uma versão mais nova do app (a interface avisa antes de restaurar). */
+  newerApp: boolean;
+  file: BackupCounts;
+  current: BackupCounts;
+}
 
 /** Chave (só neste aparelho) da data do último backup exportado. */
 export const LAST_EXPORT_KEY = 'export:lastBackup';
@@ -316,7 +324,10 @@ export class AppService {
       const existing = id ? this._data.clients.find((c) => c.id === id) : undefined;
       if (id && !existing) throw new Error('Cliente não encontrado');
       const stamp = this.stamp();
+      // `...existing` primeiro: campos que esta versão não conhece (gravados por versões
+      // mais novas) são preservados ao editar. Ver docs/COMPATIBILIDADE-0.5.md.
       const client: Client = {
+        ...existing,
         id: existing?.id ?? newId(), createdAt: existing?.createdAt ?? stamp, updatedAt: stamp,
         ...(existing?.isDemo ? { isDemo: true } : {}),
         name: input.name.trim(), phone: input.phone.trim(), email: input.email.trim(), address: input.address.trim(), notes: input.notes.trim(),
@@ -354,6 +365,7 @@ export class AppService {
       if (id && !existing) throw new Error('Agendamento não encontrado');
       const stamp = this.stamp();
       const appointment: Appointment = {
+        ...existing,
         id: existing?.id ?? newId(), createdAt: existing?.createdAt ?? stamp, updatedAt: stamp,
         ...(existing?.isDemo ? { isDemo: true } : {}),
         title: input.title.trim(),
@@ -371,7 +383,11 @@ export class AppService {
     });
   }
 
-  /** Conclui o serviço e, opcionalmente, lança a receita correspondente. */
+  /**
+   * Conclui o serviço e, opcionalmente, lança a receita correspondente. Desde a beta.4 a receita
+   * é só do que ainda falta: pagamentos já registrados (pela 0.5, inclusive antecipados) são
+   * descontados, e nada é lançado se o serviço já estiver pago.
+   */
   completeAppointment(id: string, options: { registerIncome: boolean }): Promise<Feedback> {
     return this.run(async () => {
       const a = this._data.appointments.find((x) => x.id === id);
@@ -380,11 +396,12 @@ export class AppService {
       const stamp = this.stamp();
       let transactions = this._data.transactions;
       let transactionId = a.transactionId;
-      if (options.registerIncome && a.price > 0 && !transactionId) {
+      const due = Math.max(0, a.price - paidForAppointment(a.id, transactions));
+      if (options.registerIncome && due > 0 && !transactionId) {
         const profession = getProfession(this._data.profile?.professionId);
         const tx: Transaction = {
           id: newId(), createdAt: stamp, updatedAt: stamp, ...(a.isDemo ? { isDemo: true } : {}),
-          type: 'receita', amount: a.price, description: a.title, category: profession.incomeCategories[0]!,
+          type: 'receita', amount: due, description: a.title, category: profession.incomeCategories[0]!,
           date: a.date > todayKey(this.now()) ? todayKey(this.now()) : a.date, appointmentId: a.id,
         };
         await this.storage.transactions.put(tx);
@@ -399,15 +416,19 @@ export class AppService {
     });
   }
 
-  /** Muda o status (reabrir/cancelar). Remove a receita automática vinculada, se houver. */
+  /**
+   * Muda o status (reabrir/cancelar). Remove a receita automática lançada ao concluir, se houver
+   * (a interface confirma antes). Pagamentos registrados pela 0.5 nunca são removidos aqui.
+   */
   setAppointmentStatus(id: string, status: 'agendado' | 'cancelado'): Promise<void> {
     return this.run(async () => {
       const a = this._data.appointments.find((x) => x.id === id);
       if (!a) throw new Error('Agendamento não encontrado');
       let transactions = this._data.transactions;
-      if (a.transactionId) {
-        await this.storage.transactions.remove(a.transactionId);
-        transactions = transactions.filter((t) => t.id !== a.transactionId);
+      const auto = removableAutoIncome(a.transactionId, transactions);
+      if (auto) {
+        await this.storage.transactions.remove(auto.id);
+        transactions = transactions.filter((t) => t.id !== auto.id);
       }
       const updated: Appointment = { ...a, status, completedAt: null, transactionId: null, updatedAt: this.stamp() };
       await this.storage.appointments.put(updated);
@@ -415,17 +436,21 @@ export class AppService {
     });
   }
 
-  /** Exclui o agendamento e a receita gerada automaticamente por ele. */
+  /**
+   * Exclui o agendamento e a receita gerada automaticamente por ele. Pagamentos registrados
+   * pela 0.5 continuam em Finanças (o dinheiro entrou; a interface avisa antes).
+   */
   deleteAppointment(id: string): Promise<void> {
     return this.run(async () => {
       const a = this._data.appointments.find((x) => x.id === id);
       if (!a) return;
-      if (a.transactionId) await this.storage.transactions.remove(a.transactionId);
+      const auto = removableAutoIncome(a.transactionId, this._data.transactions);
+      if (auto) await this.storage.transactions.remove(auto.id);
       await this.storage.appointments.remove(id);
       this.set({
         ...this._data,
         appointments: this._data.appointments.filter((x) => x.id !== id),
-        transactions: this._data.transactions.filter((t) => t.id !== a.transactionId),
+        transactions: auto ? this._data.transactions.filter((t) => t.id !== auto.id) : this._data.transactions,
       });
     });
   }
@@ -440,6 +465,7 @@ export class AppService {
       if (id && !existing) throw new Error('Lançamento não encontrado');
       const stamp = this.stamp();
       const transaction: Transaction = {
+        ...existing,
         id: existing?.id ?? newId(), createdAt: existing?.createdAt ?? stamp, updatedAt: stamp,
         ...(existing?.isDemo ? { isDemo: true } : {}),
         type: input.type as Transaction['type'], amount: parseMoney(input.amount)!, description: input.description.trim(),
@@ -470,6 +496,7 @@ export class AppService {
       if (!existing && this._data.serviceTypes.length >= MAX_SERVICE_TYPES) throw new Error(`Limite de ${MAX_SERVICE_TYPES} tipos de serviço.`);
       const stamp = this.stamp();
       const type: ServiceType = {
+        ...existing,
         id: existing?.id ?? newId(),
         name: input.name.trim().replace(/\s+/g, ' '),
         price: input.price.trim() ? parseMoney(input.price)! : null,
@@ -591,7 +618,8 @@ export class AppService {
       /* parseBackup já validou o JSON */
     }
     const count = (d: AppData) => ({ clients: d.clients.length, appointments: d.appointments.length, transactions: d.transactions.length });
-    return { exportedAt, appVersion, file: count(parsed), current: count(this._data) };
+    const newerApp = appVersion !== null && (compareVersions(appVersion, __APP_VERSION__) ?? 0) > 0;
+    return { exportedAt, appVersion, newerApp, file: count(parsed), current: count(this._data) };
   }
 
   importBackup(text: string): Promise<void> {

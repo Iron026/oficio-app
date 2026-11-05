@@ -45,10 +45,13 @@ service cloud.firestore {
 
     // 0.4 (rodada 3) — tipo de serviço personalizado: só os campos conhecidos, nome de 1 a 60
     // caracteres, valor sugerido opcional (centavos, até R$ 1.000.000,00). Pode ser excluído.
+    // beta.4: duração sugerida opcional (minutos, 5 a 1440), usada pela 0.5.
     function validServiceType() {
       let r = request.resource.data;
       return r.deleted == true || (
-        r.data.keys().hasOnly(['id', 'name', 'price', 'pinned', 'order', 'createdAt', 'updatedAt'])
+        r.data.keys().hasOnly(['id', 'name', 'price', 'pinned', 'order', 'duration', 'createdAt', 'updatedAt'])
+        && (!('duration' in r.data) || r.data.duration == null
+              || (r.data.duration is int && r.data.duration >= 5 && r.data.duration <= 1440))
         && r.data.name is string && r.data.name.size() > 0 && r.data.name.size() <= 60
         && (r.data.price == null || (r.data.price is int && r.data.price > 0 && r.data.price <= 100000000))
         && r.data.pinned is bool

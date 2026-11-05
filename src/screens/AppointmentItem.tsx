@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Ban, Check, MessageCircle, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
+import { paidForAppointment, paymentsOf, removableAutoIncome } from '../domain/compat';
 import type { Appointment } from '../domain/types';
 import { formatDateShort, isFutureDateKey, relativeDayLabel, todayKey } from '../lib/dates';
 import { formatMoney } from '../lib/money';
@@ -95,6 +96,13 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
   const [editing, setEditing] = useState(false);
   const client = data.clients.find((c) => c.id === a.clientId);
   const wa = client ? whatsappLink(client.phone) : null;
+  // beta.4: pagamentos registrados pela 0.5 (inclusive antecipados) já entraram no caixa.
+  const paid = paidForAppointment(a.id, data.transactions);
+  const due = Math.max(0, a.price - paid);
+  const payments = paymentsOf(a.id, data.transactions);
+  const paymentsTotal = payments.reduce((s, p) => s + (p.amount as number), 0);
+  const autoIncome = removableAutoIncome(a.transactionId, data.transactions);
+  const keepsPayments = payments.length ? ` ${payments.length === 1 ? 'O pagamento registrado' : `Os ${payments.length} pagamentos registrados`} (${formatMoney(paymentsTotal)}) ${payments.length === 1 ? 'continua' : 'continuam'} em Finanças.` : '';
 
   async function complete() {
     // Conclusão antecipada: só pergunta quando a data do serviço é futura
@@ -112,15 +120,15 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
     }
     try {
       const fb = await service.completeAppointment(a.id, { registerIncome });
-      feedback(`${t.service} ${t.completedLabel}!`, fb, registerIncome && a.price > 0 ? `Receita de ${formatMoney(a.price)} lançada.` : undefined);
+      feedback(`${t.service} ${t.completedLabel}!`, fb, registerIncome && due > 0 ? `Receita de ${formatMoney(due)} lançada.` : undefined);
       onClose();
     } catch (err) {
       onError(err);
     }
   }
   async function setStatus(status: 'agendado' | 'cancelado') {
-    if (a.transactionId) {
-      const ok = await confirm({ title: status === 'agendado' ? 'Reabrir?' : 'Cancelar?', message: `A receita lançada automaticamente para est${t.serviceArticle === 'a' ? 'a' : 'e'} ${t.service.toLowerCase()} será removida do financeiro.`, confirmLabel: 'Continuar' });
+    if (autoIncome) {
+      const ok = await confirm({ title: status === 'agendado' ? 'Reabrir?' : 'Cancelar?', message: `A receita lançada automaticamente para est${t.serviceArticle === 'a' ? 'a' : 'e'} ${t.service.toLowerCase()} (${formatMoney(autoIncome.amount as number)}) será removida do financeiro.${keepsPayments}`, confirmLabel: 'Continuar' });
       if (!ok) return;
     }
     try {
@@ -134,7 +142,7 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
   async function remove() {
     const ok = await confirm({
       title: `Excluir ${t.service.toLowerCase()}?`,
-      message: a.transactionId ? 'O registro e a receita gerada por ele serão excluídos permanentemente.' : 'Este registro será excluído permanentemente.',
+      message: `${autoIncome ? 'O registro e a receita gerada por ele serão excluídos permanentemente.' : 'Este registro será excluído permanentemente.'}${keepsPayments}`,
       confirmLabel: 'Excluir', danger: true,
     });
     if (!ok) return;
@@ -167,11 +175,17 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
 
         {a.status === 'agendado' && (
           <div className="mb-3 space-y-3">
-            {a.price > 0 && (
+            {due > 0 && (
               <label className="flex items-center gap-3 rounded-xl border border-line p-3 text-sm">
                 <input type="checkbox" checked={registerIncome} onChange={(e) => setRegisterIncome(e.target.checked)} className="h-5 w-5 accent-brand-600" />
-                <span>Lançar receita de <strong>{formatMoney(a.price)}</strong> no financeiro</span>
+                <span>
+                  Lançar receita de <strong className="num">{formatMoney(due)}</strong> no financeiro
+                  {paid > 0 && <span className="block text-muted">{formatMoney(paid)} já recebidos</span>}
+                </span>
               </label>
+            )}
+            {a.price > 0 && due === 0 && paid > 0 && (
+              <p className="rounded-xl bg-surface-2 p-3 text-sm text-muted">Já recebido: <strong className="num text-fg">{formatMoney(paid)}</strong>. Nenhuma receita nova será lançada.</p>
             )}
             <Button block size="lg" icon={<Check size={20} />} onClick={complete}>{t.completeVerb}</Button>
           </div>

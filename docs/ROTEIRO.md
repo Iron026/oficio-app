@@ -13,6 +13,9 @@ computador · 6 acessibilidade, desempenho e entrega. Ver `docs/DESIGN.md`.
   opcional nos lançamentos (categoria obrigatória), extrato mensal em PDF e CSV, tipos de serviço
   personalizados (só no aparelho e no backup), galeria Personagens (mulher e homem por área) e Ícones.
   Medalhões e comemorações da rodada 4 mantidos; XP, níveis e títulos sem mudança (R1/R2 pendentes).
+- 0.4.0-beta.4: compatibilidade com a 0.5 — edições preservam campos desconhecidos; pagamentos e estornos da
+  0.5 nunca são removidos ao reabrir, cancelar, excluir ou sincronizar; concluir lança só o que falta; backup
+  de versão mais nova é avisado e conferido. Sem mudança visual. Ver `docs/COMPATIBILIDADE-0.5.md`.
 
 ## 0.3.1 (manutenção — branch `fix/v0.3.1-maintenance`, aguardando aprovação)
 - Exportar backup no Android: “Salvar no aparelho” pela janela “Salvar como” (Storage Access

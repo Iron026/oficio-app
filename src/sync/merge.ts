@@ -1,4 +1,5 @@
 import type { SealAward } from '../domain/types';
+import { isPaymentRecord } from '../domain/compat';
 import { mergeAward } from '../gamification/seals';
 import type { MetaData } from './types';
 import { FINANCIAL_COLLECTIONS, type Entity, type SyncCollection } from './types';
@@ -98,11 +99,13 @@ function resolveCompletionFields(r: MergeOutcome, local: Entity, remote: Entity)
  * Receitas automáticas duplicadas: o mesmo serviço concluído offline em dois
  * aparelhos gera duas receitas com o mesmo `appointmentId`. Mantém a mais
  * antiga (desempate pelo id) — todos os aparelhos chegam ao mesmo resultado.
+ * Pagamentos da 0.5 (receitas com o marcador `payment`) podem ser vários por serviço e
+ * nunca entram nesta limpeza (beta.4).
  */
-export function duplicateAutoIncomeIds(transactions: { id: string; type?: unknown; appointmentId?: unknown; createdAt?: unknown }[]): { remove: string[]; keepByAppointment: Map<string, string> } {
+export function duplicateAutoIncomeIds(transactions: { id: string; type?: unknown; appointmentId?: unknown; createdAt?: unknown; payment?: unknown }[]): { remove: string[]; keepByAppointment: Map<string, string> } {
   const groups = new Map<string, { id: string; createdAt: string }[]>();
   for (const t of transactions) {
-    if (t.type !== 'receita' || typeof t.appointmentId !== 'string' || !t.appointmentId) continue;
+    if (t.type !== 'receita' || typeof t.appointmentId !== 'string' || !t.appointmentId || isPaymentRecord(t)) continue;
     const g = groups.get(t.appointmentId) ?? [];
     g.push({ id: t.id, createdAt: String(t.createdAt ?? '') });
     groups.set(t.appointmentId, g);

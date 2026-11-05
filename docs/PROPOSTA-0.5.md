@@ -1,7 +1,9 @@
 # Proposta da 0.5.0 — gestão profissional
 
-Situação: **proposta para aprovação**. Nada desta página está implementado. Base: 0.4.0-beta.3 auditada
-([AUDITORIA-0.4.md](AUDITORIA-0.4.md)). Identidade visual, paletas, medalhões, animações e avatares não mudam.
+Situação: **aprovada com ajustes** (5 nov 2026). Os ajustes pedidos estão incorporados abaixo e marcados com
+**[ajuste]**. A implementação só começa depois da validação da 0.4.0-beta.4 no aparelho
+([COMPATIBILIDADE-0.5.md](COMPATIBILIDADE-0.5.md)). Base: 0.4.0-beta.3 auditada ([AUDITORIA-0.4.md](AUDITORIA-0.4.md)).
+Identidade visual, paletas, medalhões, animações, avatares e todas as opções de personalização não mudam.
 
 ## 1. Princípios
 
@@ -33,15 +35,22 @@ apaga essa receita.
 Situação do pagamento (derivada, nunca gravada): *sem valor* (preço 0) · *pendente* (nada pago) · *parcial* ·
 *integral* · *antecipado* (algum pagamento com data anterior à data do serviço) · *acima do combinado* (aviso).
 
-- **Concluir** passa a perguntar quanto foi recebido agora: “Recebi o total” (padrão, igual ao comportamento atual),
-  “Recebi parte” (valor) ou “Ainda não recebi”. Só cria receita para o que foi recebido.
+- **[ajuste] Concluir exige uma escolha explícita**, sem opção pré-selecionada: “Recebi tudo que faltava”,
+  “Recebi parte” (valor) ou “Ainda não recebi”. O botão Concluir fica desabilitado até a escolha. Só cria receita
+  para o que foi recebido; nada entra no saldo por suposição.
 - **Registrar pagamento** a qualquer momento (antes = antecipado, depois = quitação), com data e forma
   (dinheiro, Pix, cartão, transferência, outra — opcional).
-- **Reabrir, cancelar ou excluir** um serviço com pagamentos **pergunta**: manter os pagamentos como receitas
-  (padrão) ou excluí-los. Nunca apaga dinheiro sem confirmação.
+- **Reabrir, cancelar ou excluir** um serviço com pagamentos **mantém os pagamentos por padrão**. Excluir, corrigir
+  ou estornar um pagamento é uma ação separada, com confirmação específica que mostra o valor e o efeito no saldo.
+  Nunca há perda silenciosa de histórico financeiro.
+- **[ajuste] Estorno** é uma despesa vinculada ao serviço com o marcador de pagamento (contrato em
+  COMPATIBILIDADE-0.5.md): o histórico mostra o pagamento e o estorno, e o saldo cai pelo valor estornado.
+- Pagamentos antecipados são preservados como estão; só entra no saldo o valor efetivamente recebido, na data em
+  que foi recebido.
 - **Migração: nenhuma alteração nos dados.** Receitas automáticas antigas continuam sendo o pagamento integral
   do serviço. Para não criar pendências fantasmas, serviços concluídos **antes** da 0.5 sem receita vinculada
-  aparecem como “pagamento não registrado” e ficam fora do “a receber” (o profissional pode registrar se quiser).
+  aparecem como **“pagamento não registrado”** — nem pago, nem pendente — e ficam fora do “a receber” (o
+  profissional pode registrar se quiser). Valores e saldos existentes não mudam.
   A partir da 0.5, todo serviço concluído recebe `payments: true` (controle de pagamento ativo).
 - **XP:** receitas vinculadas a serviço **não** dão o XP de lançamento (`transaction_created`); o serviço continua
   dando o XP de conclusão uma única vez (chave por id, como hoje). Parcelas, pagamentos antecipados e edições não
@@ -50,10 +59,15 @@ Situação do pagamento (derivada, nunca gravada): *sem valor* (preço 0) · *pe
 
 ### 2.2 Agenda inteligente
 
+- **[ajuste] Dia inteiro (00:00–24:00).** A visão diária não tem janela fixa: abre rolada até o primeiro
+  atendimento do dia (ou até agora, se não houver), e mostra atendimentos de madrugada e à noite. A semana
+  marca os atendimentos fora do horário comercial sem escondê-los.
+
 - **Visões dia, semana e mês** sobre os agendamentos existentes, com “Hoje” em destaque e setas/gestos para trocar de
   período. A lista atual (abertos, concluídos, cancelados) continua como filtro.
-- **Duração:** campo opcional `duration` (minutos) no agendamento e no tipo de serviço. Agendamentos antigos usam a
-  duração padrão da agenda (60 min, ajustável) — nada é gravado neles.
+- **Duração:** campo opcional `duration` (minutos) no agendamento e no tipo de serviço. A duração do tipo é só
+  uma **sugestão, sempre editável** no agendamento. Agendamentos antigos usam a duração padrão da agenda (60 min,
+  ajustável) — nada é gravado neles.
 - **Conflitos:** dois agendamentos não cancelados no mesmo dia cujos intervalos se sobrepõem. Ao salvar, aviso com os
   atendimentos envolvidos e as opções “Salvar mesmo assim” e “Mudar horário”. **Nunca bloqueia.** Na visão de dia, os
   sobrepostos aparecem lado a lado com um marcador.
@@ -74,10 +88,15 @@ Situação do pagamento (derivada, nunca gravada): *sem valor* (preço 0) · *pe
   concluídas e não destacadas; as passadas ficam como estão) ou **toda a série** (idem, desde a primeira não
   concluída). Cancelar uma ocorrência deixa a exceção registrada (o gerador não a recria).
 - **XP:** só a criação da série dá o XP de agendamento (uma vez); ocorrências geradas não.
+- **[ajuste] Nada reaparece.** O gerador só cria datas depois do maior `series.through` já gravado; nunca preenche
+  lacunas. Uma ocorrência excluída (inclusive num aparelho na 0.4), cancelada ou alterada não é recriada.
+  Testes obrigatórios: duplicação em dois aparelhos offline, cancelamento, exceções, “esta e próximas” com
+  exceção no meio, e sincronização depois de dias offline.
 
 ### 2.4 Histórico do cliente
 
-Derivado (`src/domain/clientHistory.ts`): dados cadastrais, serviços realizados e futuros, último atendimento,
+Derivado (`src/domain/clientHistory.ts`) a partir dos **lançamentos reais** vinculados aos serviços, sem copiar
+nenhum valor financeiro: dados cadastrais, serviços realizados e futuros, último atendimento,
 quantidade, **total efetivamente pago** (receitas vinculadas aos serviços do cliente), **valores pendentes**, serviços
 mais usados, frequência média (dias entre atendimentos concluídos) e observações. Nenhum dado duplicado. Respeita
 “Ocultar valores”. Isolamento entre contas: inalterado (dados por conta, regras atuais).
@@ -100,7 +119,14 @@ equivalentes para leitores de tela. Fórmulas:
 | A receber | Σ (combinado − pago) dos concluídos com controle de pagamento | Pagamentos |
 | Previsto | Σ preço dos agendados no período − pagos antecipados | Agenda (separado do caixa) |
 
+| Frequência do cliente | média dos intervalos (em dias) entre atendimentos concluídos consecutivos; com menos de 2, “sem histórico suficiente” | Agenda |
+
 Demonstração (`isDemo`) fica fora dos relatórios, como já acontece no XP.
+
+**[ajuste] Separação rigorosa:** recebido (caixa), pendente (a receber) e previsto aparecem sempre em blocos
+distintos e nunca são somados. Cada fórmula tem teste próprio, incluindo saldo negativo, meses sem movimentação
+(zero, não “sem dados”), quantias elevadas (até R$ 1 milhão por registro, somas acima de R$ 100 milhões sem perda de
+precisão: tudo em centavos inteiros) e estornos.
 
 ### 2.6 Lembretes de atendimento
 
@@ -144,8 +170,10 @@ Com “Ocultar valores”, valores aparecem mascarados e a busca não encontra r
 
 ### 2.10 Restauração aprimorada
 
-Já existe: resumo “agora × arquivo”, data, versão do app (desde a auditoria), verificação de integridade e cópia de
-segurança automática antes. A 0.5 acrescenta: **compatibilidade** (formato, versão mais antiga/mais nova), **o que
+Já existe: resumo “agora × arquivo”, data, versão do app (desde a auditoria), verificação de integridade, cópia de
+segurança automática antes e, desde a beta.4, aviso de arquivo de versão mais nova e conferência dos campos da 0.5.
+**[ajuste]** Um arquivo de versão futura nunca é considerado compatível só pelo formato: cada estrutura é
+validada, e qualquer erro recusa o arquivo inteiro antes de alterar algo (a gravação é uma única transação). A 0.5 acrescenta: **compatibilidade** (formato, versão mais antiga/mais nova), **o que
 será substituído e o que é preservado** (preferências do aparelho, cópias de segurança, selos — que nunca diminuem —,
 conta vinculada) e uma **soma de verificação** (SHA-256 dos dados) gravada no arquivo e conferida quando presente.
 
@@ -154,6 +182,13 @@ conta vinculada) e uma **soma de verificação** (SHA-256 dos dados) gravada no 
 Depois de escolher a profissão, uma tela opcional (“Pular” sempre visível) sugere: avatar da área, tipos de serviço
 comuns (caixas marcáveis — viram tipos de serviço reais só se a pessoa confirmar), organização inicial do Painel e
 preferências da Agenda (início da semana, duração padrão). Nenhum cliente, agendamento ou lançamento é criado.
+
+### 2.12 Navegação **[ajuste]**
+
+As 11 áreas dos protótipos **não** viram 11 abas. A barra principal continua com Painel, Agenda, Clientes,
+Finanças e Evolução. Pagamentos ficam dentro do serviço; histórico, dentro do cliente; relatórios, em Finanças;
+recibo, no pagamento; pesquisa, no ícone de busca do cabeçalho; lembretes, restauração e configuração do Painel,
+na Central de Ajustes; configuração inicial, depois da escolha da profissão.
 
 ## 3. Dependências
 
@@ -179,7 +214,7 @@ Restauração aprimorada e Configuração inicial (independentes)
 | Lembretes | preferências do aparelho (`kv`) | não sincroniza | nenhuma |
 | Backup | `appVersion`, `checksum` | — | formato continua 1 |
 
-**Risco principal — aparelhos com versões diferentes.** As telas da 0.4 reconstroem o registro ao salvar um cliente,
+**Risco principal — aparelhos com versões diferentes.** *(Tratado na 0.4.0-beta.4; ver COMPATIBILIDADE-0.5.md.)* As telas da 0.4 reconstroem o registro ao salvar um cliente,
 agendamento ou lançamento e descartam campos que não conhecem; como a mesclagem é campo a campo, uma edição feita na
 0.4 apagaria `series`, `duration` ou `payments` em todos os aparelhos. **Mitigação (pré-requisito):** 0.4.0-beta.4
 passa a preservar campos desconhecidos ao editar, e só depois a 0.5 entra em teste. Testes de sincronização
@@ -193,7 +228,7 @@ duplicados após sincronizar (ids de notificação derivados de serviço + antec
 
 | Etapa | Conteúdo | Entrega |
 | --- | --- | --- |
-| 0 | 0.4.0-beta.4: preservar campos desconhecidos ao editar | APK 0.4 (mesma base validada) |
+| 0 | 0.4.0-beta.4: preservar campos desconhecidos, pagamentos e estornos da 0.5 nunca removidos, conclusão só do que falta | **Feito** — aguardando validação no S26 |
 | 1 | Pagamentos: domínio, concluir com valor recebido, registrar pagamento, reabrir/cancelar com pergunta | |
 | 2 | Agenda: visões dia/semana/mês, duração, conflitos, filtros, busca, reagendar | |
 | 3 | Recorrência | |
@@ -217,7 +252,7 @@ da 0.4 continuam na `feat/v0.4-design` e entram na 0.5 por merge dessa branch �
 
 | Etapa | Aceita quando |
 | --- | --- |
-| Pagamentos | R$ 300 com R$ 100 pago mostra 100 no caixa e 200 a receber; saldos anteriores idênticos antes/depois (teste com backup veterano); nenhuma receita duplicada ao concluir, reabrir, sincronizar ou restaurar; parcelas e antecipação sem XP; cancelar com pagamento pergunta e preserva por padrão |
+| Pagamentos | concluir sem escolha explícita é impossível; R$ 300 com R$ 100 pago mostra 100 no caixa e 200 a receber; estorno reduz pago e saldo; edições em aparelhos diferentes (inclusive 0.4) sem perda; saldos anteriores idênticos antes/depois (teste com backup veterano); nenhuma receita duplicada ao concluir, reabrir, sincronizar ou restaurar; parcelas e antecipação sem XP; cancelar com pagamento pergunta e preserva por padrão |
 | Agenda | visões corretas na virada de mês e horário de verão inexistente (fuso de Brasília); conflito avisa e não bloqueia; reagendar mantém pagamentos; acessível sem gestos |
 | Recorrência | semanal/mensal/diária com término; 31 → último dia; “só esta” / “esta e próximas” / “série” conforme a tabela; dois aparelhos não duplicam ocorrências; XP só na criação |
 | Histórico | totais pago/pendente batem com Finanças; respeita “Ocultar valores” |

@@ -26,7 +26,7 @@ export function relativeDay(iso: string, now = new Date()): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
 }
 
-function CountsTable({ file, current, serviceLabel, exportedAt, appVersion }: { file: BackupCounts; current: BackupCounts; serviceLabel: string; exportedAt: string | null; appVersion: string | null }) {
+function CountsTable({ file, current, serviceLabel, exportedAt, appVersion, newerApp }: { file: BackupCounts; current: BackupCounts; serviceLabel: string; exportedAt: string | null; appVersion: string | null; newerApp: boolean }) {
   const rows: [string, keyof BackupCounts][] = [['Clientes', 'clients'], [serviceLabel, 'appointments'], ['Lançamentos', 'transactions']];
   return (
     <div className="rounded-xl border border-line text-sm">
@@ -45,6 +45,11 @@ function CountsTable({ file, current, serviceLabel, exportedAt, appVersion }: { 
       {(exportedAt || appVersion) && (
         <p className="px-3 pb-2 text-xs text-muted">
           {exportedAt ? `Arquivo exportado em ${fmtDateTime(exportedAt)}` : 'Arquivo'}{appVersion ? ` pelo Ofício v${appVersion}` : ''}
+        </p>
+      )}
+      {newerApp && (
+        <p className="mx-3 mb-3 rounded-lg bg-surface-2 p-2 text-xs">
+          Feito por uma versão mais nova que esta (v{__APP_VERSION__}). Os dados foram conferidos; informações que esta versão não usa são mantidas sem alteração.
         </p>
       )}
     </div>
@@ -85,7 +90,7 @@ export function DataPage() {
       message: cloud.linked
         ? 'Todos os dados atuais serão substituídos pelos do arquivo — neste aparelho, na nuvem e nos outros aparelhos conectados. Registros criados depois desse backup serão excluídos. Uma cópia de segurança dos dados atuais é guardada neste aparelho antes.'
         : 'Todos os dados atuais deste aparelho serão substituídos pelos dados do arquivo. Uma cópia de segurança dos dados atuais é guardada antes.',
-      details: <CountsTable file={preview.file} current={preview.current} serviceLabel={t.services} exportedAt={preview.exportedAt} appVersion={preview.appVersion} />,
+      details: <CountsTable file={preview.file} current={preview.current} serviceLabel={t.services} exportedAt={preview.exportedAt} appVersion={preview.appVersion} newerApp={preview.newerApp} />,
       confirmLabel: 'Importar',
       danger: true,
     });

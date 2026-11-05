@@ -313,6 +313,23 @@ describe('regras 0.4: tipos de serviço (serviceTypes)', () => {
     await assertFails(setDoc(ref('alice'), st({}, { id: 'outro' }))); // id do dado diferente do registro
   });
 
+  it('beta.4: aceita duração sugerida opcional (5 a 1440 minutos, inteira ou nula)', async () => {
+    for (const duration of [5, 45, 1440, null]) {
+      await env.clearFirestore();
+      await assertSucceeds(setDoc(ref('alice'), st({}, { duration })));
+    }
+    for (const duration of [0, 4, 1441, 30.5, '45', true]) {
+      await env.clearFirestore();
+      await assertFails(setDoc(ref('alice'), st({}, { duration })));
+    }
+  });
+
+  it('beta.4: serviços e lançamentos com campos da 0.5 (duração, recorrência, pagamento) são aceitos', async () => {
+    const rec = (collection: string, id: string, data: Record<string, unknown>) => ({ collection, id, deleted: false, rev: 1, updatedAt: serverTimestamp(), deviceId: 'dev-1', data: { id, ...data } });
+    await assertSucceeds(setDoc(doc(db('alice'), 'users/alice/records/appointments__a1'), rec('appointments', 'a1', { title: 'Corte', price: 6000, duration: 90, payments: true, series: { id: 's', freq: 'semanal' } })));
+    await assertSucceeds(setDoc(doc(db('alice'), 'users/alice/records/transactions__t1'), rec('transactions', 't1', { type: 'receita', amount: 1000, appointmentId: 'a1', payment: { method: 'pix' } })));
+  });
+
   it('pode ser editado (revisão +1) e excluído pelo dono', async () => {
     await assertSucceeds(setDoc(ref('alice'), st()));
     await assertFails(setDoc(ref('alice'), st({ rev: 3 }, { name: 'Pulou revisão' })));
@@ -330,7 +347,7 @@ describe('sincronização 0.4 real (emulador, coleções novas ativadas)', () =>
     const tracked = new TrackedStorage(createMemoryAdapter());
     const service = await AppService.load(tracked, () => NOW);
     const sync = await SyncEngine.create(service, tracked, new FirestoreRemote(db(uid)), { autoSync: false, now: () => NOW, isOnline: () => true, collections: V04 });
-    return { service, sync };
+    return { service, sync, tracked };
   }
   const photo = { id: 'atual' as const, mime: 'image/webp' as const, data: 'A'.repeat(60_000), bytes: 45_000, width: 320, height: 320, hash: 'h1', createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() };
 
@@ -363,5 +380,39 @@ describe('sincronização 0.4 real (emulador, coleções novas ativadas)', () =>
     await a.sync.deleteCloudData('alice');
     const left = await getDocs(collection(db('alice'), 'users/alice/records'));
     expect(left.size).toBe(0);
+  });
+  it('beta.4: campos da 0.5 e pagamentos parciais atravessam o Firestore; a edição na 0.4 não os apaga', async () => {
+    const a = await device('alice');
+    await a.service.completeOnboarding({ name: 'Alice', businessName: '', professionId: 'beleza' });
+    const { appointment } = await a.service.saveAppointment({ title: 'Coloração', clientId: '', date: '2026-11-06', time: '14:00', price: '300,00', notes: '' });
+    const st = await a.service.saveServiceType({ name: 'Coloração', price: '300,00' });
+    const stamp = NOW.toISOString();
+    // Como a 0.5 gravará: campos novos no serviço, duração no tipo e um pagamento de R$ 100 com marcador.
+    const ap05 = { ...appointment, duration: 90, payments: true, series: { id: 's1', freq: 'semanal', interval: 1 } };
+    const pg = { id: 'pg-1', createdAt: stamp, updatedAt: stamp, type: 'receita' as const, amount: 10_000, description: 'Pagamento', category: 'Serviços', date: '2026-11-01', appointmentId: appointment.id, payment: { method: 'pix' } };
+    await a.service.exclusive(async () => {
+      await a.tracked.appointments.put(ap05);
+      await a.tracked.transactions.put(pg);
+      await a.tracked.serviceTypes.put({ ...st, duration: 90 });
+      await a.tracked.untracked(() => a.service.applySyncedData({ ...a.service.data, appointments: [ap05], transactions: [pg], serviceTypes: [{ ...st, duration: 90 }] }));
+    });
+    await a.sync.setUser('alice');
+    await a.sync.link('alice', 'mesclar');
+
+    const b = await device('alice');
+    await b.sync.setUser('alice');
+    await b.sync.link('alice', 'usarNuvem');
+    await b.service.saveAppointment({ title: 'Coloração', clientId: '', date: '2026-11-06', time: '15:00', price: '300,00', notes: 'Remarcado' }, appointment.id);
+    await b.service.completeAppointment(appointment.id, { registerIncome: true });
+    await b.sync.sync();
+    await a.sync.sync();
+
+    for (const d of [a, b]) {
+      expect(d.service.data.appointments[0]).toMatchObject({ time: '15:00', notes: 'Remarcado', duration: 90, payments: true, series: { id: 's1' }, status: 'concluido' });
+      expect(d.service.data.transactions.map((t) => t.amount).sort((x, y) => x - y)).toEqual([10_000, 20_000]);
+      expect(totals(d.service.data.transactions).income).toBe(30_000);
+      expect(d.service.data.serviceTypes[0]).toMatchObject({ duration: 90 });
+    }
+    expect([...a.sync.conflicts, ...b.sync.conflicts]).toEqual([]);
   });
 });

@@ -8,16 +8,25 @@ export const MAX_SERVICE_PRICE = 100_000_000; // R$ 1.000.000,00 (mesmo limite d
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Registro válido (backup, nuvem): campos e limites conferidos; nada a mais é aceito. */
+/** Duração em minutos aceita a partir da 0.5 (nulo = sem duração definida). */
+export const MIN_DURATION = 5;
+export const MAX_DURATION = 1440;
+export function isDuration(v: unknown): boolean {
+  return v === null || (Number.isInteger(v) && (v as number) >= MIN_DURATION && (v as number) <= MAX_DURATION);
+}
+
 export function isValidServiceType(v: unknown): v is ServiceType {
   if (!isObj(v)) return false;
   const keys = Object.keys(v);
-  const allowed = ['id', 'name', 'price', 'pinned', 'order', 'createdAt', 'updatedAt'];
+  // `duration` (0.5) é opcional; as regras do Firestore aceitam o mesmo conjunto.
+  const allowed = ['id', 'name', 'price', 'pinned', 'order', 'duration', 'createdAt', 'updatedAt'];
   return keys.every((k) => allowed.includes(k))
     && typeof v.id === 'string' && v.id.length > 0 && v.id.length <= 128
     && typeof v.name === 'string' && v.name.trim().length > 0 && v.name.length <= MAX_SERVICE_NAME
     && (v.price === null || (Number.isInteger(v.price) && (v.price as number) > 0 && (v.price as number) <= MAX_SERVICE_PRICE))
     && typeof v.pinned === 'boolean'
     && Number.isInteger(v.order) && (v.order as number) >= 0 && (v.order as number) <= 100_000
+    && (v.duration === undefined || isDuration(v.duration))
     && typeof v.createdAt === 'string' && typeof v.updatedAt === 'string';
 }
 

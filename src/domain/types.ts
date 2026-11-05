@@ -43,6 +43,8 @@ export interface Settings {
   avatar?: AvatarChoice;
   /** Selo exibido no perfil; 'auto' = o de maior estágio (padrão). */
   featuredSeal?: SealId | 'auto';
+  /** Reservado para a 0.5: organização do Painel. Preservado por `updateSettings`. */
+  dashboard?: unknown;
 }
 
 /**
@@ -96,6 +98,14 @@ export interface Appointment extends BaseEntity {
   completedAt: string | null;
   /** Receita gerada automaticamente ao concluir (se houver). */
   transactionId: string | null;
+  // Reservados para a 0.5 (docs/COMPATIBILIDADE-0.5.md). Esta versão não os grava,
+  // só os preserva ao editar e confere o tipo ao restaurar um backup.
+  /** Duração em minutos (5 a 1440). */
+  duration?: number | null;
+  /** Regra da recorrência à qual esta ocorrência pertence. */
+  series?: Record<string, unknown> | null;
+  /** Controle de pagamento ativo (pagamentos parciais e antecipados). */
+  payments?: boolean;
 }
 
 export type TransactionType = 'receita' | 'despesa';
@@ -108,6 +118,11 @@ export interface Transaction extends BaseEntity {
   category: string;
   date: string; // YYYY-MM-DD
   appointmentId: string | null;
+  /**
+   * Reservado para a 0.5: presente (não nulo) numa receita vinculada = pagamento do serviço.
+   * Pagamentos nunca são removidos automaticamente (ver src/domain/compat.ts).
+   */
+  payment?: Record<string, unknown> | null;
 }
 
 /**
@@ -157,6 +172,8 @@ export interface ServiceType {
   pinned: boolean;
   /** Ordem manual (menor primeiro). */
   order: number;
+  /** Reservado para a 0.5: duração sugerida em minutos (5 a 1440), editável no agendamento. */
+  duration?: number | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,5 +1,5 @@
 import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
-import { MAX_SERVICE_TYPES, isValidServiceType, uniqueById } from '../domain/serviceTypes';
+import { MAX_SERVICE_TYPES, isDuration, isValidServiceType, uniqueById } from '../domain/serviceTypes';
 import { isProfessionId } from '../domain/professions';
 import { DEFAULT_SETTINGS, type AppData } from '../domain/types';
 
@@ -26,6 +26,8 @@ const cents = (v: unknown, min: number) => Number.isInteger(v) && (v as number) 
  * Integridade dos campos que entram nos totais (valores, datas, tipo e situação). Um arquivo
  * editado à mão ou corrompido é recusado antes de qualquer alteração — nada é restaurado pela metade.
  * Os campos conferidos sempre existiram no formato 1 (0.2 em diante), então backups reais passam.
+ * Campos reservados para a 0.5 (beta.4) são opcionais, mas, se existirem, precisam ter o tipo
+ * esperado: um arquivo de versão mais nova não é aceito só por ter o formato 1.
  */
 function checkIntegrity(d: Record<string, unknown>) {
   const bad = (key: string, i: number, field: string) => new Error(`Dados inválidos em "${key}" (item ${i + 1}: ${field}).`);
@@ -34,6 +36,9 @@ function checkIntegrity(d: Record<string, unknown>) {
     if (typeof a.date !== 'string' || !DATE_RE.test(a.date)) throw bad('appointments', i, 'data');
     if (!['agendado', 'concluido', 'cancelado'].includes(a.status as string)) throw bad('appointments', i, 'situação');
     if (!cents(a.price, 0)) throw bad('appointments', i, 'valor');
+    if (a.duration !== undefined && !isDuration(a.duration)) throw bad('appointments', i, 'duração');
+    if (a.series !== undefined && a.series !== null && !isObj(a.series)) throw bad('appointments', i, 'recorrência');
+    if (a.payments !== undefined && typeof a.payments !== 'boolean') throw bad('appointments', i, 'controle de pagamento');
   });
   (d.transactions as Record<string, unknown>[]).forEach((t, i) => {
     if (t.type !== 'receita' && t.type !== 'despesa') throw bad('transactions', i, 'tipo');
@@ -41,6 +46,8 @@ function checkIntegrity(d: Record<string, unknown>) {
     if (typeof t.date !== 'string' || !DATE_RE.test(t.date)) throw bad('transactions', i, 'data');
     if (t.category !== undefined && typeof t.category !== 'string') throw bad('transactions', i, 'categoria');
     if (t.description !== undefined && typeof t.description !== 'string') throw bad('transactions', i, 'descrição');
+    if (t.appointmentId !== undefined && t.appointmentId !== null && typeof t.appointmentId !== 'string') throw bad('transactions', i, 'serviço vinculado');
+    if (t.payment !== undefined && t.payment !== null && !isObj(t.payment)) throw bad('transactions', i, 'pagamento');
   });
   (d.clients as Record<string, unknown>[]).forEach((c, i) => {
     if (typeof c.name !== 'string') throw bad('clients', i, 'nome');

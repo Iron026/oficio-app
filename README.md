@@ -4,7 +4,7 @@
 
 Aplicativo freemium para profissionais autônomos (manutenção, beleza, limpeza, alimentação e outros) organizarem clientes, agenda e finanças — e acompanharem a própria evolução profissional com níveis, missões, metas e conquistas.
 
-> Versão **0.4.0-beta.3 (em teste)** · app Android e web · dados no aparelho, com **conta Google opcional** para sincronizar e recuperar dados.
+> Versão **0.4.0-beta.4 (em teste)** · app Android e web · dados no aparelho, com **conta Google opcional** para sincronizar e recuperar dados.
 >
 > **Acesse:** https://iron026.github.io/oficio-app/
 
@@ -12,7 +12,7 @@ Aplicativo freemium para profissionais autônomos (manutenção, beleza, limpeza
 [![Android APK](https://github.com/Iron026/oficio-app/actions/workflows/android.yml/badge.svg)](https://github.com/Iron026/oficio-app/actions/workflows/android.yml)
 [![Deploy](https://github.com/Iron026/oficio-app/actions/workflows/pages.yml/badge.svg)](https://github.com/Iron026/oficio-app/actions/workflows/pages.yml)
 
-## O que tem na 0.4 (beta.3)
+## O que tem na 0.4 (beta.4)
 
 Identidade visual nova (design system, 8 paletas, temas claro/escuro, animações com opção de reduzir), evolução com
 categorias, medalhões e selos permanentes, Central de Ajustes e ferramentas do dia a dia. Tudo funciona sem internet.
@@ -29,7 +29,7 @@ categorias, medalhões e selos permanentes, Central de Ajustes e ferramentas do 
 | Evolução | Níveis, categorias com medalhões e comemoração única, selos permanentes, missões, metas, conquistas, histórico |
 | Ajustes | Central por categorias: aparência (tema, **8 paletas**, densidade), perfil e negócio (imagem com **galeria de personagens e ícones**, selo, metas, tipos de serviço), privacidade e acessibilidade, conta e sincronização, backup e dados (exportar, restaurar com resumo e verificação, cópias de segurança automáticas), sobre |
 
-Detalhes e decisões: [Arquitetura](docs/ARQUITETURA.md) · [Design](docs/DESIGN.md) · [Avatares](docs/AVATARES.md) · [Auditoria da 0.4](docs/AUDITORIA-0.4.md).
+Detalhes e decisões: [Arquitetura](docs/ARQUITETURA.md) · [Design](docs/DESIGN.md) · [Avatares](docs/AVATARES.md) · [Auditoria da 0.4](docs/AUDITORIA-0.4.md) · [Compatibilidade com a 0.5](docs/COMPATIBILIDADE-0.5.md).
 
 ## Como usar no celular
 
