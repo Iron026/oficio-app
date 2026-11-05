@@ -63,6 +63,16 @@ describe('9. comemorações de categoria: etapas, pausa e acessibilidade', () =>
     expect((await reload()).celebrationDue()).toBeNull();
   });
 
+  it('não bloqueia a navegação: um toque na barra fecha a comemoração e já abre a outra tela', async () => {
+    const { user } = await evolution();
+    await user.click(await screen.findByRole('button', { name: /inicial: você está aqui/i }));
+    const layer = document.querySelector('[data-celebration]')!;
+    expect(layer.className).toMatch(/pointer-events-none/);
+    await user.click(screen.getByRole('link', { name: /finanças/i }));
+    await waitFor(() => expect(window.location.hash).toBe('#/financas'));
+    await waitFor(() => expect(document.querySelector('[data-celebration]')).toBeNull());
+  });
+
   it('com "Reduzir animações" a camada usa a versão sem movimento', async () => {
     const { user } = await evolution('reduzir');
     await user.click(await screen.findByRole('button', { name: /inicial: você está aqui/i }));

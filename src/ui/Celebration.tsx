@@ -36,7 +36,9 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
 /**
  * Etapas (beta.5): o fundo escurece, o medalhão se monta com a sequência própria da categoria,
  * o título e o nível entram um depois do outro e há uma pausa para contemplar o medalhão pronto.
- * Um toque, o botão Voltar ou Esc fecham a qualquer momento; nada da tela fica bloqueado depois.
+ * Não bloqueia a navegação: a camada não captura toques. Qualquer toque na tela a fecha e chega
+ * normalmente ao que está embaixo (um toque em "Finanças" fecha e já abre Finanças). Voltar e Esc
+ * também fecham.
  */
 function Layer({ tier, level, reduce, onDone }: { tier: Tier; level?: number; reduce: boolean; onDone: () => void }) {
   const box = useRef<HTMLDivElement>(null);
@@ -50,8 +52,14 @@ function Layer({ tier, level, reduce, onDone }: { tier: Tier; level?: number; re
     const t2 = setTimeout(onDone, timing.total + 320);
     const removeBack = pushBackHandler(close);
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    const onTap = () => close();
     window.addEventListener('keydown', onKey);
-    return () => { clearTimeout(t1); clearTimeout(t2); removeBack(); window.removeEventListener('keydown', onKey); };
+    window.addEventListener('pointerdown', onTap, { capture: true, passive: true });
+    return () => {
+      clearTimeout(t1); clearTimeout(t2); removeBack();
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onTap, { capture: true });
+    };
   }, [reduce, onDone, close, timing.total]);
   const grade = tier.id === 'diamante' && tier.rank > 1;
   // Textos: entram em sequência perto do fim da montagem (sem movimento com "Reduzir animações").
@@ -62,8 +70,7 @@ function Layer({ tier, level, reduce, onDone }: { tier: Tier; level?: number; re
       data-celebration=""
       data-build={timing.build}
       data-hold={timing.hold}
-      onClick={close}
-      className={`fixed inset-0 z-[60] grid place-items-center bg-[rgb(6_24_22/0.82)] transition-opacity duration-300 ${leaving ? 'opacity-0' : 'animate-fade'}`}
+      className={`pointer-events-none fixed inset-0 z-[60] grid place-items-center bg-[rgb(6_24_22/0.82)] transition-opacity duration-300 ${leaving ? 'opacity-0' : 'animate-fade'}`}
     >
       <div ref={box} className="grid justify-items-center gap-2 px-6 text-center text-white">
         <div className="relative grid place-items-center">
