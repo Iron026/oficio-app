@@ -15,7 +15,28 @@ if (!apk) throw new Error('Informe o caminho do APK.');
 mkdirSync(OUT, { recursive: true });
 
 const adb = (...args) => execFileSync('adb', args, { encoding: 'utf8' });
-const shot = (name) => writeFileSync(`${OUT}/${name}.png`, execFileSync('adb', ['exec-out', 'screencap', '-p']));
+const shot = (name) => {
+  try {
+    writeFileSync(`${OUT}/${name}.png`, execFileSync('adb', ['exec-out', 'screencap', '-p'], { timeout: 20_000 }));
+  } catch (err) {
+    console.log(`  (captura ${name} indisponível: ${String(err?.message ?? err).split('\n')[0]})`);
+  }
+};
+let currentPage = null;
+/** Estado da tela no momento da falha (rota, tema, diálogos e avisos), para diagnóstico. */
+const describeScreen = async () => {
+  if (!currentPage) return null;
+  return Promise.race([
+    currentPage.evaluate(() => ({
+      hash: location.hash,
+      dark: document.documentElement.classList.contains('dark'),
+      dialogos: [...document.querySelectorAll('[role=dialog],[role=alertdialog]')].map((d) => d.getAttribute('aria-label') || d.textContent.slice(0, 60)),
+      avisos: [...document.querySelectorAll('[role=status] > *')].map((t) => t.textContent.slice(0, 80)),
+      comemoracao: !!document.querySelector('[data-celebration]'),
+    })),
+    wait(5000).then(() => 'sem resposta da página'),
+  ]).catch((e) => `indisponível: ${String(e?.message ?? e).split('\n')[0]}`);
+};
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
 const step = async (name, fn) => {
@@ -25,9 +46,16 @@ const step = async (name, fn) => {
     results.push({ name, ok: true });
     console.log('OK');
   } catch (err) {
-    results.push({ name, ok: false, error: String(err?.message ?? err) });
-    console.log('FALHOU\n', err);
+    const tela = await describeScreen();
+    results.push({ name, ok: false, error: String(err?.message ?? err), tela });
+    console.log('FALHOU\n', err, '\n  tela:', JSON.stringify(tela));
     shot(`falha-${results.length}`);
+    // Nunca fica parado depois de uma falha: encerra em até 2 min mesmo se o aparelho não responder.
+    setTimeout(() => {
+      writeFileSync(`${OUT}/resultado.json`, JSON.stringify(results, null, 2));
+      console.log('Encerrando: o aparelho não respondeu depois da falha.');
+      process.exit(1);
+    }, 120_000).unref();
     throw err;
   }
 };
@@ -164,6 +192,7 @@ async function launch() {
   const webview = await device.webView({ pkg: PKG }, { timeout: 90_000 });
   const page = await webview.page();
   page.setDefaultTimeout(20_000);
+  currentPage = page;
   return page;
 }
 
@@ -451,9 +480,9 @@ try {
 } finally {
   writeFileSync(`${OUT}/resultado.json`, JSON.stringify(results, null, 2));
   try {
-    writeFileSync(`${OUT}/logcat.txt`, adb('logcat', '-d', '-t', '3000'));
+    writeFileSync(`${OUT}/logcat.txt`, execFileSync('adb', ['logcat', '-d', '-t', '3000'], { encoding: 'utf8', timeout: 30_000 }));
   } catch { /* sem logcat */ }
-  await device?.close().catch(() => undefined);
+  await Promise.race([device?.close().catch(() => undefined), wait(15_000)]);
 }
 
 const failed = results.filter((r) => !r.ok);
