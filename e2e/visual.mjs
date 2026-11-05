@@ -103,6 +103,8 @@ async function seed(page) {
   await page.getByLabel(/nome do negócio/i).fill('Studio Ana Beleza');
   await page.getByRole('button', { name: /entrar no ofício/i }).click();
   await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
+      await page.waitForFunction(() => location.hash === '#/painel');
 
   const clients = [
     ['Maria Oliveira', '11912340001'],
@@ -321,6 +323,8 @@ try {
       for (const s of SCREENS) {
         await page.goto(BASE + s.hash);
         await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
+      await page.waitForFunction(() => location.hash === '#/painel');
         await capture(page, vp, theme, s.id);
         if (vp.id === 'celular-360' && ['painel', 'evolucao', 'agenda'].includes(s.id)) {
           await capture(page, vp, theme, `${s.id}-inteira`, { full: true, skipChecks: true });
@@ -475,6 +479,8 @@ try {
       await page.getByLabel(/seu nome/i).fill('Ana Souza');
       await page.getByRole('button', { name: /entrar no ofício/i }).click();
       await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
+      await page.waitForFunction(() => location.hash === '#/painel');
       await page.goto(BASE + '#/ajustes/dados');
       await page.getByRole('button', { name: /exportar backup/i }).waitFor();
       await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(veteranBackup(theme === 'escuro' ? 'oceano' : 'petroleo')) });
@@ -548,6 +554,8 @@ try {
       await page.getByLabel(/seu nome/i).fill('Ana Souza');
       await page.getByRole('button', { name: /entrar no ofício/i }).click();
       await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
+      await page.waitForFunction(() => location.hash === '#/painel');
       await page.getByRole('button', { name: /^agendar$/i }).click();
       const form = page.getByRole('dialog', { name: /agendar/i });
       await form.getByLabel(/descrição/i).fill('Corte');
@@ -607,6 +615,8 @@ try {
         for (const s of SCREENS) {
           await page.goto(BASE + s.hash);
           await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
+      await page.waitForFunction(() => location.hash === '#/painel');
           await capture(page, vp, theme, `paleta-${id}-${s.id}`);
         }
         // Formulário com erros de validação (campos, mensagens, botão desabilitado ao salvar).
@@ -636,6 +646,8 @@ try {
         report.reabertura.push({ tema: theme, paleta: id, ...first });
         await page.reload();
         await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+      // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
+      await page.waitForFunction(() => location.hash === '#/painel');
       }
       // Volta ao padrão: a escolha do Petróleo também precisa funcionar.
       await page.goto(BASE + '#/ajustes/aparencia/paleta');
