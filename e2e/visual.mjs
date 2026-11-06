@@ -426,7 +426,11 @@ try {
           }
         }
         if (vp.id === 'celular-360') await capture(page, vp, theme, 'ajustes-imagem-de-perfil-inteira', { full: true, skipChecks: true });
+        // beta.7: escolher não fecha a tela (prévia + "Atualizado"); "Concluído" fecha.
         await page.getByRole('radio', { name: 'Criatividade, mulher' }).click();
+        await page.getByText('Imagem de perfil atualizada').waitFor();
+        await capture(page, vp, theme, 'ajustes-avatar-escolhido-tela-aberta', { skipChecks: true });
+        await page.getByRole('dialog').getByRole('button', { name: /^concluído$/i }).click();
         await page.getByRole('dialog').waitFor({ state: 'detached' });
         await capture(page, vp, theme, 'ajustes-com-avatar');
         await page.getByRole('button', { name: /alterar imagem de perfil/i }).click();
@@ -436,6 +440,8 @@ try {
         await page.getByRole('button', { name: /aumentar zoom/i }).click();
         await capture(page, vp, theme, 'ajustes-recorte-da-foto');
         await page.getByRole('button', { name: /usar foto/i }).click();
+        // Salvar a foto volta para a escolha (já com a foto); "Concluído" fecha.
+        await page.getByRole('dialog', { name: /imagem de perfil/i }).getByRole('button', { name: /^concluído$/i }).click();
         await page.getByRole('dialog').waitFor({ state: 'detached' });
         await capture(page, vp, theme, 'ajustes-com-foto');
         // A foto gravada no aparelho precisa respeitar os limites (WebP/JPEG, ≤ 64 KiB, 320 px).
@@ -596,6 +602,39 @@ try {
       await page.waitForFunction(() => document.documentElement.dataset.density === 'compacta', null, { timeout: 2000 }).catch(() => undefined);
       const densidade = await page.evaluate(() => document.documentElement.dataset.density);
       if (densidade !== 'compacta') fail(`360x640/${theme}: o toque em "Compacta"${m.coberto ? ' sob um aviso' : ''} não chegou ao controle (densidade: ${densidade})`);
+
+      // 3) beta.7: "Desfazer" ao excluir cliente e serviço, na tela pequena: aparece, tem 44 px,
+      //    recebe o toque real (coordenadas) e devolve o registro.
+      const undoAfterDelete = async (what, shotName, back) => {
+        const btn = page.getByRole('button', { name: /^desfazer:/i });
+        if (!(await btn.waitFor({ timeout: 5000 }).then(() => true, () => false))) return fail(`360x640/${theme}: "Desfazer" não apareceu ao excluir ${what}`);
+        const b = await btn.boundingBox();
+        if (b.height < 44 || b.width < 44) fail(`360x640/${theme}: "Desfazer" (${what}) menor que 44 px`);
+        if (b.y + b.height > small.height || b.y < 0) fail(`360x640/${theme}: "Desfazer" (${what}) fora da tela`);
+        await page.evaluate(() => document.fonts.ready);
+        await page.screenshot({ path: `${OUT}/celular-360x640-${theme}-${shotName}.png` });
+        report.capturas.push({ arquivo: `celular-360x640-${theme}-${shotName}.png`, viewport: small.id, tema: theme, tela: shotName });
+        const hit = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label')?.startsWith('Desfazer:'), { x: b.x + b.width / 2, y: b.y + b.height / 2 });
+        if (!hit) fail(`360x640/${theme}: o toque no "Desfazer" (${what}) não chega ao botão`);
+        await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+        if (!(await page.getByText('Ação desfeita').waitFor({ timeout: 4000 }).then(() => true, () => false))) fail(`360x640/${theme}: Desfazer (${what}) não confirmou`);
+        if (!(await back.waitFor({ timeout: 4000 }).then(() => true, () => false))) fail(`360x640/${theme}: ${what} não voltou depois de Desfazer`);
+      };
+      await page.goto(BASE + '#/clientes');
+      await page.getByRole('button', { name: /cadastrar cliente/i }).first().click();
+      const cf = page.getByRole('dialog', { name: /novo cliente/i });
+      await cf.getByLabel(/^nome/i).fill('Maria Oliveira');
+      await cf.getByRole('button', { name: /cadastrar cliente/i }).click();
+      await cf.waitFor({ state: 'detached' });
+      await page.getByRole('button', { name: /maria oliveira/i }).first().click();
+      await page.getByRole('dialog', { name: 'Maria Oliveira' }).getByRole('button', { name: /^excluir$/i }).click();
+      await page.getByRole('dialog', { name: /excluir cliente/i }).getByRole('button', { name: /^excluir$/i }).click();
+      await undoAfterDelete('cliente', 'desfazer-cliente', page.getByRole('button', { name: /maria oliveira/i }).first());
+      await page.goto(BASE + '#/agenda');
+      await page.getByRole('button', { name: /corte/i }).first().click();
+      await page.getByRole('dialog', { name: 'Corte' }).getByRole('button', { name: /^excluir$/i }).click();
+      await page.getByRole('dialog', { name: /excluir atendimento/i }).getByRole('button', { name: /^excluir$/i }).click();
+      await undoAfterDelete('atendimento', 'desfazer-atendimento', page.getByRole('button', { name: /corte/i }).first());
       await ctx.close();
     }
   }
