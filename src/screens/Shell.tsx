@@ -91,7 +91,7 @@ export function Shell({ route, pageKey = route, title, children, action }: { rou
         <div
           ref={setSlot}
           className={cx(
-            'hero px-4 [background-position:0_-3.5rem] empty:pb-3',
+            'hero px-4 empty:pb-3',
             overlap ? 'pb-14' : 'pb-4',
           )}
         />

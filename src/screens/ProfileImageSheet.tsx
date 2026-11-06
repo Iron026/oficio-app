@@ -13,6 +13,7 @@ import { avatarSpokenName, avatarsByArea, getInternalAvatar, groupOf, type Avata
 import { Segmented } from '../ui/Misc';
 import { ProfileAvatar } from '../ui/ProfileAvatar';
 import { clampCrop, drawCrop, encodePhoto, loadPhoto, type Crop, type Source } from '../ui/photoEncode';
+import { SavedNote, useSavedNote } from '../ui/SavedNote';
 import { Sheet } from '../ui/Sheet';
 
 /** Escolha da imagem do perfil: foto própria (com recorte), avatar do Ofício ou iniciais. */
@@ -23,14 +24,26 @@ export function ProfileImageSheet({ open, onClose }: { open: boolean; onClose: (
     setSource(null);
     onClose();
   };
+  const note = useSavedNote();
+  // beta.7: escolher não fecha a tela. A escolha é aplicada na hora (prévia + "Atualizado") e a
+  // pessoa continua trocando até tocar em "Concluído" (ou no X / Voltar). Salvar uma foto volta
+  // para a escolha, já com a foto aplicada (o aviso informa o tamanho final).
+  const backToChooser = () => { source?.close(); setSource(null); };
   return (
-    <Sheet open={open} onClose={close} title={source ? 'Ajustar foto' : 'Imagem de perfil'}>
-      {open && (source ? <PhotoEditor source={source} onCancel={() => { source.close(); setSource(null); }} onDone={close} /> : <Chooser onPhoto={setSource} onDone={close} />)}
+    <Sheet
+      open={open}
+      onClose={close}
+      title={source ? 'Ajustar foto' : 'Imagem de perfil'}
+      footer={source ? undefined : <Button block size="lg" variant="secondary" onClick={close}>Concluído</Button>}
+    >
+      {open && (source
+        ? <PhotoEditor source={source} onCancel={backToChooser} onDone={backToChooser} />
+        : <Chooser onPhoto={setSource} note={note} />)}
     </Sheet>
   );
 }
 
-function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: () => void }) {
+function Chooser({ onPhoto, note }: { onPhoto: (s: Source) => void; note: ReturnType<typeof useSavedNote> }) {
   const { data, service } = useApp();
   const { tier, featured } = useProfile();
   const feedback = useFeedback();
@@ -44,8 +57,7 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
   async function pick(c: AvatarChoice) {
     try {
       await service.updateSettings({ avatar: c });
-      feedback('Imagem de perfil atualizada');
-      onDone();
+      note.flash();
     } catch (err) {
       onError(err);
     }
@@ -57,7 +69,6 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
     try {
       await service.removeProfileImage();
       feedback('Foto removida');
-      onDone();
     } catch (err) {
       onError(err);
     }
@@ -92,6 +103,7 @@ function Chooser({ onPhoto, onDone }: { onPhoto: (s: Source) => void; onDone: ()
       <div className="flex flex-col items-center gap-2">
         <ProfileAvatar data={data} tier={tier} size={112} seal={featured ? { id: featured.def.id, stage: featured.stage } : null} />
         <p className="text-center text-sm font-semibold" aria-live="polite" data-avatar-current>{currentName}</p>
+        <SavedNote shown={note.shown} label="Imagem de perfil atualizada" />
       </div>
 
       <section aria-labelledby="img-foto" className="space-y-2">

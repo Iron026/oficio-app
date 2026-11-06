@@ -163,7 +163,18 @@ describe('Central de Ajustes — páginas internas', () => {
     expect(within(sheet).getByRole('radio', { name: 'Segurança: Escudo' })).toBeInTheDocument();
     expect(within(sheet).queryByRole('radio', { name: /medicina|laboratório|gráfico|balança/i })).not.toBeInTheDocument();
     expect(within(sheet).queryByRole('radio', { name: 'Limpeza, homem' })).not.toBeInTheDocument();
+    // beta.7: escolher aplica na hora e a tela continua aberta (prévia + "Atualizado").
     await user.click(within(sheet).getByRole('radio', { name: 'Saúde e ciência: Coração' }));
+    await waitFor(() => expect(within(sheet).getByRole('radio', { name: 'Saúde e ciência: Coração' })).toHaveAttribute('aria-checked', 'true'));
+    expect(within(sheet).getByText('Coração', { selector: '[data-avatar-current]' })).toBeInTheDocument();
+    expect(within(sheet).getByText('Imagem de perfil atualizada')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /imagem de perfil/i })).toBeInTheDocument();
+    // Dá para continuar trocando; só "Concluído" fecha.
+    await user.click(within(sheet).getByRole('radio', { name: 'Segurança: Escudo' }));
+    await waitFor(() => expect(within(sheet).getByText('Escudo', { selector: '[data-avatar-current]' })).toBeInTheDocument());
+    await user.click(within(sheet).getByRole('radio', { name: 'Saúde e ciência: Coração' }));
+    await waitFor(() => expect(within(sheet).getByText('Coração', { selector: '[data-avatar-current]' })).toBeInTheDocument());
+    await user.click(within(sheet).getByRole('button', { name: /^concluído$/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByText('Avatar: Coração')).toBeInTheDocument();
 
@@ -174,6 +185,8 @@ describe('Central de Ajustes — páginas internas', () => {
     expect(within(again).getByText('Coração', { selector: '[data-avatar-current]' })).toBeInTheDocument();
     await user.click(within(again).getByRole('radio', { name: /^personagens$/i }));
     await user.click(within(again).getByRole('radio', { name: 'Saúde e ciência, mulher' }));
+    await waitFor(() => expect(within(again).getByText('Saúde e ciência, mulher', { selector: '[data-avatar-current]' })).toBeInTheDocument());
+    await user.click(within(again).getByRole('button', { name: /fechar/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByText('Avatar: Saúde e ciência, mulher')).toBeInTheDocument();
 

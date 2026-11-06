@@ -45,8 +45,8 @@ export interface Feedback {
 export interface UndoTicket { id: number; label: string }
 export const UNDO_TTL_MS = 30_000;
 
-type UndoCollection = 'appointments' | 'transactions';
-type UndoRecord = Appointment | Transaction;
+type UndoCollection = 'appointments' | 'transactions' | 'clients';
+type UndoRecord = Appointment | Transaction | Client;
 /**
  * Estado antes e depois de uma ação, por registro afetado (null = não existia). Desfazer só
  * acontece se cada registro ainda estiver exatamente como a ação o deixou; então o estado
@@ -363,10 +363,17 @@ export class AppService {
     });
   }
 
-  /** Exclui o cliente. Os serviços dele são mantidos, sem vínculo. */
-  deleteClient(id: string): Promise<void> {
+  /**
+   * Exclui o cliente. Os serviços dele são mantidos, sem vínculo. Reversível (beta.7): desfazer
+   * devolve o cliente com todos os campos (inclusive os gravados por versões mais novas) e o
+   * vínculo dos serviços que eram dele. XP e selos não mudam ao excluir nem ao desfazer.
+   */
+  deleteClient(id: string): Promise<UndoTicket | null> {
     return this.run(async () => {
-      const affected = this._data.appointments.filter((a) => a.clientId === id).map((a) => ({ ...a, clientId: null, updatedAt: this.stamp() }));
+      const client = this._data.clients.find((c) => c.id === id);
+      if (!client) return null;
+      const before = this._data.appointments.filter((a) => a.clientId === id);
+      const affected = before.map((a) => ({ ...a, clientId: null, updatedAt: this.stamp() }));
       await this.storage.appointments.putMany(affected);
       await this.storage.clients.remove(id);
       const byId = new Map(affected.map((a) => [a.id, a]));
@@ -375,6 +382,10 @@ export class AppService {
         clients: this._data.clients.filter((c) => c.id !== id),
         appointments: this._data.appointments.map((a) => byId.get(a.id) ?? a),
       });
+      return this.recordUndo('Cliente excluído', [
+        { collection: 'clients', id, before: client, after: null },
+        ...before.map((a, i) => ({ collection: 'appointments' as const, id: a.id, before: a, after: affected[i]! })),
+      ]);
     });
   }
 
@@ -506,12 +517,15 @@ export class AppService {
 
   /**
    * Exclui o agendamento e a receita gerada automaticamente por ele. Pagamentos registrados
-   * pela 0.5 continuam em Finanças (o dinheiro entrou; a interface avisa antes).
+   * pela 0.5 continuam em Finanças (o dinheiro entrou; a interface avisa antes). Reversível
+   * (beta.7), em qualquer situação: agendado e cancelado voltam como estavam; concluído volta
+   * concluído e, se tinha receita automática, ela volta com o mesmo vínculo. Desfazer não dá XP
+   * de novo (o XP da conclusão nunca foi retirado).
    */
-  deleteAppointment(id: string): Promise<void> {
+  deleteAppointment(id: string): Promise<UndoTicket | null> {
     return this.run(async () => {
       const a = this._data.appointments.find((x) => x.id === id);
-      if (!a) return;
+      if (!a) return null;
       const auto = removableAutoIncome(a.transactionId, this._data.transactions);
       if (auto) await this.storage.transactions.remove(auto.id);
       await this.storage.appointments.remove(id);
@@ -520,6 +534,11 @@ export class AppService {
         appointments: this._data.appointments.filter((x) => x.id !== id),
         transactions: auto ? this._data.transactions.filter((t) => t.id !== auto.id) : this._data.transactions,
       });
+      const terms = getProfession(this._data.profile?.professionId).terms;
+      return this.recordUndo(`${terms.service} ${terms.serviceArticle === 'a' ? 'excluída' : 'excluído'}`, [
+        { collection: 'appointments', id, before: a, after: null },
+        ...(auto ? [{ collection: 'transactions' as const, id: auto.id, before: auto, after: null }] : []),
+      ]);
     });
   }
 

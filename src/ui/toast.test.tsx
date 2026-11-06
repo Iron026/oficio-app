@@ -69,6 +69,23 @@ describe('ToastProvider — temporizadores', () => {
     expect(vi.getTimerCount()).toBe(2); // o temporizador do aviso que saiu foi cancelado
   });
 
+  it('beta.7: um novo aviso com Desfazer substitui o anterior (só a última ação pode ser desfeita); os sem ação ficam', () => {
+    renderWith([
+      { title: 'Cliente excluído', action: { label: 'Desfazer', onClick: () => undefined } },
+      { title: 'Salvo' },
+      { title: 'Atendimento excluído', action: { label: 'Desfazer', onClick: () => undefined } },
+    ]);
+    expect(screen.queryByText('Cliente excluído')).not.toBeInTheDocument();
+    expect(screen.getByText('Salvo')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^desfazer/i })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Desfazer: Atendimento excluído' })).toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(2);
+    act(() => vi.advanceTimersByTime(7999));
+    expect(screen.getByText('Atendimento excluído')).toBeInTheDocument(); // 8 s com ação
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByText('Atendimento excluído')).not.toBeInTheDocument();
+  });
+
   it('beta.5: com o "Desfazer" em foco (teclado ou TalkBack) o aviso não some; ao sair do foco, mais 4 s', () => {
     const onClick = vi.fn();
     renderWith([{ title: 'Concluído', action: { label: 'Desfazer', onClick } }]);

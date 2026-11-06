@@ -23,6 +23,7 @@ import { Onboarding } from './screens/Onboarding';
 import { Settings } from './screens/Settings';
 import { settingsTitle } from './screens/settings/pages';
 import { Logo, Shell } from './screens/Shell';
+import { HideValuesToggle } from './screens/HideValuesToggle';
 
 type Boot = { service: AppService; persistent: boolean; sync: SyncEngine };
 
@@ -120,7 +121,12 @@ function Root() {
   return (
     <HideValuesContext.Provider value={prefs.hideValues}>
       <CelebrationProvider>
-        <Shell route={route} pageKey={route === 'ajustes' && sub ? `${route}/${sub}` : route} title={route === 'ajustes' ? settingsTitle(sub) : TITLES[route]}>
+        <Shell
+          route={route}
+          pageKey={route === 'ajustes' && sub ? `${route}/${sub}` : route}
+          title={route === 'ajustes' ? settingsTitle(sub) : TITLES[route]}
+          action={route === 'painel' || route === 'financas' ? <HideValuesToggle /> : undefined}
+        >
           {screens[route]}
         </Shell>
       </CelebrationProvider>

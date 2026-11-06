@@ -51,7 +51,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((t: ToastInput) => {
     const id = nextId.current++;
     setItems((cur) => {
-      const next = [...cur, { ...t, id }];
+      // beta.7: só a última ação pode ser desfeita (o serviço guarda um bilhete só). Um novo aviso
+      // com ação substitui o anterior, cujo "Desfazer" já não funcionaria.
+      const stale = t.action ? cur.filter((x) => x.action) : [];
+      for (const g of stale) { clearTimeout(timers.current.get(g.id)); timers.current.delete(g.id); }
+      const next = [...cur.filter((x) => !stale.includes(x)), { ...t, id }];
       while (next.length > MAX_TOASTS) {
         const i = next.findIndex((x) => !x.action);
         const [gone] = next.splice(i >= 0 && i < next.length - 1 ? i : 0, 1);

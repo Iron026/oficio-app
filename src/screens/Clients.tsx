@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import { completedCountByClient } from '../domain/insights';
 import { CalendarPlus, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Search, Trash2, UserPlus } from 'lucide-react';
 import type { Client } from '../domain/types';
-import { useApp, useErrorHandler } from '../state/AppContext';
+import { useApp, useErrorHandler, useUndoAction } from '../state/AppContext';
 import { Button } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
 import { Avatar } from '../ui/Avatar';
@@ -116,6 +116,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   const t = profession.terms;
   const confirm = useConfirm();
   const toast = useToast();
+  const undoAction = useUndoAction();
   const onError = useErrorHandler();
   const [mode, setMode] = useState<'view' | 'edit' | 'schedule'>('view');
   const history = data.appointments.filter((a) => a.clientId === client.id).sort((a, b) => b.date.localeCompare(a.date));
@@ -126,11 +127,11 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   const wa = whatsappLink(client.phone);
 
   async function remove() {
-    const ok = await confirm({ title: 'Excluir cliente?', message: `${client.name} será removido. O histórico de ${t.services.toLowerCase()} e o financeiro são mantidos, sem vínculo com o cliente.`, confirmLabel: 'Excluir', danger: true });
+    const ok = await confirm({ title: 'Excluir cliente?', message: `${client.name} será removido. O histórico de ${t.services.toLowerCase()} e o financeiro são mantidos, sem vínculo com o cliente. Logo depois, dá para desfazer pelo aviso.`, confirmLabel: 'Excluir', danger: true });
     if (!ok) return;
     try {
-      await service.deleteClient(client.id);
-      toast({ title: 'Cliente excluído', tone: 'info' });
+      const ticket = await service.deleteClient(client.id);
+      toast({ title: 'Cliente excluído', description: client.name, tone: 'info', action: undoAction(ticket) });
       onClose();
     } catch (err) {
       onError(err);

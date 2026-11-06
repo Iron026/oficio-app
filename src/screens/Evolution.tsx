@@ -22,6 +22,7 @@ import { ProfileAvatar } from '../ui/ProfileAvatar';
 import { CategoryMedal } from '../ui/CategoryMedal';
 import { useCelebration } from '../ui/celebrationContext';
 import { SealMedal, StagePips } from '../ui/SealMedal';
+import { SavedNote, useSavedNote } from '../ui/SavedNote';
 import { Sheet } from '../ui/Sheet';
 import { HeroSlot } from './Shell';
 type Tab = 'missoes' | 'selos' | 'conquistas' | 'historico';
@@ -244,14 +245,14 @@ function SealsTab({ seals, featuredId, owned }: { seals: SealProgress[]; feature
 
 function SealSheet({ seal, featuredId, onClose }: { seal: SealProgress | null; featuredId: SealId | null; onClose: () => void }) {
   const { data, service } = useApp();
-  const feedback = useFeedback();
   const onError = useErrorHandler();
+  const note = useSavedNote();
   const choice = featuredSealOf(data.settings);
+  // beta.7: destacar não fecha a tela; o botão muda de estado e aparece "Atualizado".
   async function feature(id: SealId | 'auto') {
     try {
       await service.updateSettings({ featuredSeal: id });
-      feedback(id === 'auto' ? 'Destaque automático' : 'Selo em destaque no perfil');
-      onClose();
+      note.flash();
     } catch (err) {
       onError(err);
     }
@@ -292,6 +293,7 @@ function SealSheet({ seal, featuredId, onClose }: { seal: SealProgress | null; f
           ) : (
             <p className="text-sm text-muted">Conquiste o estágio I para poder destacar este selo no seu perfil.</p>
           )}
+          <SavedNote shown={note.shown} label={choice === 'auto' ? 'Destaque automático' : 'Selo em destaque no perfil'} />
           <p className="text-xs text-muted">No destaque automático, o perfil mostra o selo de maior estágio (no empate, o mais recente).</p>
         </div>
       )}

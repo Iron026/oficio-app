@@ -205,30 +205,33 @@ input, select, textarea, button { font: inherit; }
 }
 
 /*
- * Cabeçalho (beta.5): degradê suave. O topo é exatamente --hero-1 em toda a largura (igual à
- * barra fixa acima, sem emenda); a transição até --hero-2 é vertical, interpolada em oklab com
- * paradas em curva suave (sem faixas visíveis), e o brilho fica abaixo da emenda e se dissolve
- * aos poucos. Só gradientes CSS: nada de filtros, imagens ou animação.
+ * Cabeçalho (beta.7). A área abaixo da barra fixa continua a barra sem emenda: começa exatamente
+ * em --hero-1 e desce, em oklab e com paradas em curva suave, só até a metade do caminho para
+ * --hero-2 (transição contida, sem faixas). O fundo não se repete e ocupa a área inteira — na
+ * beta.5/6 ele era deslocado 3,5rem para cima e se repetia, o que criava uma faixa clara com
+ * borda dura no fim do cabeçalho. A base é arredondada; o brilho fica no canto de baixo e se
+ * dissolve. Só gradientes CSS: nada de filtros, imagens ou animação.
  */
 @utility hero {
   color: #fff;
   background: linear-gradient(180deg, var(--hero-1), var(--hero-2));
-  background-color: var(--hero-2);
+  background-color: var(--hero-1);
   background-image:
-    radial-gradient(120% 140% at 96% 88%,
-      color-mix(in srgb, var(--hero-glow) 70%, transparent) 0%,
-      color-mix(in srgb, var(--hero-glow) 44%, transparent) 24%,
-      color-mix(in srgb, var(--hero-glow) 20%, transparent) 46%,
-      color-mix(in srgb, var(--hero-glow) 6%, transparent) 60%,
-      transparent 70%),
+    radial-gradient(120% 100% at 100% 100%,
+      color-mix(in srgb, var(--hero-glow) 45%, transparent) 0%,
+      color-mix(in srgb, var(--hero-glow) 18%, transparent) 35%,
+      transparent 65%),
     linear-gradient(180deg,
       var(--hero-1) 0%,
-      color-mix(in oklab, var(--hero-1) 92%, var(--hero-2)) 14%,
-      color-mix(in oklab, var(--hero-1) 74%, var(--hero-2)) 34%,
-      color-mix(in oklab, var(--hero-1) 50%, var(--hero-2)) 54%,
-      color-mix(in oklab, var(--hero-1) 27%, var(--hero-2)) 74%,
-      color-mix(in oklab, var(--hero-1) 9%, var(--hero-2)) 90%,
-      var(--hero-2) 100%);
+      color-mix(in oklab, var(--hero-1) 94%, var(--hero-2)) 20%,
+      color-mix(in oklab, var(--hero-1) 80%, var(--hero-2)) 45%,
+      color-mix(in oklab, var(--hero-1) 62%, var(--hero-2)) 72%,
+      color-mix(in oklab, var(--hero-1) 50%, var(--hero-2)) 100%);
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-size: 100% 100%;
+  border-bottom-left-radius: 1.75rem;
+  border-bottom-right-radius: 1.75rem;
 }
 
 /* Barras de progresso: preenchimento por transform (600 ms) e animação ao aparecer. */

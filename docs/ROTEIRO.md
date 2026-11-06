@@ -29,6 +29,11 @@ computador · 6 acessibilidade, desempenho e entrega. Ver `docs/DESIGN.md`.
   CI Android: o emulador passou a usar `-gpu swangle` (o `swiftshader_indirect` é obsoleto desde o
   emulador 36.4.9 e congelava o emulador com qualquer APK, inclusive os anteriores à beta.5); o teste
   espera o Android se acalmar após o boot e registra memória/CPU da máquina e logcat contínuo.
+- 0.4.0-beta.7 (ajustes após o teste da beta.6 no S26): cabeçalho com transição contínua e base
+  arredondada (sem a faixa repetida e sem emenda com a barra); imagem de perfil e selo não fecham a
+  tela ao escolher; botão de ocultar valores no Painel e em Finanças; "Desfazer" ao excluir cliente e
+  serviço/atendimento (agendado, concluído com ou sem receita, cancelado); um novo "Desfazer"
+  substitui o anterior.
 
 ## 0.3.1 (manutenção — branch `fix/v0.3.1-maintenance`, aguardando aprovação)
 - Exportar backup no Android: “Salvar no aparelho” pela janela “Salvar como” (Storage Access

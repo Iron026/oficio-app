@@ -78,7 +78,7 @@ Nada abaixo de 12 px. Não use tamanhos avulsos (`text-[13px]`).
 | Status | `ui/Badge.tsx` | ponto colorido + texto (Agendado, Pendente, Concluído, Cancelado) |
 | Avatar | `ui/Avatar.tsx` | iniciais com cor estável por nome, em tons discretos |
 | Demonstração | `ui/Misc.tsx` (`DemoBadge`) | contorno tracejado violeta, sem preenchimento |
-| Avisos | `ui/Toast.tsx` | na base, acima da navegação; até 3 visíveis; toque fecha |
+| Avisos | `ui/Toast.tsx` | na base, acima da navegação; até 2 visíveis; só o botão de ação recebe toques |
 | Controle segmentado | `ui/Misc.tsx` | opções com 40 px de altura |
 
 Cartões de lista (serviços, clientes, lançamentos): título e nomes em até 2–3 linhas, sem reticências
@@ -104,9 +104,19 @@ No CI, o job **Capturas visuais e acessibilidade** roda em modo estrito e public
   40 px ou menos o desenho encolhe e os pontos crescem (legível em 32 px). Para o TalkBack, o texto
   ao lado diz "Estágio III de IV"; sozinho, o medalhão aceita `label`.
 - **Não mudam:** navegação inferior, círculos de receita e despesa e demais ícones da 0.4.
-- **Avisos (beta.5/6):** no máximo dois; não capturam toques, só o botão "Desfazer" (44 px, nome
-  "Desfazer: <ação>", tempo pausa com foco). Novidades de gamificação num único aviso. O aviso com
-  "Desfazer" vale só na tela da ação e sai ao trocar de tela.
+- **Avisos (beta.5 a 7):** no máximo dois; não capturam toques, só o botão "Desfazer" (44 px, nome
+  "Desfazer: <ação>", 8 s, tempo pausa com foco). Novidades de gamificação num único aviso. O aviso
+  com "Desfazer" vale só na tela da ação e sai ao trocar de tela; um novo "Desfazer" substitui o
+  anterior (só a última ação pode ser desfeita). Têm "Desfazer": concluir, reabrir, cancelar,
+  lançar receita, excluir lançamento, excluir cliente e excluir serviço/atendimento.
+- **Cabeçalho (beta.7):** a área abaixo da barra fixa continua a barra sem emenda (começa em
+  `--hero-1`), desce em oklab só até a metade do caminho para `--hero-2`, não se repete e tem a base
+  arredondada (1,75rem). A beta.5/6 deslocava o fundo 3,5rem e ele se repetia, o que criava uma
+  faixa clara com borda dura no fim do cabeçalho.
+- **Telas de escolha (beta.7):** imagem de perfil e selo em destaque aplicam a escolha na hora e
+  continuam abertas, com prévia, "Atualizado" (anunciado ao TalkBack) e o botão "Concluído".
+- **Ocultar valores (beta.7):** botão de olho no cabeçalho do Painel e de Finanças; mesma preferência
+  de Ajustes › Privacidade, só no aparelho.
 - **Tela de abertura (beta.6):** Android 12+ mostra o símbolo da logo A (`drawable/splash_logo.xml`)
   sobre o petróleo `#0F7B71`; Android 11 e anteriores usam `drawable*/splash.png`, gerados por
   `scripts/icone-app.mjs` com o símbolo e o nome.

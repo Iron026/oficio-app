@@ -16,6 +16,8 @@ import { ProfessionIcon } from '../../ui/icons';
 import { Card } from '../../ui/Misc';
 import { SealMedal } from '../../ui/SealMedal';
 import { useHideValues } from '../../ui/privacy';
+import { ProfileAvatar } from '../../ui/ProfileAvatar';
+import { SavedNote, useSavedNote } from '../../ui/SavedNote';
 import { Sheet } from '../../ui/Sheet';
 import { GoalsSheet } from '../Evolution';
 import { ProfileImageSheet } from '../ProfileImageSheet';
@@ -135,23 +137,32 @@ function ProfessionSheet({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
+/**
+ * beta.7: escolher um selo não fecha a tela. A prévia do avatar mostra o selo aplicado, aparece
+ * "Atualizado" e a pessoa continua trocando até tocar em "Concluído" (ou no X / Voltar).
+ */
 function FeaturedSealSheet({ open, seals, onClose }: { open: boolean; seals: SealProgress[]; onClose: () => void }) {
   const { data, service } = useApp();
-  const feedback = useFeedback();
+  const { tier, featured } = useProfile();
   const onError = useErrorHandler();
+  const note = useSavedNote();
   const current = featuredSealOf(data.settings);
   async function choose(id: SealId | 'auto') {
     try {
       await service.updateSettings({ featuredSeal: id });
-      feedback(id === 'auto' ? 'Destaque automático' : 'Selo em destaque atualizado');
-      onClose();
+      note.flash();
     } catch (err) {
       onError(err);
     }
   }
   const option = (active: boolean, disabled?: boolean) => cx('press-soft flex w-full items-center gap-3 rounded-2xl border-2 p-3 text-left', active ? 'border-brand-500' : 'border-line', disabled && 'opacity-60');
   return (
-    <Sheet open={open} onClose={onClose} title="Selo em destaque">
+    <Sheet open={open} onClose={onClose} title="Selo em destaque" footer={<Button block size="lg" variant="secondary" onClick={onClose}>Concluído</Button>}>
+      <div className="mb-3 flex flex-col items-center gap-1" data-seal-preview>
+        <ProfileAvatar data={data} tier={tier} size={88} seal={featured ? { id: featured.def.id, stage: featured.stage } : null} />
+        <p className="text-center text-sm font-semibold">{featured ? `${current === 'auto' ? 'Automático · ' : ''}${featured.def.name} ${ROMAN[featured.stage]}` : 'Nenhum selo conquistado ainda'}</p>
+        <SavedNote shown={note.shown} label="Selo em destaque atualizado" />
+      </div>
       <p className="mb-3 text-sm text-muted">O selo em destaque aparece no canto do seu avatar. Selos são permanentes e não dão XP.</p>
       <div role="radiogroup" aria-label="Selo em destaque" className="space-y-2">
         <button type="button" role="radio" aria-checked={current === 'auto'} onClick={() => choose('auto')} className={option(current === 'auto')}>

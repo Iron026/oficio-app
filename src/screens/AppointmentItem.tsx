@@ -166,13 +166,13 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
   async function remove() {
     const ok = await confirm({
       title: `Excluir ${t.service.toLowerCase()}?`,
-      message: `${autoIncome ? 'O registro e a receita gerada por ele serão excluídos permanentemente.' : 'Este registro será excluído permanentemente.'}${keepsPayments}`,
+      message: `${autoIncome ? 'O registro e a receita gerada por ele serão excluídos.' : 'Este registro será excluído.'}${keepsPayments} Logo depois, dá para desfazer pelo aviso.`,
       confirmLabel: 'Excluir', danger: true,
     });
     if (!ok) return;
     try {
-      await service.deleteAppointment(a.id);
-      toast({ title: 'Excluído', tone: 'info' });
+      const ticket = await service.deleteAppointment(a.id);
+      toast({ title: ticket?.label ?? 'Excluído', description: autoIncome ? 'A receita automática também saiu de Finanças.' : undefined, tone: 'info', action: undoAction(ticket) });
       onClose();
     } catch (err) {
       onError(err);

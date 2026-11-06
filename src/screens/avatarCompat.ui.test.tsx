@@ -60,6 +60,8 @@ describe('Compatibilidade com perfis existentes', () => {
     expect(sheet.querySelector(`[data-avatar-id="${legacy.id}"]`)).toBeNull();
     expect(within(sheet).getAllByRole('radio').filter((r) => r.hasAttribute('data-avatar-id') && r.getAttribute('aria-checked') === 'true')).toHaveLength(0);
     await user.click(within(sheet).getByRole('radio', { name: 'Geral, mulher' }));
+    await waitFor(() => expect(within(sheet).getByText('Geral, mulher', { selector: '[data-avatar-current]' })).toBeInTheDocument());
+    await user.click(within(sheet).getByRole('button', { name: /^concluído$/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByText('Avatar: Geral, mulher')).toBeInTheDocument();
     // Depois de escolher um da coleção atual, o aviso some.
