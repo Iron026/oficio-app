@@ -241,9 +241,19 @@ const [device] = await android.devices({ omitDriverInstall: true });
 assert(device, 'Nenhum dispositivo Android encontrado.');
 console.log(`Dispositivo: ${device.model()} · Android SDK ${adb('shell', 'getprop', 'ro.build.version.sdk').trim()}`);
 
-async function launch() {
+let lastPid = null;
+async function launch({ newProcess = true } = {}) {
   adb('shell', 'am', 'start', '-W', '-n', `${PKG}/.MainActivity`);
-  const webview = await device.webView({ pkg: PKG }, { timeout: 90_000 });
+  // Depois de reinstalar (`install -r`), o Playwright ainda pode guardar a WebView do processo que o
+  // Android encerrou; esperar a de um processo novo evita usar uma página já fechada.
+  let webview;
+  for (const until = Date.now() + 90_000; ;) {
+    webview = await device.webView({ pkg: PKG }, { timeout: Math.max(1000, until - Date.now()) });
+    if (!newProcess || webview.pid() !== lastPid) break;
+    if (Date.now() > until) throw new Error('a WebView do processo novo não apareceu');
+    await wait(1000);
+  }
+  lastPid = webview.pid();
   const page = await webview.page();
   page.setDefaultTimeout(20_000);
   currentPage = page;
