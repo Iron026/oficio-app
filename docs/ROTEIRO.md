@@ -1,5 +1,14 @@
 # Roteiro
 
+## 0.5 (em desenvolvimento — branch `feat/v0.5-gestao`, a partir de `18fd752`, 0.4.0-beta.7 aprovada)
+Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0.5.md`.
+- 0.5.0-beta.1: **pagamentos** — concluir com escolha explícita (recebi tudo que faltava / uma parte /
+  ainda não recebi), pagamentos integrais, parciais e antecipados, estornos que não apagam o histórico,
+  contratado × recebido × estornado × pendente, "A receber" separado do saldo, reabrir/cancelar/excluir sem
+  apagar dinheiro, idempotência entre aparelhos; **agenda** — visões dia/semana/mês, duração, horários de
+  parede (sem efeito de fuso ou horário de verão), atendimentos que atravessam a meia-noite e conflitos
+  que avisam sem bloquear. Teste Android inclui a atualização por cima da 0.4.0-beta.7.
+
 ## 0.4 (em desenvolvimento — branch `feat/v0.4-design`)
 Design, estética e experiência. Etapas: 0 rede de segurança visual · 1 fundamentos do design
 system · 2 componentes · 3 telas do dia a dia · 4 Evolução, Ajustes e Boas-vindas · 5 tablets e

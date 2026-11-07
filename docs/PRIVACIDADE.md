@@ -42,7 +42,7 @@ Ao tocar em **Continuar com Google** e confirmar a conexão:
 - **Dados de demonstração** (fictícios) não são enviados.
 - **Foto de perfil, selos e tipos de serviço (versão 0.4):** a foto escolhida no Ofício é recortada e
   reduzida no próprio aparelho (até 64 KB, sem localização ou outros metadados da câmera). Até a versão
-  0.4.0-beta.7 a foto, os selos e os tipos de serviço personalizados ficam **só no aparelho e no arquivo
+  0.5.0-beta.1 a foto, os selos e os tipos de serviço personalizados ficam **só no aparelho e no arquivo
   de backup** — não são enviados para a nuvem, mesmo com conta conectada. Se isso mudar numa versão futura, esta política será atualizada antes.
   A foto da conta Google não é usada como foto de perfil do Ofício.
 

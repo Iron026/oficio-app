@@ -62,6 +62,20 @@ A beta.4 não gera ocorrências. Se uma ocorrência for **excluída** num aparel
 sincronização. Por isso o gerador da 0.5 não pode “preencher buracos”: ele só cria datas **depois** do maior
 `series.through` já gravado na série. Ocorrência excluída, cancelada ou alterada nunca é recriada.
 
+## O que a 0.5.0-beta.1 implementou (e como conversa com a 0.4)
+
+| Situação | Na 0.5.0-beta.1 |
+| --- | --- |
+| Pagamento | `payment: { kind: 'pagamento', method?, key? }` em receita vinculada; id `pg-<operação>` (repetir não duplica) |
+| Estorno | `payment: { kind: 'estorno', of: <pagamento> }` em despesa vinculada; o pagamento original nunca muda |
+| Quitação em dois aparelhos offline | Chave `quitacao:<serviço>:<líquido antes>`; ao sincronizar fica o mais antigo. Parciais (sem chave) nunca são removidos |
+| `appointment.payments` | `true` em serviço criado, concluído ou pago na 0.5 |
+| `appointment.transactionId` | Não é mais gravado; o que já existe (receita automática da 0.4) conta como pago |
+| Reabrir, cancelar, excluir | Nunca apagam pagamentos, estornos **nem a receita automática legada** (diferente da 0.4, que removia esta última) |
+| Concluído na 0.4 sem receita | "Pagamento não registrado": nem pago nem pendente, fora do "a receber"; nada é gravado |
+| `appointment.duration` | Gravado só quando escolhido; antigos usam 60 min na exibição |
+| Regras do Firestore | Sem mudança (lançamentos e serviços não são validados campo a campo) |
+
 ## Riscos que continuam
 
 - **Aparelho ainda na beta.3 ou anterior.** Ele não tem estas proteções. Antes de usar a 0.5, todos os

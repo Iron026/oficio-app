@@ -259,6 +259,15 @@ jobs:
           path: apk
           run-id: ${{ env.APK_RUN_ID }}
           github-token: ${{ github.token }}
+      # 0.5: o teste também instala a 0.4.0-beta.7 aprovada e atualiza por cima, conferindo os dados.
+      - name: APK da 0.4.0-beta.7 (teste de atualização)
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          name: oficio-apk-debug
+          path: apk-anterior
+          run-id: 42287028515
+          github-token: ${{ github.token }}
       - name: Habilitar KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -273,7 +282,7 @@ jobs:
           profile: pixel_7
           disable-animations: true
           emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim
-          script: node e2e/android.e2e.mjs "$(ls apk/*.apk | head -1)"
+          script: node e2e/android.e2e.mjs "$(ls apk/*.apk | head -1)" "$(ls apk-anterior/*.apk 2>/dev/null | head -1)"
       - uses: actions/upload-artifact@v6
         if: always()
         with:

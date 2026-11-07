@@ -11,6 +11,8 @@ import { _android as android } from 'playwright-core';
 const PKG = 'io.github.iron026.oficio';
 const OUT = 'e2e-results';
 const apk = process.argv[2];
+/** APK da versão anterior (0.4.0-beta.7) para o teste de atualização por cima; opcional. */
+const previousApk = process.argv[3] || '';
 if (!apk) throw new Error('Informe o caminho do APK.');
 mkdirSync(OUT, { recursive: true });
 
@@ -274,6 +276,57 @@ try {
     }
     console.log(`\n  carga do Android após o boot (5 s): ${loads.join(' ')} → ${calm >= 3 ? 'estável' : 'não estabilizou'} em ${Math.round((Date.now() - start) / 1000)} s`);
     adb('shell', 'am', 'broadcast', '-a', 'android.intent.action.CLOSE_SYSTEM_DIALOGS');
+  });
+
+  if (previousApk) await step('Atualização por cima da 0.4.0-beta.7 sem perder dados', async () => {
+    // Instala a versão anterior do zero e cria dados pela interface dela.
+    try { adb('uninstall', PKG); } catch { /* não estava instalado */ }
+    adb('install', previousApk);
+    page = await launch();
+    await tap(page.getByRole('button', { name: /começar/i }));
+    await tap(page.getByRole('radio', { name: /beleza/i }));
+    await tap(page.getByRole('button', { name: /continuar/i }));
+    await page.getByLabel(/seu nome/i).fill('Ana da 0.4');
+    await tap(page.getByRole('button', { name: /entrar no ofício/i }));
+    await page.getByText(/atendimentos na semana/i).waitFor();
+    await tap(page.getByRole('button', { name: /^cliente$/i }));
+    const cf = page.getByRole('dialog', { name: /novo cliente/i });
+    await cf.getByLabel(/^nome/i).fill('Cliente da 0.4');
+    await tap(cf.getByRole('button', { name: /cadastrar cliente/i }));
+    await cf.waitFor({ state: 'detached' });
+    await tap(page.getByRole('button', { name: /^agendar$/i }));
+    const af = page.getByRole('dialog');
+    await af.getByLabel(/descrição/i).fill('Corte da 0.4');
+    await af.getByLabel(/valor/i).fill('80,00');
+    await tap(af.getByRole('button', { name: /^agendar$/i }));
+    await af.waitFor({ state: 'detached' });
+    await tap(page.getByRole('navigation').getByRole('link', { name: /agenda/i }));
+    await tap(page.getByRole('button', { name: /corte da 0\.4/i }));
+    // Na 0.4, concluir lança a receita automática (caixa "Lançar receita" marcada por padrão).
+    await tap(page.getByRole('button', { name: /concluir atendimento/i }));
+    await eventually(async () => (await readStore(page, 'transactions')).length === 1, 'a 0.4 não lançou a receita automática');
+    const snap = async () => {
+      const [clients, appointments, transactions, xpEvents] = await Promise.all(['clients', 'appointments', 'transactions', 'xpEvents'].map((s) => readStore(page, s)));
+      return { clients, appointments, transactions, xpEvents, profile: await page.evaluate(() => localStorage.length) };
+    };
+    const before = await snap();
+    // Atualiza para a 0.5 por cima (mesma assinatura, versionCode maior), sem limpar dados.
+    adb('install', '-r', apk);
+    page = await launch();
+    await page.getByText(/atendimentos na semana/i).waitFor();
+    const after = await snap();
+    for (const k of ['clients', 'appointments', 'transactions', 'xpEvents']) {
+      assert(JSON.stringify(after[k]) === JSON.stringify(before[k]), `${k} mudou ao atualizar (antes ${before[k].length}, depois ${after[k].length})`);
+    }
+    // A receita automática da 0.4 é lida como pagamento integral (nada reinterpretado nem gravado).
+    await tap(page.getByRole('navigation').getByRole('link', { name: /agenda/i }));
+    await tap(page.getByRole('radio', { name: /concluíd/i }));
+    const item = page.getByRole('button', { name: /corte da 0\.4/i });
+    await item.waitFor();
+    assert(/Pago/.test((await item.textContent()) ?? ''), 'atendimento pago na 0.4 não aparece como "Pago" na 0.5');
+    await wait(800);
+    shot('00-atualizado-da-0.4');
+    console.log(`\n  dados preservados: ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
   });
 
   await step('Instalar APK', async () => {
