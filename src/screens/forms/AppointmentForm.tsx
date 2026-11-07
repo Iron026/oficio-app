@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pin, Settings2 } from 'lucide-react';
+import { conflictsFor, DEFAULT_DURATION, DURATION_OPTIONS, formatDuration, timeRange } from '../../domain/agenda';
 import { applyServiceChoice, serviceChoices } from '../../domain/serviceTypes';
 import type { Appointment } from '../../domain/types';
 import { todayKey } from '../../lib/dates';
@@ -7,33 +8,35 @@ import { centsToInput, formatMoney } from '../../lib/money';
 import { hasErrors, validateAppointment, type AppointmentInput, type Errors } from '../../lib/validation';
 import { useApp, useErrorHandler, useFeedback } from '../../state/AppContext';
 import { Button } from '../../ui/Button';
+import { useConfirm } from '../../ui/Confirm';
 import { SelectField, TextArea, TextField } from '../../ui/Field';
 import { Chip } from '../../ui/Misc';
 import { Sheet } from '../../ui/Sheet';
 import { useHideValues } from '../../ui/privacy';
 import { ServiceTypesSheet } from '../ServiceTypesSheet';
 
-interface Props { open: boolean; onClose: () => void; appointment?: Appointment; defaultClientId?: string }
+interface Props { open: boolean; onClose: () => void; appointment?: Appointment; defaultClientId?: string; defaultDate?: string }
 
-export function AppointmentFormSheet({ open, onClose, appointment, defaultClientId }: Props) {
+export function AppointmentFormSheet({ open, onClose, appointment, defaultClientId, defaultDate }: Props) {
   const { profession } = useApp();
   const t = profession.terms;
   return (
     <Sheet open={open} onClose={onClose} title={appointment ? `Editar ${t.service.toLowerCase()}` : `Agendar ${t.service.toLowerCase()}`}>
-      {open && <AppointmentForm appointment={appointment} defaultClientId={defaultClientId} onDone={onClose} />}
+      {open && <AppointmentForm appointment={appointment} defaultClientId={defaultClientId} defaultDate={defaultDate} onDone={onClose} />}
     </Sheet>
   );
 }
 
-function AppointmentForm({ appointment, defaultClientId, onDone }: { appointment?: Appointment; defaultClientId?: string; onDone: () => void }) {
+function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: { appointment?: Appointment; defaultClientId?: string; defaultDate?: string; onDone: () => void }) {
   const { service, data, profession } = useApp();
   const t = profession.terms;
   const feedback = useFeedback();
   const onError = useErrorHandler();
+  const confirm = useConfirm();
   const [v, setV] = useState<AppointmentInput>(
     appointment
-      ? { title: appointment.title, clientId: appointment.clientId ?? '', date: appointment.date, time: appointment.time, price: centsToInput(appointment.price), notes: appointment.notes }
-      : { title: '', clientId: defaultClientId ?? '', date: todayKey(), time: '', price: '', notes: '' },
+      ? { title: appointment.title, clientId: appointment.clientId ?? '', date: appointment.date, time: appointment.time, price: centsToInput(appointment.price), notes: appointment.notes, duration: appointment.duration ? String(appointment.duration) : '' }
+      : { title: '', clientId: defaultClientId ?? '', date: defaultDate ?? todayKey(), time: '', price: '', notes: '', duration: String(DEFAULT_DURATION) },
   );
   const [errors, setErrors] = useState<Errors<AppointmentInput>>({});
   const [saving, setSaving] = useState(false);
@@ -48,6 +51,21 @@ function AppointmentForm({ appointment, defaultClientId, onDone }: { appointment
     const errs = validateAppointment(v);
     setErrors(errs);
     if (hasErrors(errs)) return;
+    // 0.5: conflito de horário avisa, mostra quem coincide e nunca bloqueia.
+    const clash = conflictsFor(
+      { id: appointment?.id ?? '__novo', date: v.date, time: v.time, duration: v.duration ? Number(v.duration) : appointment?.duration, status: appointment?.status ?? 'agendado' },
+      data.appointments,
+    ).map((id) => data.appointments.find((a) => a.id === id)!).filter(Boolean);
+    if (clash.length) {
+      const lines = clash.slice(0, 3).map((a) => `${a.title} · ${a.date === v.date ? '' : `${a.date.split('-').reverse().slice(0, 2).join('/')} `}${timeRange(a)}${a.clientId ? ` (${data.clients.find((c) => c.id === a.clientId)?.name ?? 'cliente'})` : ''}`);
+      const ok = await confirm({
+        title: 'Conflito de horário',
+        message: `Este horário coincide com: ${lines.join('; ')}${clash.length > 3 ? ` e mais ${clash.length - 3}` : ''}. Você pode salvar assim mesmo.`,
+        cancelLabel: 'Mudar horário',
+        confirmLabel: 'Salvar mesmo assim',
+      });
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       const res = await service.saveAppointment(v, appointment?.id);
@@ -96,6 +114,10 @@ function AppointmentForm({ appointment, defaultClientId, onDone }: { appointment
         <TextField label="Data" type="date" value={v.date} onChange={set('date')} error={errors.date} />
         <TextField label="Horário" type="time" value={v.time} onChange={set('time')} error={errors.time} optional />
       </div>
+      <SelectField label="Duração" value={v.duration ?? ''} onChange={set('duration')} error={errors.duration} hint={v.time ? undefined : 'A duração vale quando há horário.'}>
+        {!v.duration && <option value="">Padrão da agenda ({formatDuration(DEFAULT_DURATION)})</option>}
+        {[...new Set([...DURATION_OPTIONS, ...(v.duration ? [Number(v.duration)] : [])])].sort((a, b) => a - b).map((m) => <option key={m} value={String(m)}>{formatDuration(m)}</option>)}
+      </SelectField>
       <TextField label="Valor" prefix="R$" inputMode="decimal" placeholder="0,00" value={v.price} onChange={set('price')} error={errors.price} hint="Os preços sugeridos são apenas referência." optional />
       <TextArea label="Observações" value={v.notes} onChange={set('notes')} error={errors.notes} optional maxLength={500} />
       <Button type="submit" block size="lg" disabled={saving}>{appointment ? 'Salvar alterações' : 'Agendar'}</Button>

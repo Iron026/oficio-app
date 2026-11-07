@@ -332,6 +332,19 @@ try {
           await capture(page, vp, theme, `${s.id}-inteira`, { full: true, skipChecks: true });
         }
       }
+      // 0.5: visões da agenda (dia com grade de 24 h, semana e mês) e o painel de pagamento.
+      await page.goto(BASE + '#/agenda');
+      for (const [name, id] of [['Dia', 'dia'], ['Semana', 'semana'], ['Mês', 'mes']]) {
+        await page.getByRole('radio', { name, exact: true }).click();
+        await capture(page, vp, theme, `agenda-${id}`, { keepScroll: id === 'dia' });
+      }
+      await page.getByRole('radio', { name: 'Lista', exact: true }).click();
+      await page.getByRole('radio', { name: /concluíd/i }).click();
+      await page.getByRole('button', { name: /pacote noiva/i }).first().click();
+      await page.getByRole('region', { name: 'Pagamento' }).waitFor();
+      await capture(page, vp, theme, 'agenda-pagamento', { skipChecks: true });
+      await page.keyboard.press('Escape');
+      await page.getByRole('dialog').waitFor({ state: 'detached' });
       // Central de Ajustes: páginas internas (rodada 5).
       for (const sub of ['aparencia', 'aparencia/paleta', 'perfil', 'privacidade', 'conta', 'dados', 'sobre']) {
         await page.goto(BASE + '#/ajustes/' + sub);

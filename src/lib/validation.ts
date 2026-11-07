@@ -31,7 +31,9 @@ export function validateClient(v: ClientInput): Errors<ClientInput> {
   return e;
 }
 
-export interface AppointmentInput { title: string; clientId: string; date: string; time: string; price: string; notes: string }
+export interface AppointmentInput { title: string; clientId: string; date: string; time: string; price: string; notes: string;
+  /** 0.5: duração em minutos (5–1440). Vazio/ausente = não altera (agendamentos antigos usam 60 sem gravar). */
+  duration?: string }
 
 export function validateAppointment(v: AppointmentInput): Errors<AppointmentInput> {
   const e: Errors<AppointmentInput> = {};
@@ -45,6 +47,7 @@ export function validateAppointment(v: AppointmentInput): Errors<AppointmentInpu
     else if (cents > 100_000_000) e.price = 'Valor muito alto.';
   }
   if (v.notes.length > 500) e.notes = 'Use no máximo 500 caracteres.';
+  if (v.duration && !(/^\d+$/.test(v.duration) && Number(v.duration) >= 5 && Number(v.duration) <= 1440)) e.duration = 'Duração entre 5 minutos e 24 horas.';
   return e;
 }
 

@@ -416,6 +416,8 @@ export class AppService {
         status: existing?.status ?? 'agendado', completedAt: existing?.completedAt ?? null, transactionId: existing?.transactionId ?? null,
         // 0.5: serviço novo nasce com controle de pagamento; os antigos não são reinterpretados.
         ...(existing ? {} : { payments: true }),
+        // Duração só é gravada quando informada (os antigos continuam sem, usando 60 min na agenda).
+        ...(input.duration ? { duration: Number(input.duration) } : {}),
       };
       await this.storage.appointments.put(appointment);
       const appointments = existing
