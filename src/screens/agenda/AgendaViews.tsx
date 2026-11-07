@@ -93,17 +93,36 @@ function DayBlock({ it, conflict, onOpen }: { it: DayItem<Appointment>; conflict
   const top = (it.from / 60) * HOUR;
   const height = Math.max(((it.to - it.from) / 60) * HOUR - 2, 40);
   const gutter = 48;
+  // Até 1 h 30 min o bloco tem altura para duas linhas: horário (e cliente) em cima; serviço e situação embaixo.
+  const compact = height < 84;
+  const cancelled = it.a.status === 'cancelado';
+  const time = <>{it.fromPrev ? '↑ ' : ''}{timeRange(it.a)}{it.toNext ? ' ↓' : ''}</>;
   return (
     <div role="listitem" className="absolute" style={{ top, height, left: `calc(${gutter}px + (100% - ${gutter + 4}px) * ${it.lane / it.lanes})`, width: `calc((100% - ${gutter + 4}px) / ${it.lanes} - 3px)` }}>
       <button type="button" onClick={onOpen} data-agenda-block={it.a.id}
-        className={cx('press-soft flex h-full w-full flex-col overflow-hidden rounded-lg px-2 py-1 text-left text-xs', statusTone(it.a, conflict > 0))}>
-        <span className="num font-semibold">{it.fromPrev ? '↑ ' : ''}{timeRange(it.a)}{it.toNext ? ' ↓' : ''}</span>
-        <span className={cx('line-clamp-2 font-display text-sm font-semibold leading-tight', it.a.status === 'cancelado' && 'line-through')}>{it.a.title}</span>
-        {client && <span className="truncate text-muted">{client.name}</span>}
-        <span className="mt-auto flex flex-wrap items-center gap-1">
-          {conflict > 0 && <ConflictMark n={conflict} />}
-          {it.lanes === 1 && <PaymentBadge a={it.a} s={pay} />}
-        </span>
+        className={cx('press-soft flex h-full w-full flex-col overflow-hidden rounded-lg px-2 text-left text-xs', compact ? 'justify-center gap-0.5' : 'py-1', statusTone(it.a, conflict > 0))}>
+        {compact ? (
+          <>
+            <span className="truncate leading-4"><span className="num font-semibold">{time}</span>{client && <span className="text-muted"> · {client.name}</span>}</span>
+            <span className="flex min-w-0 items-center gap-1.5 leading-5">
+              <span className={cx('min-w-0 flex-1 truncate font-display text-sm font-semibold', cancelled && 'line-through')}>{it.a.title}</span>
+              {conflict > 0 && (
+                <span className="shrink-0 text-amber-800 dark:text-amber-200"><AlertTriangle size={13} aria-hidden="true" /><span className="sr-only">Conflito{conflict > 1 ? ` (${conflict})` : ''}</span></span>
+              )}
+              {it.lanes === 1 && <span className="shrink-0"><PaymentBadge a={it.a} s={pay} /></span>}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="num font-semibold">{time}</span>
+            <span className={cx('line-clamp-2 font-display text-sm font-semibold leading-tight', cancelled && 'line-through')}>{it.a.title}</span>
+            {client && <span className="truncate text-muted">{client.name}</span>}
+            <span className="mt-auto flex flex-wrap items-center gap-1">
+              {conflict > 0 && <ConflictMark n={conflict} />}
+              {it.lanes === 1 && <PaymentBadge a={it.a} s={pay} />}
+            </span>
+          </>
+        )}
       </button>
     </div>
   );
@@ -185,18 +204,20 @@ export function MonthView({ dateKey, items, onPickDay }: { dateKey: string; item
               const clash = list.some((a) => (conflicts.get(a.id)?.length ?? 0) > 0);
               const inMonth = k.startsWith(month);
               const d = Number(k.slice(8));
-              const label = `${dayTitle(k, true)}: ${list.length ? `${list.length} ${list.length === 1 ? 'atendimento' : 'atendimentos'}` : 'livre'}${clash ? ', com conflito de horário' : ''}`;
+              const n = list.length;
+              // Nome acessível = texto visível + complemento oculto (o leitor de tela ouve o mesmo que se vê).
               return (
-                <button key={k} type="button" role="gridcell" aria-label={label} aria-current={k === today ? 'date' : undefined}
+                <button key={k} type="button" role="gridcell" aria-current={k === today ? 'date' : undefined}
                   onClick={() => onPickDay(k)} data-month-day={k}
-                  className={cx('press-soft flex min-h-12 flex-col items-center justify-start rounded-lg py-1 text-sm', inMonth ? 'text-fg' : 'text-muted/60', k === today && 'bg-brand-600 font-bold text-white', k !== today && list.length > 0 && 'bg-surface-2')}>
-                  <span className="num">{d}</span>
-                  {list.length > 0 && (
-                    <span className="mt-0.5 flex items-center gap-0.5 text-[0.6875rem] font-semibold">
-                      {clash && <AlertTriangle size={11} className={k === today ? 'text-white' : 'text-amber-600'} aria-hidden="true" />}
-                      <span className="num">{list.length}</span>
+                  className={cx('press-soft flex min-h-12 flex-col items-center justify-start rounded-lg py-1 text-sm', inMonth ? 'text-fg' : 'text-muted', k === today && 'bg-brand-600 font-bold text-white', k !== today && n > 0 && 'bg-surface-2')}>
+                  <span aria-hidden="true" className="num">{d}</span>
+                  {n > 0 && (
+                    <span aria-hidden="true" className="mt-0.5 flex items-center gap-0.5 text-[0.6875rem] font-semibold">
+                      {clash && <AlertTriangle size={11} className={k === today ? 'text-white' : 'text-amber-600'} />}
+                      <span className="num">{n}</span>
                     </span>
                   )}
+                  <span className="sr-only">{`${dayTitle(k, true)}: ${n ? `${n} ${n === 1 ? 'atendimento' : 'atendimentos'}${clash ? ', com conflito de horário' : ''}` : 'livre'}`}</span>
                 </button>
               );
             })}
