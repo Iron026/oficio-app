@@ -1,7 +1,8 @@
 import { buildDemoData } from '../domain/demo';
 import { getProfession } from '../domain/professions';
 import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, ServiceType, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
-import { compareVersions, paidForAppointment, removableAutoIncome } from '../domain/compat';
+import { compareVersions } from '../domain/compat';
+import { paymentSummary, type PaymentMark, type PaymentMethod } from '../domain/payments';
 import { MAX_SERVICE_TYPES, moveServiceType, nextServiceOrder, serviceNameKey } from '../domain/serviceTypes';
 import { isValidProfileImage } from '../domain/profileImage';
 import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
@@ -43,6 +44,13 @@ export interface Feedback {
 
 /** Bilhete para desfazer a última ação reversível (válido por {@link UNDO_TTL_MS}). */
 export interface UndoTicket { id: number; label: string }
+
+/** Escolha explícita ao concluir (0.5): nada é pré-selecionado na interface. */
+export type CompletePayment =
+  | { mode: 'integral'; method?: PaymentMethod | null; date?: string }
+  | { mode: 'parcial'; amount: number; method?: PaymentMethod | null; date?: string }
+  | { mode: 'nenhum' };
+export interface CompleteOptions { payment: CompletePayment; opId?: string }
 export const UNDO_TTL_MS = 30_000;
 
 type UndoCollection = 'appointments' | 'transactions' | 'clients';
@@ -406,6 +414,8 @@ export class AppService {
         clientId: input.clientId && this._data.clients.some((c) => c.id === input.clientId) ? input.clientId : null,
         date: input.date, time: input.time, price: parseMoney(input.price) ?? 0, notes: input.notes.trim(),
         status: existing?.status ?? 'agendado', completedAt: existing?.completedAt ?? null, transactionId: existing?.transactionId ?? null,
+        // 0.5: serviço novo nasce com controle de pagamento; os antigos não são reinterpretados.
+        ...(existing ? {} : { payments: true }),
       };
       await this.storage.appointments.put(appointment);
       const appointments = existing
@@ -418,38 +428,34 @@ export class AppService {
   }
 
   /**
-   * Conclui o serviço e, opcionalmente, lança a receita correspondente. Desde a beta.4 a receita
-   * é só do que ainda falta: pagamentos já registrados (pela 0.5, inclusive antecipados) são
-   * descontados, e nada é lançado se o serviço já estiver pago.
+   * Conclui o serviço (0.5). O recebimento é sempre uma escolha explícita da pessoa:
+   *  - `integral`: registra como pagamento só o que falta (preço − líquido já recebido, inclusive
+   *    antecipado). Se nada falta, não registra nada — nunca uma segunda receita para valor já recebido;
+   *  - `parcial`: registra o valor informado;
+   *  - `nenhum`: conclui sem registrar pagamento (fica "a receber").
+   * Compatível com a chamada antiga `{ registerIncome }` (true = integral, false = nenhum).
+   * O XP de conclusão continua uma vez por serviço; pagamentos não dão XP.
    */
-  completeAppointment(id: string, options: { registerIncome: boolean }): Promise<Feedback> {
+  completeAppointment(id: string, options: CompleteOptions | { registerIncome: boolean }): Promise<Feedback> {
     return this.run(async () => {
+      const o: CompleteOptions = 'registerIncome' in options ? { payment: options.registerIncome ? { mode: 'integral' } : { mode: 'nenhum' } } : options;
       const a = this._data.appointments.find((x) => x.id === id);
       if (!a) throw new Error('Agendamento não encontrado');
       if (a.status === 'concluido') return emptyFeedback();
       const stamp = this.stamp();
-      let transactions = this._data.transactions;
-      let transactionId = a.transactionId;
-      const due = Math.max(0, a.price - paidForAppointment(a.id, transactions));
-      if (options.registerIncome && due > 0 && !transactionId) {
-        const profession = getProfession(this._data.profile?.professionId);
-        const tx: Transaction = {
-          id: newId(), createdAt: stamp, updatedAt: stamp, ...(a.isDemo ? { isDemo: true } : {}),
-          type: 'receita', amount: due, description: a.title, category: profession.incomeCategories[0]!,
-          date: a.date > todayKey(this.now()) ? todayKey(this.now()) : a.date, appointmentId: a.id,
-        };
-        await this.storage.transactions.put(tx);
-        transactions = [...transactions, tx];
-        transactionId = tx.id;
-      }
-      const updated: Appointment = { ...a, status: 'concluido', completedAt: stamp, updatedAt: stamp, transactionId };
+      const updated: Appointment = { ...a, status: 'concluido', completedAt: stamp, updatedAt: stamp, payments: true };
+      const payment = o.payment.mode === 'nenhum' ? null : this.buildPayment(updated, o.payment.mode === 'integral' ? 'restante' : o.payment.amount, { method: o.payment.method, date: o.payment.date, opId: o.opId });
+      if (payment) await this.storage.transactions.put(payment);
       await this.storage.appointments.put(updated);
-      this.set({ ...this._data, transactions, appointments: this._data.appointments.map((x) => (x.id === id ? updated : x)) });
+      this.set({
+        ...this._data,
+        transactions: payment ? [...this._data.transactions, payment] : this._data.transactions,
+        appointments: this._data.appointments.map((x) => (x.id === id ? updated : x)),
+      });
       const terms = getProfession(this._data.profile?.professionId).terms;
-      const created = transactionId !== a.transactionId ? transactions.find((t) => t.id === transactionId) ?? null : null;
       const undo = this.recordUndo(`${terms.service} ${terms.completedLabel}`, [
         { collection: 'appointments', id, before: a, after: updated },
-        ...(created ? [{ collection: 'transactions' as const, id: created.id, before: null, after: created }] : []),
+        ...(payment ? [{ collection: 'transactions' as const, id: payment.id, before: null, after: payment }] : []),
       ]);
       // XP de conclusão: uma vez por serviço (chave por id). Desfazer não o retira, e concluir de novo não o repete.
       const fb = await this.gamify({ type: 'appointment_completed', id, label: `${terms.service} ${terms.completedLabel}`, isDemo: a.isDemo });
@@ -458,87 +464,124 @@ export class AppService {
   }
 
   /**
-   * Muda o status (reabrir/cancelar). Remove a receita automática lançada ao concluir, se houver
-   * (a interface confirma antes). Pagamentos registrados pela 0.5 nunca são removidos aqui.
+   * Monta o lançamento de um pagamento (sem gravar). `restante` = o que falta; 0 → null.
+   * Id estável: o id da operação vindo da interface (repetir o envio não duplica). Quitação do
+   * restante leva uma chave que permite reconhecer a mesma quitação feita em outro aparelho offline.
    */
-  setAppointmentStatus(id: string, status: 'agendado' | 'cancelado'): Promise<UndoTicket> {
-    return this.run(async () => {
-      const a = this._data.appointments.find((x) => x.id === id);
-      if (!a) throw new Error('Agendamento não encontrado');
-      let transactions = this._data.transactions;
-      const auto = removableAutoIncome(a.transactionId, transactions);
-      if (auto) {
-        await this.storage.transactions.remove(auto.id);
-        transactions = transactions.filter((t) => t.id !== auto.id);
-      }
-      const updated: Appointment = { ...a, status, completedAt: null, transactionId: null, updatedAt: this.stamp() };
-      await this.storage.appointments.put(updated);
-      this.set({ ...this._data, transactions, appointments: this._data.appointments.map((x) => (x.id === id ? updated : x)) });
-      return this.recordUndo(status === 'agendado' ? 'Reaberto' : 'Cancelado', [
-        { collection: 'appointments', id, before: a, after: updated },
-        ...(auto ? [{ collection: 'transactions' as const, id: auto.id, before: auto, after: null }] : []),
-      ]);
-    });
+  private buildPayment(a: Appointment, amount: number | 'restante', opts: { method?: PaymentMethod | null; date?: string; opId?: string }): Transaction | null {
+    const s = paymentSummary(a, this._data.transactions);
+    const value = amount === 'restante' ? Math.max(0, a.price - s.net) : amount;
+    if (amount === 'restante' && value === 0) return null;
+    if (!Number.isInteger(value) || value <= 0) throw new Error('Informe um valor maior que zero.');
+    if (value > 100_000_000) throw new Error('Valor muito alto.');
+    const date = opts.date ?? todayKey(this.now());
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Data inválida.');
+    const stamp = this.stamp();
+    const profession = getProfession(this._data.profile?.professionId);
+    const mark: PaymentMark = { kind: 'pagamento', method: opts.method ?? null, key: amount === 'restante' ? `quitacao:${a.id}:${s.net}` : null };
+    return {
+      id: opts.opId ? `pg-${opts.opId}` : newId(), createdAt: stamp, updatedAt: stamp, ...(a.isDemo ? { isDemo: true } : {}),
+      type: 'receita', amount: value, description: a.title, category: profession.incomeCategories[0]!, date, appointmentId: a.id,
+      payment: mark as unknown as Record<string, unknown>,
+    };
   }
 
   /**
-   * Lança a receita de um serviço já concluído que está sem lançamento (receita excluída em
-   * Finanças ou "Lançar receita" desmarcado ao concluir). Não reabre o serviço e não dá XP: o XP
-   * de conclusão já foi concedido e receitas vinculadas não dão o XP de lançamento. Lança só o que
-   * falta (preço − pago, compatível com pagamentos da 0.5); se já houver receita automática
-   * vinculada ou nada faltar, não faz nada — chamar duas vezes nunca duplica.
+   * Registra um pagamento do serviço (integral do restante, parcial ou antecipado — antes da data do
+   * serviço). Nunca dá XP. Idempotente pelo id da operação: enviar de novo devolve o mesmo pagamento.
    */
-  registerAppointmentIncome(id: string): Promise<{ transaction: Transaction | null; undo?: UndoTicket }> {
+  registerPayment(appointmentId: string, input: { amount: number | 'restante'; method?: PaymentMethod | null; date?: string; opId?: string }): Promise<{ transaction: Transaction | null; undo?: UndoTicket }> {
     return this.run(async () => {
-      const a = this._data.appointments.find((x) => x.id === id);
+      const a = this._data.appointments.find((x) => x.id === appointmentId);
       if (!a) throw new Error('Agendamento não encontrado');
-      if (a.status !== 'concluido') throw new Error('Só é possível lançar a receita de um serviço concluído.');
-      const linked = a.transactionId ? this._data.transactions.find((t) => t.id === a.transactionId) : undefined;
-      const due = Math.max(0, a.price - paidForAppointment(a.id, this._data.transactions));
-      if (linked || due === 0) return { transaction: null };
-      const stamp = this.stamp();
-      const profession = getProfession(this._data.profile?.professionId);
-      const tx: Transaction = {
-        id: newId(), createdAt: stamp, updatedAt: stamp, ...(a.isDemo ? { isDemo: true } : {}),
-        type: 'receita', amount: due, description: a.title, category: profession.incomeCategories[0]!,
-        date: a.date > todayKey(this.now()) ? todayKey(this.now()) : a.date, appointmentId: a.id,
-      };
-      const updated: Appointment = { ...a, transactionId: tx.id, updatedAt: stamp };
+      if (input.opId) {
+        const existing = this._data.transactions.find((t) => t.id === `pg-${input.opId}`);
+        if (existing) return { transaction: existing };
+      }
+      const tx = this.buildPayment(a, input.amount, input);
+      if (!tx) return { transaction: null };
+      const updated: Appointment = a.payments === true ? a : { ...a, payments: true, updatedAt: tx.createdAt };
       await this.storage.transactions.put(tx);
-      await this.storage.appointments.put(updated);
-      this.set({ ...this._data, transactions: [...this._data.transactions, tx], appointments: this._data.appointments.map((x) => (x.id === id ? updated : x)) });
-      const undo = this.recordUndo('Receita lançada', [
+      if (updated !== a) await this.storage.appointments.put(updated);
+      this.set({ ...this._data, transactions: [...this._data.transactions, tx], appointments: this._data.appointments.map((x) => (x.id === a.id ? updated : x)) });
+      const undo = this.recordUndo('Pagamento registrado', [
         { collection: 'transactions', id: tx.id, before: null, after: tx },
-        { collection: 'appointments', id, before: a, after: updated },
+        ...(updated !== a ? [{ collection: 'appointments' as const, id: a.id, before: a, after: updated }] : []),
       ]);
       return { transaction: tx, undo };
     });
   }
 
   /**
-   * Exclui o agendamento e a receita gerada automaticamente por ele. Pagamentos registrados
-   * pela 0.5 continuam em Finanças (o dinheiro entrou; a interface avisa antes). Reversível
-   * (beta.7), em qualquer situação: agendado e cancelado voltam como estavam; concluído volta
-   * concluído e, se tinha receita automática, ela volta com o mesmo vínculo. Desfazer não dá XP
-   * de novo (o XP da conclusão nunca foi retirado).
+   * Estorna (devolve) um pagamento, total ou em parte, sem apagar nada: cria uma despesa vinculada ao
+   * serviço com `payment.of` apontando para o pagamento. O pagamento original continua no histórico.
+   * Não estorna mais do que resta do pagamento. Nunca dá XP. Idempotente pelo id da operação.
+   */
+  refundPayment(paymentId: string, input: { amount: number | 'total'; date?: string; opId?: string }): Promise<{ transaction: Transaction; undo?: UndoTicket }> {
+    return this.run(async () => {
+      if (input.opId) {
+        const existing = this._data.transactions.find((t) => t.id === `es-${input.opId}`);
+        if (existing) return { transaction: existing };
+      }
+      const p = this._data.transactions.find((t) => t.id === paymentId);
+      if (!p || p.type !== 'receita' || !p.appointmentId) throw new Error('Pagamento não encontrado.');
+      const already = this._data.transactions.filter((t) => t.type === 'despesa' && (t.payment as Record<string, unknown> | null | undefined)?.of === paymentId).reduce((n, t) => n + t.amount, 0);
+      const refundable = Math.max(0, p.amount - already);
+      const value = input.amount === 'total' ? refundable : input.amount;
+      if (!Number.isInteger(value) || value <= 0) throw new Error('Informe um valor maior que zero.');
+      if (value > refundable) throw new Error(`Só é possível estornar até ${(refundable / 100).toFixed(2).replace('.', ',')}.`);
+      const date = input.date ?? todayKey(this.now());
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Data inválida.');
+      const stamp = this.stamp();
+      const mark: PaymentMark = { kind: 'estorno', of: paymentId, key: input.amount === 'total' ? `estorno:${paymentId}:${already}` : null };
+      const tx: Transaction = {
+        id: input.opId ? `es-${input.opId}` : newId(), createdAt: stamp, updatedAt: stamp, ...(p.isDemo ? { isDemo: true } : {}),
+        type: 'despesa', amount: value, description: `Estorno: ${p.description || 'pagamento'}`, category: 'Estorno', date,
+        appointmentId: p.appointmentId, payment: mark as unknown as Record<string, unknown>,
+      };
+      await this.storage.transactions.put(tx);
+      this.set({ ...this._data, transactions: [...this._data.transactions, tx] });
+      const undo = this.recordUndo('Estorno registrado', [{ collection: 'transactions', id: tx.id, before: null, after: tx }]);
+      return { transaction: tx, undo };
+    });
+  }
+
+  /**
+   * Muda o status (reabrir/cancelar). Desde a 0.5, nunca apaga dinheiro: pagamentos, estornos e a
+   * receita automática legada da 0.4 continuam em Finanças e no histórico do serviço. Reabrir mantém
+   * o controle de pagamento; cancelar zera o que é devido (nada fica "a receber").
+   */
+  setAppointmentStatus(id: string, status: 'agendado' | 'cancelado'): Promise<UndoTicket> {
+    return this.run(async () => {
+      const a = this._data.appointments.find((x) => x.id === id);
+      if (!a) throw new Error('Agendamento não encontrado');
+      const updated: Appointment = { ...a, status, completedAt: null, updatedAt: this.stamp() };
+      await this.storage.appointments.put(updated);
+      this.set({ ...this._data, appointments: this._data.appointments.map((x) => (x.id === id ? updated : x)) });
+      return this.recordUndo(status === 'agendado' ? 'Reaberto' : 'Cancelado', [{ collection: 'appointments', id, before: a, after: updated }]);
+    });
+  }
+
+  /** Atalho da 0.4 ("Lançar receita"): registra o que falta como pagamento. Nunca duplica nem dá XP. */
+  registerAppointmentIncome(id: string): Promise<{ transaction: Transaction | null; undo?: UndoTicket }> {
+    const a = this._data.appointments.find((x) => x.id === id);
+    if (a && a.status !== 'concluido') return Promise.reject(new Error('Só é possível lançar a receita de um serviço concluído.'));
+    return this.registerPayment(id, { amount: 'restante' });
+  }
+
+  /**
+   * Exclui o agendamento. Desde a 0.5, os valores recebidos nunca somem junto: pagamentos, estornos e
+   * a receita automática legada continuam em Finanças (como "serviço excluído"); a interface avisa
+   * antes. Reversível (beta.7), em qualquer situação; desfazer não dá XP de novo.
    */
   deleteAppointment(id: string): Promise<UndoTicket | null> {
     return this.run(async () => {
       const a = this._data.appointments.find((x) => x.id === id);
       if (!a) return null;
-      const auto = removableAutoIncome(a.transactionId, this._data.transactions);
-      if (auto) await this.storage.transactions.remove(auto.id);
       await this.storage.appointments.remove(id);
-      this.set({
-        ...this._data,
-        appointments: this._data.appointments.filter((x) => x.id !== id),
-        transactions: auto ? this._data.transactions.filter((t) => t.id !== auto.id) : this._data.transactions,
-      });
+      this.set({ ...this._data, appointments: this._data.appointments.filter((x) => x.id !== id) });
       const terms = getProfession(this._data.profile?.professionId).terms;
-      return this.recordUndo(`${terms.service} ${terms.serviceArticle === 'a' ? 'excluída' : 'excluído'}`, [
-        { collection: 'appointments', id, before: a, after: null },
-        ...(auto ? [{ collection: 'transactions' as const, id: auto.id, before: auto, after: null }] : []),
-      ]);
+      return this.recordUndo(`${terms.service} ${terms.serviceArticle === 'a' ? 'excluída' : 'excluído'}`, [{ collection: 'appointments', id, before: a, after: null }]);
     });
   }
 
@@ -550,6 +593,13 @@ export class AppService {
       if (hasErrors(errors)) throw new ValidationError(errors);
       const existing = id ? this._data.transactions.find((t) => t.id === id) : undefined;
       if (id && !existing) throw new Error('Lançamento não encontrado');
+      if (existing) {
+        // Um pagamento editado em Finanças não pode ficar menor do que o já estornado dele.
+        const refunded = this._data.transactions.filter((x) => x.type === 'despesa' && (x.payment as Record<string, unknown> | null | undefined)?.of === existing.id).reduce((n, x) => n + x.amount, 0);
+        if (refunded > 0 && (input.type !== existing.type || (parseMoney(input.amount) ?? 0) < refunded)) {
+          throw new ValidationError<TransactionInput>({ amount: `Este pagamento tem ${(refunded / 100).toFixed(2).replace('.', ',')} estornado; o valor não pode ser menor.` });
+        }
+      }
       const stamp = this.stamp();
       const transaction: Transaction = {
         ...existing,
@@ -641,6 +691,10 @@ export class AppService {
     return this.run(async () => {
       const t = this._data.transactions.find((x) => x.id === id);
       if (!t) return null;
+      // Rastreabilidade (0.5): um pagamento com estorno não some sozinho — o estorno ficaria órfão.
+      if (this._data.transactions.some((x) => x.type === 'despesa' && (x.payment as Record<string, unknown> | null | undefined)?.of === id)) {
+        throw new Error('Este pagamento tem estorno registrado. Exclua o estorno antes, se precisar corrigir.');
+      }
       let appointments = this._data.appointments;
       const linked = appointments.find((a) => a.transactionId === id);
       let linkedAfter: Appointment | null = null;

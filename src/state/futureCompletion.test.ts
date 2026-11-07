@@ -65,7 +65,7 @@ describe('conclusão antecipada (serviço com data futura)', () => {
     const a = reopened.data.appointments.find((x) => x.id === appointment.id)!;
     const t = reopened.data.transactions.find((x) => x.appointmentId === appointment.id)!;
     expect(a.status).toBe('concluido');
-    expect(a.transactionId).toBe(t.id);
+    expect(t.appointmentId).toBe(a.id); // 0.5: vínculo pelo serviço (pagamento), sem transactionId
     expect(reopened.data.xpEvents).toHaveLength(xp);
     expect(futureServiceDateFor(t, reopened.data.appointments, NOW)).toBe('2026-11-10');
   });

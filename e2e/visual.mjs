@@ -147,6 +147,10 @@ async function seed(page) {
       await page.goto(BASE + '#/agenda');
       await page.getByRole('button', { name: new RegExp(title, 'i') }).first().click();
       await page.getByRole('button', { name: /concluir/i }).first().click();
+      // 0.5: escolha explícita do recebimento.
+      const done = page.getByRole('dialog', { name: /^concluir:/i });
+      await done.getByRole('radio', { name: /recebi tudo que faltava/i }).click();
+      await done.getByRole('button', { name: /concluir/i }).click();
       await page.getByRole('dialog').waitFor({ state: 'detached' });
       await page.goto(BASE + '#/painel');
     }
@@ -569,6 +573,13 @@ try {
       await page.goto(BASE + '#/agenda');
       await page.getByRole('button', { name: /corte/i }).first().click();
       await page.getByRole('dialog', { name: 'Corte' }).getByRole('button', { name: /concluir atendimento/i }).click();
+      const escolha = page.getByRole('dialog', { name: /concluir: corte/i });
+      await escolha.waitFor();
+      if (await escolha.getByRole('radio', { checked: true }).count()) fail(`360x640/${theme}: opção de recebimento pré-selecionada ao concluir`);
+      await page.screenshot({ path: `${OUT}/celular-360x640-${theme}-concluir-escolha.png` });
+      report.capturas.push({ arquivo: `celular-360x640-${theme}-concluir-escolha.png`, viewport: small.id, tema: theme, tela: 'concluir-escolha' });
+      await escolha.getByRole('radio', { name: /recebi tudo que faltava/i }).click();
+      await escolha.getByRole('button', { name: /concluir atendimento/i }).click();
       // 1) Na tela da ação: o "Desfazer" aparece, tem 44 px, recebe o toque e funciona.
       const undo = page.getByRole('button', { name: /^desfazer/i });
       if (!(await undo.waitFor({ timeout: 5000 }).then(() => true, () => false))) fail(`360x640/${theme}: "Desfazer" não apareceu depois de concluir`);

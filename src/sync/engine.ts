@@ -4,6 +4,7 @@ import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
 import { newId } from '../lib/id';
 import { serializeBackup } from '../storage/backup';
 import type { AppService } from '../state/service';
+import { duplicatePaymentIds } from '../domain/payments';
 import { duplicateAutoIncomeIds, duplicateXpIds, mergeMeta, mergeRecord } from './merge';
 import { sealsPhotoSyncEnabled } from './features';
 import type { ChangeTracker, TrackedStorage } from './tracked';
@@ -630,6 +631,13 @@ export class SyncEngine implements ChangeTracker {
     };
     const income = duplicateAutoIncomeIds([...maps.transactions.values()] as unknown as Parameters<typeof duplicateAutoIncomeIds>[0]);
     for (const id of income.remove) {
+      maps.transactions.delete(id);
+      markDeleted('transactions', id);
+      changed = true;
+    }
+    // 0.5: a mesma quitação ("recebi tudo que faltava") ou estorno total registrados offline em dois
+    // aparelhos têm a mesma chave; fica o mais antigo. Parciais (sem chave) nunca são removidos.
+    for (const id of duplicatePaymentIds([...maps.transactions.values()] as unknown as Parameters<typeof duplicatePaymentIds>[0])) {
       maps.transactions.delete(id);
       markDeleted('transactions', id);
       changed = true;

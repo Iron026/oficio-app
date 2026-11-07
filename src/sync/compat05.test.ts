@@ -176,14 +176,17 @@ describe('beta.4: pagamentos registrados na 0.5', () => {
     }
   });
 
-  it('reabrir na 0.4 remove só a receita automática dela; o pagamento da 0.5 fica', async () => {
+  it('0.5: concluir registra só o que falta (R$ 200) como pagamento; reabrir mantém os dois pagamentos', async () => {
     const { a, b, ap } = await partial();
     await b.service.completeAppointment(ap.id, { registerIncome: true });
+    const created = linked(b, ap.id).find((t) => t.id !== 'pg-1')!;
+    expect(created).toMatchObject({ amount: 20_000, payment: { kind: 'pagamento' } });
     await b.service.setAppointmentStatus(ap.id, 'agendado');
     await syncAll(b, a);
     for (const d of [a, b]) {
-      expect(linked(d, ap.id).map((t) => t.id)).toEqual(['pg-1']);
-      expect(find(d, ap.id)).toMatchObject({ status: 'agendado', payments: true });
+      expect(linked(d, ap.id).map((t) => t.id).sort()).toEqual(['pg-1', created.id].sort());
+      expect(find(d, ap.id)).toMatchObject({ status: 'agendado', payments: true, transactionId: null });
+      expect(paidForAppointment(ap.id, d.service.data.transactions)).toBe(30_000);
     }
   });
 
@@ -239,27 +242,30 @@ describe('beta.4: pagamentos registrados na 0.5', () => {
   });
 });
 
-describe('beta.4: comportamento de sempre para dados sem campos da 0.5', () => {
-  it('concluir, reabrir e excluir um serviço antigo funcionam como na 0.4 (receita automática com o valor cheio)', async () => {
+describe('0.5: concluir, reabrir e excluir nunca apagam dinheiro recebido', () => {
+  it('pagamento integral fica em Finanças ao reabrir e ao excluir o serviço (inclusive no outro aparelho)', async () => {
     const { a, b } = await pair();
     const ap = await appt(b, 'Corte', '60,00');
     await b.service.completeAppointment(ap.id, { registerIncome: true });
     expect(linked(b, ap.id).map((t) => t.amount)).toEqual([6_000]);
-    expect(find(b, ap.id)?.transactionId).toBe(linked(b, ap.id)[0]!.id);
     await b.service.setAppointmentStatus(ap.id, 'agendado');
-    expect(linked(b, ap.id)).toEqual([]);
+    expect(linked(b, ap.id).map((t) => t.amount)).toEqual([6_000]);
+    // Concluir de novo com "integral": já está pago, nada é lançado outra vez.
     await b.service.completeAppointment(ap.id, { registerIncome: true });
+    expect(linked(b, ap.id).map((t) => t.amount)).toEqual([6_000]);
     await b.service.deleteAppointment(ap.id);
     await syncAll(b, a);
-    expect(a.service.data.transactions).toEqual([]);
+    expect(a.service.data.transactions.map((t) => t.amount)).toEqual([6_000]);
   });
 
-  it('nenhum campo novo é gravado pela 0.4 (os registros continuam no formato de sempre)', async () => {
+  it('a 0.5 só grava os campos reservados do contrato com a beta.4 (payments e payment)', async () => {
     const { b } = await pair();
     const ap = await appt(b, 'Corte', '60,00');
     await b.service.completeAppointment(ap.id, { registerIncome: true });
-    expect(Object.keys(find(b, ap.id)!).sort()).toEqual(['clientId', 'completedAt', 'createdAt', 'date', 'id', 'notes', 'price', 'status', 'time', 'title', 'transactionId', 'updatedAt']);
-    expect(Object.keys(b.service.data.transactions[0]!).sort()).toEqual(['amount', 'appointmentId', 'category', 'createdAt', 'date', 'description', 'id', 'type', 'updatedAt']);
+    expect(Object.keys(find(b, ap.id)!).sort()).toEqual(['clientId', 'completedAt', 'createdAt', 'date', 'id', 'notes', 'payments', 'price', 'status', 'time', 'title', 'transactionId', 'updatedAt']);
+    expect(find(b, ap.id)).toMatchObject({ payments: true, transactionId: null }); // a 0.5 não aponta transactionId para pagamento
+    expect(Object.keys(b.service.data.transactions[0]!).sort()).toEqual(['amount', 'appointmentId', 'category', 'createdAt', 'date', 'description', 'id', 'payment', 'type', 'updatedAt']);
+    expect(b.service.data.transactions[0]!.payment).toMatchObject({ kind: 'pagamento' });
   });
 });
 

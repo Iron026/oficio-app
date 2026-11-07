@@ -26,13 +26,14 @@ const ap = (s: AppService, id: string) => s.data.appointments.find((a) => a.id =
 const income = (s: AppService) => totals(s.data.transactions).income;
 
 describe('concluir, excluir a receita e lançar de novo', () => {
-  it('2. concluir cria a receita vinculada nos dois sentidos', async () => {
+  it('2. concluir com recebimento integral cria o pagamento vinculado ao serviço (0.5: marcador, sem transactionId)', async () => {
     const s = await app();
     const a = await appt(s);
     const fb = await s.completeAppointment(a.id, { registerIncome: true });
     const tx = s.data.transactions[0]!;
     expect(tx).toMatchObject({ type: 'receita', amount: 30_000, appointmentId: a.id, date: '2026-11-05' });
-    expect(ap(s, a.id)).toMatchObject({ status: 'concluido', transactionId: tx.id });
+    expect(ap(s, a.id)).toMatchObject({ status: 'concluido', transactionId: null, payments: true });
+    expect(tx.payment).toMatchObject({ kind: 'pagamento' });
     expect(fb.undo?.label).toMatch(/concluíd/i);
   });
 
@@ -60,7 +61,8 @@ describe('concluir, excluir a receita e lançar de novo', () => {
     expect(r1.transaction).toMatchObject({ amount: 30_000, appointmentId: a.id, date: '2026-11-05' });
     expect(r2.transaction).toBeNull();
     expect(s.data.transactions).toHaveLength(1);
-    expect(ap(s, a.id)).toMatchObject({ status: 'concluido', transactionId: r1.transaction!.id });
+    expect(ap(s, a.id)).toMatchObject({ status: 'concluido' });
+    expect(r1.transaction!.payment).toMatchObject({ kind: 'pagamento' });
     expect(totalXp(s.data.xpEvents)).toBe(xp);
     expect(s.data.xpEvents.map((e) => e.key).sort()).toEqual(xpKeys);
     expect(missingIncome(ap(s, a.id), s.data.transactions)).toBe(false);
@@ -119,19 +121,19 @@ describe('5. desfazer com integridade financeira', () => {
     const undo = await s.deleteTransaction(tx.id);
     await s.undo(undo!);
     expect(s.data.transactions).toEqual([expect.objectContaining({ id: tx.id, amount: 30_000, appointmentId: a.id })]);
-    expect(ap(s, a.id).transactionId).toBe(tx.id);
+    expect(s.data.transactions[0]!.payment).toMatchObject({ kind: 'pagamento' });
     expect(income(s)).toBe(30_000);
   });
 
-  it('desfazer reabrir devolve concluído e a receita automática removida', async () => {
+  it('0.5: reabrir mantém o pagamento; desfazer volta a concluído sem mexer no dinheiro', async () => {
     const s = await app();
     const a = await appt(s);
     await s.completeAppointment(a.id, { registerIncome: true });
     const tx = s.data.transactions[0]!;
     const undo = await s.setAppointmentStatus(a.id, 'agendado');
-    expect(s.data.transactions).toEqual([]);
+    expect(s.data.transactions.map((t) => t.id)).toEqual([tx.id]);
     await s.undo(undo);
-    expect(ap(s, a.id)).toMatchObject({ status: 'concluido', transactionId: tx.id });
+    expect(ap(s, a.id)).toMatchObject({ status: 'concluido' });
     expect(s.data.transactions.map((t) => t.id)).toEqual([tx.id]);
   });
 
@@ -222,7 +224,7 @@ describe('6. persistência e sincronização offline', () => {
     await both(a, b);
     for (const d of [a, b]) {
       expect(totals(d.service.data.transactions).income).toBe(30_000);
-      expect(d.service.data.appointments[0]!.transactionId).toBe(d.service.data.transactions[0]!.id);
+      expect(d.service.data.transactions[0]!.appointmentId).toBe(d.service.data.appointments[0]!.id);
     }
   });
 
@@ -241,7 +243,7 @@ describe('6. persistência e sincronização offline', () => {
     for (const d of [a, b]) {
       expect(d.service.data.transactions).toHaveLength(1);
       expect(totals(d.service.data.transactions).income).toBe(30_000);
-      expect(d.service.data.appointments[0]!.transactionId).toBe(d.service.data.transactions[0]!.id);
+      expect(d.service.data.transactions[0]!.appointmentId).toBe(d.service.data.appointments[0]!.id);
     }
   });
 

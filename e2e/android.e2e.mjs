@@ -380,6 +380,15 @@ try {
     await aviso.waitFor({ state: 'detached' });
     await tap(page.getByRole('button', { name: /concluir atendimento/i }));
     await tap(page.getByRole('dialog', { name: 'Data futura' }).getByRole('button', { name: /concluir mesmo assim/i }));
+    // 0.5: escolha explícita do recebimento — nada pré-selecionado e Concluir desabilitado até escolher.
+    const escolha = page.getByRole('dialog', { name: /concluir: corte antecipado/i });
+    await escolha.waitFor();
+    const marcadas = await escolha.getByRole('radio', { checked: true }).count();
+    assert(marcadas === 0, `${marcadas} opção(ões) de recebimento já vinham marcadas`);
+    assert(await escolha.getByRole('button', { name: /concluir atendimento/i }).isDisabled(), 'Concluir habilitado antes da escolha');
+    shot('07b-concluir-escolha');
+    await tap(escolha.getByRole('radio', { name: /recebi tudo que faltava/i }));
+    await tap(escolha.getByRole('button', { name: /concluir atendimento/i }));
     await noteToast(page, /atendimento concluído/i);
     // beta.5: os avisos não capturam toques fora do botão Desfazer, e há no máximo dois.
     const avisos = await page.evaluate(() => [...document.querySelectorAll('[data-toast]')].map((t) => {
@@ -395,12 +404,12 @@ try {
       assert(avisos.length <= 2, `mais de 2 avisos empilhados (${avisos.length})`);
       assert(avisos.every((a) => !a.bloqueia), 'um aviso está capturando toques fora do botão Desfazer');
     }
-    // Prova durável: serviço concluído e UMA receita vinculada gravados.
+    // Prova durável: serviço concluído e UM pagamento (0.5: marcador `payment`) vinculado gravados.
     await eventually(async () => {
       const ap = (await readStore(page, 'appointments')).find((a) => a.title === 'Corte antecipado');
       const tx = (await readStore(page, 'transactions')).filter((t) => ap && t.appointmentId === ap.id);
-      return ap?.status === 'concluido' && tx.length === 1 && ap.transactionId === tx[0].id;
-    }, 'conclusão/receita não gravadas corretamente');
+      return ap?.status === 'concluido' && ap.payments === true && tx.length === 1 && tx[0].amount === 7000 && tx[0].payment?.kind === 'pagamento';
+    }, 'conclusão/pagamento não gravados corretamente');
     await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
     await page.getByTestId('data-futura').waitFor();
     await wait(600);

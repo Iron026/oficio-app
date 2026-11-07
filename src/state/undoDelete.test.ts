@@ -102,16 +102,16 @@ describe('excluir atendimento e desfazer, por situação', () => {
     expect(strip(s.data.appointments[0]!)).toEqual(before);
   });
 
-  it('concluído com receita automática: volta concluído e a receita volta vinculada; XP não repete', async () => {
+  it('0.5: concluído com pagamento — excluir mantém o pagamento em Finanças; desfazer devolve o serviço; XP não repete', async () => {
     const s = await app();
     const a = await appt(s);
     await s.completeAppointment(a.id, { registerIncome: true });
     const xp = totalXp(s.data.xpEvents);
     const tx = s.data.transactions[0]!;
     const t = await s.deleteAppointment(a.id);
-    expect(s.data.transactions).toEqual([]);
+    expect(s.data.transactions.map((x) => x.id)).toEqual([tx.id]); // o dinheiro recebido nunca some junto
     await s.undo(t!);
-    expect(s.data.appointments[0]).toMatchObject({ status: 'concluido', transactionId: tx.id });
+    expect(s.data.appointments[0]).toMatchObject({ status: 'concluido' });
     expect(strip(s.data.transactions[0]!)).toEqual(strip(tx));
     expect(totals(s.data.transactions).income).toBe(30_000);
     expect(totalXp(s.data.xpEvents)).toBe(xp);
@@ -192,7 +192,7 @@ describe('desfazer exclusões com sincronização', () => {
     expect([...a.sync.conflicts, ...b.sync.conflicts]).toEqual([]);
   });
 
-  it('excluir atendimento concluído, sincronizar a exclusão e desfazer: atendimento e receita voltam nos dois aparelhos', async () => {
+  it('excluir atendimento concluído, sincronizar a exclusão e desfazer: o pagamento nunca sai; o atendimento volta nos dois aparelhos', async () => {
     const { a, b } = await pair();
     const x = await appt(a.service);
     await a.service.completeAppointment(x.id, { registerIncome: true });
@@ -200,13 +200,13 @@ describe('desfazer exclusões com sincronização', () => {
     const t = await a.service.deleteAppointment(x.id);
     await both(a, b);
     expect(b.service.data.appointments).toEqual([]);
-    expect(b.service.data.transactions).toEqual([]);
+    expect(totals(b.service.data.transactions).income).toBe(30_000);
     await a.service.undo(t!);
     await both(a, b);
     for (const d of [a, b]) {
       expect(d.service.data.appointments[0]).toMatchObject({ id: x.id, status: 'concluido' });
       expect(totals(d.service.data.transactions).income).toBe(30_000);
-      expect(d.service.data.appointments[0]!.transactionId).toBe(d.service.data.transactions[0]!.id);
+      expect(d.service.data.transactions[0]!.appointmentId).toBe(d.service.data.appointments[0]!.id);
     }
   });
 });

@@ -60,10 +60,15 @@ function TransactionForm({ transaction, defaultType, onDone }: { transaction?: T
 
   async function remove() {
     if (!transaction) return;
-    const linked = data.appointments.find((x) => x.transactionId === transaction.id && x.status === 'concluido');
+    // 0.5: pagamento ou estorno de um serviço — diz o efeito e aponta o caminho que preserva o histórico.
+    const linked = transaction.appointmentId ? data.appointments.find((x) => x.id === transaction.appointmentId) : undefined;
+    const t = profession.terms;
+    const effect = !linked ? '' : transaction.type === 'despesa'
+      ? ` É um estorno de “${linked.title}”: o valor volta a contar como recebido.`
+      : ` ${t.service} “${linked.title}” continua ${linked.status === 'concluido' ? t.completedLabel : linked.status === 'cancelado' ? 'cancelado' : 'agendado'}, e este valor volta a ficar a receber. Para registrar uma devolução sem apagar o histórico, use “Estornar” no próprio ${t.service.toLowerCase()}.`;
     const ok = await confirm({
       title: 'Excluir lançamento?',
-      message: `"${transactionLabel(transaction)}" será removido de Finanças.${linked ? ` ${profession.terms.service} “${linked.title}” continua ${profession.terms.completedLabel}, sem lançamento financeiro; você pode lançar a receita de novo por ele.` : ''}`,
+      message: `"${transactionLabel(transaction)}" será removido de Finanças.${effect}`,
       confirmLabel: 'Excluir',
       danger: true,
     });

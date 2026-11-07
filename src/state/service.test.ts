@@ -37,7 +37,7 @@ describe('AppService', () => {
     expect(r.feedback.xpGained).toBe(0);
   });
 
-  it('concluir serviço lança receita vinculada; reabrir remove; concluir de novo não repete XP', async () => {
+  it('concluir com recebimento integral registra o pagamento; reabrir mantém; concluir de novo não repete XP nem receita', async () => {
     const { service } = await setup();
     const { appointment } = await service.saveAppointment(apptInput());
     const fb1 = await service.completeAppointment(appointment.id, { registerIncome: true });
@@ -46,19 +46,19 @@ describe('AppService', () => {
     expect(service.data.transactions[0]).toMatchObject({ type: 'receita', amount: 6000, appointmentId: appointment.id });
 
     await service.setAppointmentStatus(appointment.id, 'agendado');
-    expect(service.data.transactions).toHaveLength(0);
+    expect(service.data.transactions).toHaveLength(1); // 0.5: reabrir nunca apaga dinheiro recebido
 
-    const fb2 = await service.completeAppointment(appointment.id, { registerIncome: false });
+    const fb2 = await service.completeAppointment(appointment.id, { registerIncome: true });
     expect(fb2.events.some((e) => e.key.startsWith('appointment_completed:'))).toBe(false);
-    expect(service.data.transactions).toHaveLength(0);
+    expect(service.data.transactions).toHaveLength(1); // já pago: integral não lança de novo
   });
 
-  it('excluir agendamento remove receita automática', async () => {
+  it('0.5: excluir agendamento mantém o pagamento recebido em Finanças', async () => {
     const { service } = await setup();
     const { appointment } = await service.saveAppointment(apptInput());
     await service.completeAppointment(appointment.id, { registerIncome: true });
     await service.deleteAppointment(appointment.id);
-    expect(service.data.transactions).toHaveLength(0);
+    expect(service.data.transactions).toHaveLength(1);
     expect(service.data.appointments).toHaveLength(0);
   });
 

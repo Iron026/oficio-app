@@ -22,6 +22,13 @@ async function seed() {
   return { factory };
 }
 
+/** 0.5: depois de "Concluir", a escolha do recebimento é explícita. */
+async function chooseFull(user: ReturnType<typeof userEvent.setup>, title: string) {
+  const done = await screen.findByRole('dialog', { name: `Concluir: ${title}` });
+  await user.click(within(done).getByRole('radio', { name: /recebi tudo que faltava/i }));
+  await user.click(within(done).getByRole('button', { name: /concluir atendimento/i }));
+}
+
 async function openAndComplete(user: ReturnType<typeof userEvent.setup>, title: string) {
   await user.click(await screen.findByRole('button', { name: new RegExp(title, 'i') }));
   const sheet = await screen.findByRole('dialog', { name: title });
@@ -48,6 +55,7 @@ describe('aviso ao concluir serviço com data futura', () => {
     // 3. Concluir mesmo assim
     await user.click(within(sheet).getByRole('button', { name: /concluir atendimento/i }));
     await user.click(within(await screen.findByRole('dialog', { name: 'Data futura' })).getByRole('button', { name: /concluir mesmo assim/i }));
+    await chooseFull(user, 'Corte amanhã');
     expect(await screen.findByText(/atendimento concluído!/i)).toBeInTheDocument();
 
     // 5. Indicador discreto em Finanças
@@ -66,6 +74,7 @@ describe('aviso ao concluir serviço com data futura', () => {
     for (const title of ['Escova hoje', 'Manicure ontem']) {
       await openAndComplete(user, title);
       expect(screen.queryByRole('dialog', { name: 'Data futura' })).not.toBeInTheDocument();
+      await chooseFull(user, title);
       // concluído direto: o painel fecha sem passar por confirmação
       await waitFor(() => expect(screen.queryByRole('dialog', { name: title })).not.toBeInTheDocument());
       expect(screen.queryByRole('dialog', { name: 'Data futura' })).not.toBeInTheDocument();

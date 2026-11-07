@@ -52,7 +52,7 @@ describe('beta.7: Desfazer ao excluir cliente', () => {
 });
 
 describe('beta.7: Desfazer ao excluir atendimento', () => {
-  it('concluído com receita: o aviso diz que a receita saiu; Desfazer devolve atendimento e receita', async () => {
+  it('0.5: concluído com pagamento — o aviso diz que os valores continuam; Desfazer devolve o atendimento', async () => {
     const { user, reload } = await start('#/agenda', async (s) => {
       const { appointment } = await s.saveAppointment({ title: 'Coloração', clientId: '', date: today, time: '', price: '300,00', notes: '' });
       await s.completeAppointment(appointment.id, { registerIncome: true });
@@ -67,17 +67,17 @@ describe('beta.7: Desfazer ao excluir atendimento', () => {
 
     const undo = await undoButton();
     expect(undo).toHaveAccessibleName('Desfazer: Atendimento excluído');
-    expect(undo.closest('[data-toast]')).toHaveTextContent(/receita automática também saiu/i);
+    expect(undo.closest('[data-toast]')).toHaveTextContent(/valores recebidos continuam em Finanças/i);
     let s = await reload();
     expect(s.data.appointments).toEqual([]);
-    expect(s.data.transactions).toEqual([]);
+    expect(s.data.transactions.map((t) => t.amount)).toEqual([30_000]);
 
     await user.click(undo);
     await screen.findByText('Ação desfeita');
     s = await reload();
     expect(s.data.appointments[0]).toMatchObject({ title: 'Coloração', status: 'concluido' });
     expect(s.data.transactions.map((t) => t.amount)).toEqual([30_000]);
-    expect(s.data.appointments[0]!.transactionId).toBe(s.data.transactions[0]!.id);
+    expect(s.data.transactions[0]!.appointmentId).toBe(s.data.appointments[0]!.id);
   });
 
   it('agendado: Desfazer devolve o atendimento na Agenda', async () => {

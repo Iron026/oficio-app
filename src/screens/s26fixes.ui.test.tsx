@@ -30,30 +30,32 @@ const seedCompletedWithoutIncome = async (s: AppService) => {
 };
 
 describe('beta.5: atendimento concluído sem receita', () => {
-  it('a agenda indica "Sem receita lançada"; "Lançar receita" lança uma vez e o aviso oferece Desfazer', async () => {
+  it('0.5: a agenda mostra "A receber"; registrar o pagamento lança uma vez e o aviso oferece Desfazer', async () => {
     const { user, reload } = await start('#/agenda', seedCompletedWithoutIncome);
     await user.click(await screen.findByRole('radio', { name: /concluíd/i }));
     const item = await screen.findByRole('button', { name: /coloração/i });
-    expect(item).toHaveTextContent(/Sem receita lançada/);
+    expect(item).toHaveTextContent(/A receber R\$\s300,00/);
     await user.click(item);
     const sheet = await screen.findByRole('dialog', { name: 'Coloração' });
-    expect(within(sheet).getByTestId('sem-receita')).toHaveTextContent(/Sem lançamento financeiro/);
-    await user.click(within(sheet).getByRole('button', { name: /lançar receita de/i }));
+    expect(within(sheet).getByRole('region', { name: 'Pagamento' })).toHaveTextContent(/Pendente.*R\$\s300,00/);
+    await user.click(within(sheet).getByRole('button', { name: /^registrar pagamento$/i }));
+    const pay = await screen.findByRole('dialog', { name: /registrar pagamento/i });
+    await user.click(within(pay).getByRole('button', { name: /usar o que falta/i }));
+    await user.click(within(pay).getByRole('button', { name: /^registrar pagamento$/i }));
 
-    expect(await screen.findByText(/Receita de R\$\s300,00 lançada/)).toBeInTheDocument();
-    await waitFor(() => expect(within(sheet).queryByTestId('sem-receita')).not.toBeInTheDocument());
+    expect(await screen.findByText(/Pagamento de R\$\s300,00 registrado/)).toBeInTheDocument();
     let s = await reload();
     expect(s.data.transactions.map((t) => t.amount)).toEqual([30_000]);
-    expect(s.data.appointments[0]).toMatchObject({ status: 'concluido', transactionId: s.data.transactions[0]!.id });
+    expect(s.data.appointments[0]).toMatchObject({ status: 'concluido' });
 
     await user.click(screen.getByRole('button', { name: /^desfazer/i }));
     expect(await screen.findByText('Ação desfeita')).toBeInTheDocument();
     s = await reload();
     expect(s.data.transactions).toEqual([]);
-    expect(s.data.appointments[0]).toMatchObject({ status: 'concluido', transactionId: null });
+    expect(s.data.appointments[0]).toMatchObject({ status: 'concluido' });
   });
 
-  it('excluir a receita em Finanças avisa que o atendimento continua concluído, e Desfazer devolve a receita', async () => {
+  it('excluir o pagamento em Finanças avisa que volta a ficar a receber (e sugere estornar); Desfazer devolve', async () => {
     const { user, reload } = await start('#/financas', async (s) => {
       const { appointment } = await s.saveAppointment({ title: 'Escova', clientId: '', date: today, time: '', price: '50,00', notes: '' });
       await s.completeAppointment(appointment.id, { registerIncome: true });
@@ -61,13 +63,13 @@ describe('beta.5: atendimento concluído sem receita', () => {
     await user.click(await screen.findByRole('button', { name: /escova/i }));
     await user.click(await screen.findByRole('button', { name: /excluir/i }));
     const dlg = await screen.findByRole('dialog', { name: /excluir lançamento/i });
-    expect(dlg).toHaveTextContent(/continua concluído, sem lançamento financeiro/);
+    expect(dlg).toHaveTextContent(/continua concluído, e este valor volta a ficar a receber.*Estornar/);
     await user.click(within(dlg).getByRole('button', { name: /^excluir$/i }));
     await user.click(await screen.findByRole('button', { name: /^desfazer/i }));
     await screen.findByText('Ação desfeita');
     const s = await reload();
     expect(s.data.transactions.map((t) => t.amount)).toEqual([5_000]);
-    expect(s.data.appointments[0]!.transactionId).toBe(s.data.transactions[0]!.id);
+    expect(s.data.transactions[0]!.appointmentId).toBe(s.data.appointments[0]!.id);
   });
 
   it('concluir mostra Desfazer; desfazer volta o atendimento para agendado sem receita', async () => {
@@ -77,6 +79,9 @@ describe('beta.5: atendimento concluído sem receita', () => {
     await user.click(await screen.findByRole('button', { name: /corte/i }));
     const sheet = await screen.findByRole('dialog', { name: 'Corte' });
     await user.click(within(sheet).getByRole('button', { name: /concluir atendimento/i }));
+    const done = await screen.findByRole('dialog', { name: /concluir: corte/i });
+    await user.click(within(done).getByRole('radio', { name: /recebi tudo que faltava/i }));
+    await user.click(within(done).getByRole('button', { name: /concluir atendimento/i }));
     // Primeira conclusão: conquista e nível novos chegam num aviso só (no máximo 2 avisos).
     await screen.findByText(/conquista: primeiro atendimento/i);
     const toasts = document.querySelectorAll('[data-toast]');

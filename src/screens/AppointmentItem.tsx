@@ -1,18 +1,20 @@
 import { useState } from 'react';
-import { Ban, Check, CircleDollarSign, MessageCircle, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
-import { paidForAppointment, paymentsOf, removableAutoIncome } from '../domain/compat';
+import { Ban, Check, MessageCircle, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
+import { paymentSummary, type PaymentEntry } from '../domain/payments';
 import type { Appointment } from '../domain/types';
 import { formatDateShort, isFutureDateKey, relativeDayLabel, todayKey } from '../lib/dates';
 import { formatMoney } from '../lib/money';
-import { useApp, useErrorHandler, useFeedback, useUndoAction } from '../state/AppContext';
+import { useApp, useErrorHandler, useUndoAction } from '../state/AppContext';
 import { Button } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
 import { cx } from '../ui/cx';
 import { StatusBadge } from '../ui/Badge';
 import { DemoBadge } from '../ui/Misc';
+import { Money } from '../ui/Money';
 import { Sheet } from '../ui/Sheet';
 import { useToast } from '../ui/Toast';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
+import { CompleteSheet, PaymentBadge, PaymentPanel, PaymentSheet, RefundSheet } from './payments/PaymentSheets';
 
 export function whatsappLink(phone: string): string | null {
   let d = phone.replace(/\D/g, '');
@@ -31,17 +33,19 @@ function StatusPill({ a }: { a: Appointment }) {
 }
 
 /**
- * Serviço concluído com valor e sem nenhuma receita vinculada (receita excluída em Finanças ou
- * "Lançar receita" desmarcado ao concluir). Continua concluído; só falta o lançamento.
+ * Serviço concluído com controle de pagamento e nada recebido (0.5: "a receber"). Mantido pelo
+ * nome antigo para os testes da 0.4; serviços antigos "não registrados" não contam como faltando.
  */
-export function missingIncome(a: Appointment, transactions: Parameters<typeof paidForAppointment>[1]): boolean {
-  return a.status === 'concluido' && a.price > 0 && paidForAppointment(a.id, transactions) === 0;
+export function missingIncome(a: Appointment, transactions: Parameters<typeof paymentSummary>[1]): boolean {
+  if (a.status !== 'concluido' || a.price <= 0) return false;
+  const s = paymentSummary(a, transactions);
+  return s.net <= 0 && (s.state === 'pendente' || s.state === 'nao-registrado');
 }
 
 /** Item de agendamento clicável, com painel de ações. */
 export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: boolean }) {
   const { data } = useApp();
-  const noIncome = missingIncome(a, data.transactions);
+  const pay = paymentSummary(a, data.transactions);
   const [open, setOpen] = useState(false);
   const client = data.clients.find((c) => c.id === a.clientId);
   const cancelled = a.status === 'cancelado';
@@ -77,7 +81,7 @@ export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: bo
           <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span className="flex flex-wrap items-center gap-2">
               <StatusPill a={a} />
-              {noIncome && <StatusBadge tone="warning">Sem receita lançada</StatusBadge>}
+              <PaymentBadge a={a} s={pay} />
               {a.isDemo && <DemoBadge />}
             </span>
             {a.price > 0 && <span className={cx('num text-base font-bold', cancelled && 'text-muted line-through')}>{formatMoney(a.price)}</span>}
@@ -98,23 +102,17 @@ function shortDay(key: string): string {
 function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolean; onClose: () => void }) {
   const { service, data, profession } = useApp();
   const t = profession.terms;
-  const feedback = useFeedback();
   const onError = useErrorHandler();
   const confirm = useConfirm();
   const toast = useToast();
   const undoAction = useUndoAction();
-  const [registerIncome, setRegisterIncome] = useState(true);
-  const [launching, setLaunching] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [sheet, setSheet] = useState<null | 'editar' | 'concluir' | 'pagar'>(null);
+  const [refund, setRefund] = useState<PaymentEntry | null>(null);
   const client = data.clients.find((c) => c.id === a.clientId);
   const wa = client ? whatsappLink(client.phone) : null;
-  // beta.4: pagamentos registrados pela 0.5 (inclusive antecipados) já entraram no caixa.
-  const paid = paidForAppointment(a.id, data.transactions);
-  const due = Math.max(0, a.price - paid);
-  const payments = paymentsOf(a.id, data.transactions);
-  const paymentsTotal = payments.reduce((s, p) => s + (p.amount as number), 0);
-  const autoIncome = removableAutoIncome(a.transactionId, data.transactions);
-  const keepsPayments = payments.length ? ` ${payments.length === 1 ? 'O pagamento registrado' : `Os ${payments.length} pagamentos registrados`} (${formatMoney(paymentsTotal)}) ${payments.length === 1 ? 'continua' : 'continuam'} em Finanças.` : '';
+  const pay = paymentSummary(a, data.transactions);
+  // 0.5: dinheiro recebido nunca some ao reabrir, cancelar ou excluir; a confirmação diz isso.
+  const keepsMoney = pay.net > 0 ? ` Os valores recebidos (${formatMoney(pay.net)}) continuam em Finanças e no histórico.` : '';
 
   async function complete() {
     // Conclusão antecipada: só pergunta quando a data do serviço é futura
@@ -130,17 +128,11 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
       });
       if (!ok) return;
     }
-    try {
-      const fb = await service.completeAppointment(a.id, { registerIncome });
-      feedback(`${t.service} ${t.completedLabel}!`, fb, registerIncome && due > 0 ? `Receita de ${formatMoney(due)} lançada.` : undefined);
-      onClose();
-    } catch (err) {
-      onError(err);
-    }
+    setSheet('concluir');
   }
   async function setStatus(status: 'agendado' | 'cancelado') {
-    if (autoIncome) {
-      const ok = await confirm({ title: status === 'agendado' ? 'Reabrir?' : 'Cancelar?', message: `A receita lançada automaticamente para est${t.serviceArticle === 'a' ? 'a' : 'e'} ${t.service.toLowerCase()} (${formatMoney(autoIncome.amount as number)}) será removida do financeiro.${keepsPayments}`, confirmLabel: 'Continuar' });
+    if (keepsMoney) {
+      const ok = await confirm({ title: status === 'agendado' ? 'Reabrir?' : 'Cancelar?', message: `${status === 'cancelado' ? 'Nada ficará a receber.' : `${t.service} volta para a agenda.`}${keepsMoney} Para devolver dinheiro, use “Estornar”.`, confirmLabel: 'Continuar' });
       if (!ok) return;
     }
     try {
@@ -151,28 +143,17 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
       onError(err);
     }
   }
-  async function launchIncome() {
-    setLaunching(true);
-    try {
-      const res = await service.registerAppointmentIncome(a.id);
-      if (res.transaction) toast({ title: `Receita de ${formatMoney(res.transaction.amount)} lançada`, description: 'Sem XP novo: o XP da conclusão já foi contado.', tone: 'success', action: undoAction(res.undo) });
-    } catch (err) {
-      onError(err);
-    } finally {
-      setLaunching(false);
-    }
-  }
 
   async function remove() {
     const ok = await confirm({
       title: `Excluir ${t.service.toLowerCase()}?`,
-      message: `${autoIncome ? 'O registro e a receita gerada por ele serão excluídos.' : 'Este registro será excluído.'}${keepsPayments} Logo depois, dá para desfazer pelo aviso.`,
+      message: `Este registro será excluído.${keepsMoney ? `${keepsMoney.replace(' e no histórico', '')} (como “serviço excluído”).` : ''} Logo depois, dá para desfazer pelo aviso.`,
       confirmLabel: 'Excluir', danger: true,
     });
     if (!ok) return;
     try {
       const ticket = await service.deleteAppointment(a.id);
-      toast({ title: ticket?.label ?? 'Excluído', description: autoIncome ? 'A receita automática também saiu de Finanças.' : undefined, tone: 'info', action: undoAction(ticket) });
+      toast({ title: ticket?.label ?? 'Excluído', description: pay.net > 0 ? 'Os valores recebidos continuam em Finanças.' : undefined, tone: 'info', action: undoAction(ticket) });
       onClose();
     } catch (err) {
       onError(err);
@@ -181,10 +162,10 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
 
   return (
     <>
-      <Sheet open={open && !editing} onClose={onClose} title={a.title}>
-        <dl className="mb-5 grid grid-cols-2 gap-3 text-sm">
+      <Sheet open={open && !sheet && !refund} onClose={onClose} title={a.title}>
+        <dl className="mb-4 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Data</dt><dd className="font-semibold">{relativeDayLabel(a.date)}{a.time && ` · ${a.time}`}</dd></div>
-          <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Valor</dt><dd className="num font-semibold">{a.price ? formatMoney(a.price) : '—'}</dd></div>
+          <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Valor combinado</dt><dd className="font-semibold">{a.price ? <Money cents={a.price} /> : '—'}</dd></div>
           <div className="col-span-2 flex items-center gap-2 rounded-xl bg-surface-2 p-3">
             <User size={16} className="text-muted" aria-hidden="true" />
             <dd className="min-w-0 flex-1 font-semibold [overflow-wrap:anywhere]">{client?.name ?? 'Sem cliente vinculado'}</dd>
@@ -197,38 +178,13 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
           {a.notes && <div className="col-span-2 rounded-xl bg-surface-2 p-3"><dt className="text-muted">Observações</dt><dd className="whitespace-pre-wrap">{a.notes}</dd></div>}
         </dl>
 
+        <PaymentPanel a={a} onPay={() => setSheet('pagar')} onRefund={setRefund} />
+
         {a.status === 'agendado' && (
-          <div className="mb-3 space-y-3">
-            {due > 0 && (
-              <label className="flex items-center gap-3 rounded-xl border border-line p-3 text-sm">
-                <input type="checkbox" checked={registerIncome} onChange={(e) => setRegisterIncome(e.target.checked)} className="h-5 w-5 accent-brand-600" />
-                <span>
-                  Lançar receita de <strong className="num">{formatMoney(due)}</strong> no financeiro
-                  {paid > 0 && <span className="block text-muted">{formatMoney(paid)} já recebidos</span>}
-                </span>
-              </label>
-            )}
-            {a.price > 0 && due === 0 && paid > 0 && (
-              <p className="rounded-xl bg-surface-2 p-3 text-sm text-muted">Já recebido: <strong className="num text-fg">{formatMoney(paid)}</strong>. Nenhuma receita nova será lançada.</p>
-            )}
-            <Button block size="lg" icon={<Check size={20} />} onClick={complete}>{t.completeVerb}</Button>
-          </div>
-        )}
-        {a.status === 'concluido' && a.price > 0 && due > 0 && (
-          <div className="mb-3 space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-500/40 dark:bg-amber-500/10" data-testid="sem-receita">
-            <p>
-              <strong className="block">{paid > 0 ? 'Lançamento financeiro incompleto' : 'Sem lançamento financeiro'}</strong>
-              <span className="text-muted">
-                {paid > 0 ? `${formatMoney(paid)} recebidos de ${formatMoney(a.price)}.` : `Este ${t.service.toLowerCase()} continua ${t.completedLabel}, mas nenhuma receita está lançada em Finanças.`}
-              </span>
-            </p>
-            <Button block variant="secondary" icon={<CircleDollarSign size={18} />} onClick={launchIncome} disabled={launching}>
-              Lançar receita de <span className="num">{formatMoney(due)}</span>
-            </Button>
-          </div>
+          <Button block size="lg" className="mb-3" icon={<Check size={20} />} onClick={complete}>{t.completeVerb}</Button>
         )}
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setEditing(true)}>Editar</Button>
+          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setSheet('editar')}>Editar</Button>
           {a.status === 'agendado' ? (
             <Button variant="secondary" icon={<Ban size={16} />} onClick={() => setStatus('cancelado')}>Cancelar</Button>
           ) : (
@@ -237,7 +193,10 @@ function AppointmentActions({ a, open, onClose }: { a: Appointment; open: boolea
           <Button variant="ghost" className="col-span-2 text-red-700 dark:text-red-300" icon={<Trash2 size={16} />} onClick={remove}>Excluir</Button>
         </div>
       </Sheet>
-      <AppointmentFormSheet open={open && editing} appointment={a} onClose={() => { setEditing(false); onClose(); }} />
+      <CompleteSheet a={a} open={open && sheet === 'concluir'} onClose={() => setSheet(null)} onDone={() => { setSheet(null); onClose(); }} />
+      <PaymentSheet a={a} open={open && sheet === 'pagar'} onClose={() => setSheet(null)} />
+      <RefundSheet entry={open ? refund : null} onClose={() => setRefund(null)} />
+      <AppointmentFormSheet open={open && sheet === 'editar'} appointment={a} onClose={() => { setSheet(null); onClose(); }} />
     </>
   );
 }

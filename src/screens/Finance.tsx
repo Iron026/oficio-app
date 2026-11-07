@@ -10,6 +10,7 @@ import { Card, DemoBadge, EmptyState, ProgressBar, Segmented } from '../ui/Misc'
 import { Money } from '../ui/Money';
 import { TransactionFormSheet } from './forms/TransactionForm';
 import { HeroSlot } from './Shell';
+import { isPayment, isRefund, receivables } from '../domain/payments';
 import { StatementSheet } from './StatementExport';
 
 type Filter = 'todos' | TransactionType;
@@ -28,6 +29,8 @@ export function Finance() {
   const topExpenses = byCategory(monthTx, 'despesa').slice(0, 3);
   const shift = (n: number) => setMonth((m) => monthKey(addMonths(parseDateKey(`${m}-01`), n)));
   const isCurrent = month === monthKey(new Date());
+  // 0.5: pendências ficam separadas do caixa (nunca somadas ao saldo).
+  const due = useMemo(() => receivables(data.appointments, data.transactions), [data.appointments, data.transactions]);
 
   const grouped = new Map<string, Transaction[]>();
   for (const t of list) grouped.set(t.date, [...(grouped.get(t.date) ?? []), t]);
@@ -58,6 +61,12 @@ export function Finance() {
             <dd className="text-lg font-bold"><Money cents={sum.expense} kind="expense" /></dd>
           </div>
         </dl>
+        {due.pending > 0 && (
+          <p className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-line px-3.5 py-2.5 text-sm" data-receivables>
+            <span className="text-muted">A receber · {due.count} {due.count === 1 ? 'serviço concluído' : 'serviços concluídos'} <span className="block text-xs">Fora do saldo até ser recebido</span></span>
+            <span className="font-bold"><Money cents={due.pending} /></span>
+          </p>
+        )}
         {topExpenses.length > 0 && (
           <div className="mt-5 space-y-3">
             <p className="font-sans text-xs font-bold uppercase tracking-wider text-muted">Para onde foi o dinheiro</p>
@@ -105,7 +114,8 @@ export function Finance() {
                         <span className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
                           <span className="sr-only">{t.type === 'receita' ? 'Receita,' : 'Despesa,'}</span>
                           {t.description.trim() ? t.category : t.type === 'receita' ? 'Receita' : 'Despesa'}
-                          {t.appointmentId && <Link2 size={12} aria-label="Gerado por serviço concluído" />}
+                          {t.appointmentId && <Link2 size={12} aria-label="Vinculado a um serviço" />}
+                          <PaymentKindLabel t={t} exists={!!t.appointmentId && data.appointments.some((a) => a.id === t.appointmentId)} />
                           {t.isDemo && <DemoBadge />}
                           <FutureServiceBadge date={futureServiceDateFor(t, data.appointments)} />
                         </span>
@@ -141,4 +151,12 @@ function FutureServiceBadge({ date }: { date: string | null }) {
       Data futura · {formatDateShort(date)}
     </span>
   );
+}
+
+/** 0.5: identifica pagamentos e estornos de serviços (e serviço excluído) na lista de Finanças. */
+function PaymentKindLabel({ t, exists }: { t: Transaction; exists: boolean }) {
+  if (!t.appointmentId) return null;
+  const kind = isRefund(t) ? 'Estorno' : isPayment(t) ? 'Pagamento' : null;
+  if (!kind && exists) return null;
+  return <span className="text-xs">{[kind, exists ? null : 'serviço excluído'].filter(Boolean).join(' · ')}</span>;
 }
