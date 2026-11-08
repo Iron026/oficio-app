@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { addDaysKey, addMonthsKey, weekKeys } from '../domain/agenda';
 import type { Appointment } from '../domain/types';
@@ -35,7 +35,9 @@ function periodLabel(view: View, key: string): string {
 }
 
 export function Agenda() {
-  const { data, profession } = useApp();
+  const { data, profession, service } = useApp();
+  // beta.3: ao abrir a Agenda, completa as séries que chegaram ao horizonte (dias depois, outro aparelho).
+  useEffect(() => { void service.extendSeries().catch(() => undefined); }, [service]);
   const t = profession.terms;
   const [tab, setTab] = useState<Tab>('abertos');
   const [view, setView] = useState<View>('lista');

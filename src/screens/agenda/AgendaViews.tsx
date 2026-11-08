@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDown, MoonStar, User } from 'lucide-react';
+import { AlertTriangle, ArrowDown, MoonStar, Repeat, User } from 'lucide-react';
+import { seriesOf } from '../../domain/recurrence';
 import { byDay, conflictMap, dayLayout, formatDuration, durationOf, monthGrid, timeRange, weekKeys, type DayItem } from '../../domain/agenda';
 import { paymentSummary } from '../../domain/payments';
 import type { Appointment } from '../../domain/types';
@@ -109,7 +110,7 @@ function DayBlock({ it, conflict, onOpen }: { it: DayItem<Appointment>; conflict
         title={it.unknownEnd ? 'Duração não informada' : undefined}>
         {compact ? (
           <>
-            <span className="truncate leading-4"><span className="num font-semibold">{time}</span>{it.unknownEnd && <span className="sr-only">, duração não informada</span>}{client && <span className="text-muted"> · {client.name}</span>}</span>
+            <span className="truncate leading-4">{seriesOf(it.a) && <Repeat size={11} className="mr-1 inline" aria-label="Recorrente" role="img" />}<span className="num font-semibold">{time}</span>{it.unknownEnd && <span className="sr-only">, duração não informada</span>}{client && <span className="text-muted"> · {client.name}</span>}</span>
             <span className="flex min-w-0 items-center gap-1.5 leading-5">
               <span className={cx('min-w-0 flex-1 truncate font-display text-sm font-semibold', cancelled && 'line-through')}>{it.a.title}</span>
               {conflict > 0 && (
@@ -150,6 +151,7 @@ function AgendaRow({ a, conflict, onOpen, dayKey }: { a: Appointment; conflict: 
       <span className="min-w-0 flex-1">
         <span className={cx('block font-semibold leading-snug', a.status === 'cancelado' && 'line-through')}>
           {crosses && <MoonStar size={13} className="mr-1 inline" aria-label="Continua da noite anterior" />}{a.title}
+          {seriesOf(a) && <Repeat size={13} className="ml-1 inline text-muted" aria-label="Recorrente" role="img" />}
         </span>
         <span className="flex items-center gap-1 text-xs text-muted"><User size={12} aria-hidden="true" />{client?.name ?? 'Sem cliente'}</span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5">

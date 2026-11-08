@@ -96,7 +96,12 @@ sincronização. Por isso o gerador da 0.5 não pode “preencher buracos”: el
 | Decisão da pessoa | “Manter”: `payment.review = { ack: <assinatura do conjunto>, at }` em cada estorno do grupo (um estorno novo ou valor diferente reabre a revisão). “Remover”: exclui o estorno escolhido e anota no pagamento `payment.reviews: [{ at, decision: 'removido', refund }]` |
 | Limpeza automática de estornos | **Removida.** A chave `estorno:<pagamento>:<estornado antes>` deixou de ser gravada e de ser usada pela sincronização. Só a quitação de pagamentos (`quitacao:…`) continua deduplicada |
 | Aparelho na beta.2 | Continua removendo estornos antigos com a mesma chave (comportamento dela). Estornos da beta.3 não têm chave, então nenhuma versão os remove |
-| Regras do Firestore | Sem mudança (os campos novos ficam dentro de `payment`, que não é validado campo a campo) |
+| Regras do Firestore | Sem mudança (os campos novos ficam dentro de `payment` e `series`, que não são validados campo a campo) |
+| Recorrência | `appointment.series = { id, freq, interval, days, start, until, count, through, v, auto, detached }`, sem coleção nova. `freq`: `diaria`, `semanal` (quinzenal = semanal a cada 2), `mensal` (29/30/31 → último dia nos meses curtos). Ids `<série>-<aaaammdd>`; geradas com `createdAt = updatedAt = v` (idênticas nos dois aparelhos); horizonte de 90 dias e 120 por série |
+| Nada reaparece | O gerador só cria datas depois do maior `through` da série e nunca antes de hoje. Excluir as últimas ocorrências grava o limite na que sobrou. Regra efetiva = maior `v` (sempre crescente) |
+| Sincronização de ocorrências | Gerada e intocada (`auto`, não destacada, agendada, `updatedAt = createdAt`) cede à exclusão feita em outro aparelho e não vira conflito quando os dois aparelhos geram o mesmo registro |
+| XP | Só a criação da série dá XP de agendamento; ocorrências geradas não contam na missão semanal |
+| Aparelho na beta.2 | Vê as ocorrências como agendamentos comuns e preserva `series`; não gera nada. Uma ocorrência excluída lá não volta (o `through` continua gravado nas outras) |
 
 ## Riscos que continuam
 

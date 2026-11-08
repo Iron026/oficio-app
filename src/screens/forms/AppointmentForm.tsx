@@ -8,6 +8,10 @@ import { centsToInput, formatMoney } from '../../lib/money';
 import { hasErrors, validateAppointment, type AppointmentInput, type Errors } from '../../lib/validation';
 import { useApp, useErrorHandler, useFeedback } from '../../state/AppContext';
 import { Button } from '../../ui/Button';
+import { effectiveRule, repeatFromRule, seriesGroups, seriesOf } from '../../domain/recurrence';
+import type { RepeatInput } from '../../lib/validation';
+import type { EditScope } from '../../state/service';
+import { EMPTY_REPEAT, RepeatFields } from '../agenda/Recurrence';
 import { useConfirm } from '../../ui/Confirm';
 import { SelectField, TextArea, TextField } from '../../ui/Field';
 import { Chip } from '../../ui/Misc';
@@ -15,19 +19,20 @@ import { Sheet } from '../../ui/Sheet';
 import { useHideValues } from '../../ui/privacy';
 import { ServiceTypesSheet } from '../ServiceTypesSheet';
 
-interface Props { open: boolean; onClose: () => void; appointment?: Appointment; defaultClientId?: string; defaultDate?: string }
+interface Props { open: boolean; onClose: () => void; appointment?: Appointment; defaultClientId?: string; defaultDate?: string; scope?: EditScope }
 
-export function AppointmentFormSheet({ open, onClose, appointment, defaultClientId, defaultDate }: Props) {
+export function AppointmentFormSheet({ open, onClose, appointment, defaultClientId, defaultDate, scope = 'esta' }: Props) {
   const { profession } = useApp();
   const t = profession.terms;
+  const batch = appointment && seriesOf(appointment) && scope !== 'esta';
   return (
-    <Sheet open={open} onClose={onClose} title={appointment ? `Editar ${t.service.toLowerCase()}` : `Agendar ${t.service.toLowerCase()}`}>
-      {open && <AppointmentForm appointment={appointment} defaultClientId={defaultClientId} defaultDate={defaultDate} onDone={onClose} />}
+    <Sheet open={open} onClose={onClose} title={appointment ? (batch ? (scope === 'serie' ? 'Editar toda a série' : 'Editar esta e as próximas') : `Editar ${t.service.toLowerCase()}`) : `Agendar ${t.service.toLowerCase()}`}>
+      {open && <AppointmentForm appointment={appointment} defaultClientId={defaultClientId} defaultDate={defaultDate} scope={scope} onDone={onClose} />}
     </Sheet>
   );
 }
 
-function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: { appointment?: Appointment; defaultClientId?: string; defaultDate?: string; onDone: () => void }) {
+function AppointmentForm({ appointment, defaultClientId, defaultDate, scope, onDone }: { appointment?: Appointment; defaultClientId?: string; defaultDate?: string; scope: EditScope; onDone: () => void }) {
   const { service, data, profession } = useApp();
   const t = profession.terms;
   const feedback = useFeedback();
@@ -38,6 +43,14 @@ function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: 
       ? { title: appointment.title, clientId: appointment.clientId ?? '', date: appointment.date, time: appointment.time, price: centsToInput(appointment.price), notes: appointment.notes, duration: appointment.duration ? String(appointment.duration) : '' }
       : { title: '', clientId: defaultClientId ?? '', date: defaultDate ?? todayKey(), time: '', price: '', notes: '', duration: '' },
   );
+  // beta.3: repetição ao criar; ao editar "esta e as próximas" ou "toda a série", parte da regra atual.
+  const batch = !!appointment && !!seriesOf(appointment) && scope !== 'esta';
+  const [repeat, setRepeat] = useState<RepeatInput>(() => {
+    if (!batch) return EMPTY_REPEAT;
+    const rule = effectiveRule(seriesGroups(data.appointments).get(seriesOf(appointment!)!.id) ?? [appointment!]);
+    return rule ? repeatFromRule(rule) : EMPTY_REPEAT;
+  });
+  const showRepeat = !appointment || batch;
   const [errors, setErrors] = useState<Errors<AppointmentInput>>({});
   const [saving, setSaving] = useState(false);
   const [managing, setManaging] = useState(false);
@@ -48,7 +61,8 @@ function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: 
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const errs = validateAppointment(v);
+    const input: AppointmentInput = { ...v, ...(showRepeat ? { repeat } : {}) };
+    const errs = validateAppointment(input);
     setErrors(errs);
     if (hasErrors(errs)) return;
     // 0.5: conflito de horário avisa, mostra quem coincide e nunca bloqueia.
@@ -68,8 +82,8 @@ function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: 
     }
     setSaving(true);
     try {
-      const res = await service.saveAppointment(v, appointment?.id);
-      feedback(appointment ? 'Alterações salvas' : `${t.service} agendad${t.serviceArticle}`, res.feedback);
+      const res = await service.saveAppointment(input, appointment?.id, scope);
+      feedback(appointment ? (batch ? 'Série atualizada' : 'Alterações salvas') : repeat.freq ? 'Atendimentos recorrentes agendados' : `${t.service} agendad${t.serviceArticle}`, res.feedback);
       onDone();
     } catch (err) {
       onError(err);
@@ -111,7 +125,7 @@ function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: 
         ))}
       </SelectField>
       <div className="grid grid-cols-2 gap-3">
-        <TextField label="Data" type="date" value={v.date} onChange={set('date')} error={errors.date} />
+        <TextField label={batch ? 'Data (desta)' : 'Data'} type="date" value={v.date} onChange={set('date')} error={errors.date} disabled={batch} hint={batch ? 'Para mudar a data, edite só esta.' : undefined} />
         <TextField label="Horário" type="time" value={v.time} onChange={set('time')} error={errors.time} optional />
       </div>
       <SelectField label="Duração" value={v.duration ?? ''} onChange={set('duration')} error={errors.duration} optional hint={v.time ? (v.duration ? undefined : 'Sem duração, a agenda mostra só o início e não presume o término.') : 'A duração vale quando há horário.'}>
@@ -120,6 +134,7 @@ function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: 
       </SelectField>
       <TextField label="Valor" prefix="R$" inputMode="decimal" placeholder="0,00" value={v.price} onChange={set('price')} error={errors.price} hint="Os preços sugeridos são apenas referência." optional />
       <TextArea label="Observações" value={v.notes} onChange={set('notes')} error={errors.notes} optional maxLength={500} />
+      {showRepeat && <RepeatFields value={repeat} onChange={setRepeat} date={v.date} error={errors.repeat} />}
       <Button type="submit" block size="lg" disabled={saving}>{appointment ? 'Salvar alterações' : 'Agendar'}</Button>
     </form>
     {/* Fora do <form>: eventos do React atravessam portais e o envio do painel não pode enviar o agendamento. */}

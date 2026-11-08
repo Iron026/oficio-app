@@ -52,6 +52,8 @@ export function App({ storageFactory, cloudFactory }: AppProps) {
       if (cancelled) return engine.dispose();
       // 0.4: reconhece selos já merecidos pelo histórico (idempotente, sem XP).
       await service.reconcileSeals();
+      // beta.3: completa as séries recorrentes até 90 dias à frente (sem XP; idempotente).
+      await service.extendSeries().catch(() => undefined);
       setBoot({ service, persistent, sync: engine });
       void setupKeyboard();
       // Conta Google e nuvem carregam depois, sem atrasar a abertura (e o app funciona sem elas).

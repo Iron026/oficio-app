@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Ban, Check, MessageCircle, Pencil, RotateCcw, Trash2, User } from 'lucide-react';
+import { Ban, Check, MessageCircle, Pencil, Repeat, RotateCcw, Trash2, User } from 'lucide-react';
 import { durationOf, formatDuration, timeRange } from '../domain/agenda';
 import { paymentSummary, type PaymentEntry } from '../domain/payments';
 import type { Appointment } from '../domain/types';
@@ -15,6 +15,9 @@ import { Money } from '../ui/Money';
 import { Sheet } from '../ui/Sheet';
 import { useToast } from '../ui/Toast';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
+import { describeRule, effectiveRule, seriesGroups, seriesOf } from '../domain/recurrence';
+import type { EditScope } from '../state/service';
+import { ScopeSheet } from './agenda/Recurrence';
 import { CompleteSheet, PaymentBadge, PaymentPanel, PaymentSheet, RefundSheet } from './payments/PaymentSheets';
 
 export function whatsappLink(phone: string): string | null {
@@ -82,6 +85,7 @@ export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: bo
           <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span className="flex flex-wrap items-center gap-2">
               <StatusPill a={a} />
+              {seriesOf(a) && <Repeat size={14} className="text-muted" aria-label="Recorrente" role="img" />}
               <PaymentBadge a={a} s={pay} />
               {a.isDemo && <DemoBadge />}
             </span>
@@ -108,6 +112,11 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
   const toast = useToast();
   const undoAction = useUndoAction();
   const [sheet, setSheet] = useState<null | 'editar' | 'concluir' | 'pagar'>(null);
+  // beta.3: ocorrência de série pergunta o alcance antes de editar ou cancelar.
+  const series = seriesOf(a);
+  const rule = series ? effectiveRule(seriesGroups(data.appointments).get(series.id) ?? [a]) : null;
+  const [scopeFor, setScopeFor] = useState<null | 'editar' | 'cancelar'>(null);
+  const [editScope, setEditScope] = useState<EditScope>('esta');
   const [refund, setRefund] = useState<PaymentEntry | null>(null);
   const client = data.clients.find((c) => c.id === a.clientId);
   const wa = client ? whatsappLink(client.phone) : null;
@@ -145,6 +154,20 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
     }
   }
 
+  async function chooseScope(scope: EditScope) {
+    const kind = scopeFor;
+    setScopeFor(null);
+    if (kind === 'editar') { setEditScope(scope); setSheet('editar'); return; }
+    if (scope === 'esta') return setStatus('cancelado');
+    try {
+      const undo = await service.cancelSeries(a.id, scope);
+      toast({ title: scope === 'serie' ? 'Série cancelada' : 'Esta e as próximas canceladas', description: 'A repetição foi encerrada.', tone: 'info', action: undoAction(undo) });
+      onClose();
+    } catch (err) {
+      onError(err);
+    }
+  }
+
   async function remove() {
     const ok = await confirm({
       title: `Excluir ${t.service.toLowerCase()}?`,
@@ -163,7 +186,7 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
 
   return (
     <>
-      <Sheet open={open && !sheet && !refund} onClose={onClose} title={a.title}>
+      <Sheet open={open && !sheet && !refund && !scopeFor} onClose={onClose} title={a.title}>
         <dl className="mb-4 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Data</dt><dd className="font-semibold">{relativeDayLabel(a.date)}</dd></div>
           <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Horário</dt><dd className="font-semibold">{a.time ? <>{timeRange(a)}<span className="block text-xs font-normal text-muted">{durationOf(a) ? formatDuration(durationOf(a)!) : 'Duração não informada'}</span></> : 'Sem horário'}</dd></div>
@@ -177,6 +200,13 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
               </a>
             )}
           </div>
+          {rule && (
+            <div className="col-span-2 rounded-xl bg-surface-2 p-3" data-series-rule>
+              <dt className="flex items-center gap-1.5 text-muted"><Repeat size={14} aria-hidden="true" /> Repete</dt>
+              <dd className="font-semibold">{describeRule(rule)}</dd>
+              {series?.detached && <dd className="text-xs text-muted">Esta data foi alterada à parte.</dd>}
+            </div>
+          )}
           {a.notes && <div className="col-span-2 rounded-xl bg-surface-2 p-3"><dt className="text-muted">Observações</dt><dd className="whitespace-pre-wrap">{a.notes}</dd></div>}
         </dl>
 
@@ -186,9 +216,9 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
           <Button block size="lg" className="mb-3" icon={<Check size={20} />} onClick={complete}>{t.completeVerb}</Button>
         )}
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setSheet('editar')}>Editar</Button>
+          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => (series && a.status === 'agendado' ? setScopeFor('editar') : (setEditScope('esta'), setSheet('editar')))}>Editar</Button>
           {a.status === 'agendado' ? (
-            <Button variant="secondary" icon={<Ban size={16} />} onClick={() => setStatus('cancelado')}>Cancelar</Button>
+            <Button variant="secondary" icon={<Ban size={16} />} onClick={() => (series ? setScopeFor('cancelar') : void setStatus('cancelado'))}>Cancelar</Button>
           ) : (
             <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={() => setStatus('agendado')}>Reabrir</Button>
           )}
@@ -198,7 +228,8 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
       <CompleteSheet a={a} open={open && sheet === 'concluir'} onClose={() => setSheet(null)} onDone={() => { setSheet(null); onClose(); }} />
       <PaymentSheet a={a} open={open && sheet === 'pagar'} onClose={() => setSheet(null)} />
       <RefundSheet entry={open ? refund : null} onClose={() => setRefund(null)} />
-      <AppointmentFormSheet open={open && sheet === 'editar'} appointment={a} onClose={() => { setSheet(null); onClose(); }} />
+      <AppointmentFormSheet open={open && sheet === 'editar'} appointment={a} scope={editScope} onClose={() => { setSheet(null); onClose(); }} />
+      <ScopeSheet open={open && !!scopeFor} kind={scopeFor ?? 'editar'} onClose={() => setScopeFor(null)} onChoose={(s) => void chooseScope(s)} />
     </>
   );
 }
