@@ -376,8 +376,11 @@ try {
     await tap(page.getByRole('button', { name: 'Buscar' }));
     const busca = page.getByRole('dialog', { name: 'Buscar' });
     await busca.getByRole('searchbox').fill('CORTE');
-    await busca.getByRole('button', { name: /corte da 0\.4/i }).first().waitFor();
-    await wait(500);
+    await busca.getByRole('heading', { name: /atendimentos \(1\)/i }).waitFor();
+    await wait(800);
+    // O resultado precisa continuar na tela (e o "Nada encontrado" não pode aparecer) na hora da captura.
+    assert(await busca.getByRole('heading', { name: /atendimentos \(1\)/i }).count() === 1, 'a busca perdeu o resultado depois de mostrar');
+    assert(await busca.locator('[data-search-empty]').count() === 0, 'a busca mostrou "Nada encontrado" para um texto com resultado');
     shot('00c-busca');
     await page.keyboard.press('Escape');
     await busca.waitFor({ state: 'detached' });

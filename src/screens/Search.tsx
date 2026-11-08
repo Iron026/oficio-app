@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CalendarDays, CircleMinus, CirclePlus, Search as SearchIcon, Tag, Undo2, User } from 'lucide-react';
 import { movementKind } from '../domain/finance';
 import { MIN_QUERY, searchAll } from '../domain/search';
@@ -40,8 +40,9 @@ function SearchPanel() {
   const t = profession.terms;
   const hidden = useHideValues();
   const [query, setQuery] = useState('');
-  const deferred = useDeferredValue(query);
-  const r = useMemo(() => searchAll(data, deferred, { hideValues: hidden }), [data, deferred, hidden]);
+  // Resultado calculado do mesmo texto exibido (sem valor adiado): num aparelho lento, um valor adiado podia
+  // ficar para trás e mostrar "Nada encontrado" para um texto que tem resultados. A busca é rápida o bastante.
+  const r = useMemo(() => searchAll(data, query, { hideValues: hidden }), [data, query, hidden]);
   const [client, setClient] = useState<string | null>(null);
   const [appt, setAppt] = useState<string | null>(null);
   const [tx, setTx] = useState<Transaction | null>(null);
