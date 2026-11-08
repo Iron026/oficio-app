@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDown, Clock, MoonStar, User } from 'lucide-react';
+import { AlertTriangle, ArrowDown, MoonStar, User } from 'lucide-react';
 import { byDay, conflictMap, dayLayout, formatDuration, durationOf, monthGrid, timeRange, weekKeys, type DayItem } from '../../domain/agenda';
 import { paymentSummary } from '../../domain/payments';
 import type { Appointment } from '../../domain/types';
@@ -61,10 +61,9 @@ export function DayView({ dateKey, items }: { dateKey: string; items: Appointmen
   const first = timed.find((it) => !it.fromPrev) ?? timed[0];
   return (
     <div>
-      {(isToday || first) && (
+      {first && (
         <div className="mb-3 flex flex-wrap gap-2" data-day-jump>
-          {isToday && <Button variant="secondary" size="sm" icon={<Clock size={16} />} onClick={() => goTo(nowMin)}>Ir para agora</Button>}
-          {first && <Button variant="secondary" size="sm" icon={<ArrowDown size={16} />} onClick={() => goTo(first.from)}>Primeiro atendimento ({String(Math.floor(first.from / 60)).padStart(2, '0')}:{String(first.from % 60).padStart(2, '0')})</Button>}
+          <Button variant="secondary" size="sm" icon={<ArrowDown size={16} />} onClick={() => goTo(first.from)}>Primeiro atendimento ({String(Math.floor(first.from / 60)).padStart(2, '0')}:{String(first.from % 60).padStart(2, '0')})</Button>
         </div>
       )}
       {untimed.length > 0 && (

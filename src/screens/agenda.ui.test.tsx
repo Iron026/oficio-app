@@ -177,7 +177,7 @@ describe('beta.2: duração opcional e visão Dia sem rolagem automática', () =
     expect(data.find((a) => a.title === 'Manicure')!.duration).toBe(45);
   });
 
-  it('entrar na visão Dia (e trocar de dia ou de visão) não rola a página; "Ir para agora" e "Primeiro atendimento" rolam', async () => {
+  it('entrar na visão Dia (e trocar de dia ou de visão) não rola a página; só "Primeiro atendimento" rola', async () => {
     const scroll = vi.fn();
     window.scrollTo = scroll as unknown as typeof window.scrollTo;
     const { user } = await start(async (s) => { await appt(s, 'Noiva', today, '18:00'); await appt(s, 'Amanhã', addDaysKey(today, 1), '20:00'); });
@@ -191,14 +191,14 @@ describe('beta.2: duração opcional e visão Dia sem rolagem automática', () =
     await user.click(screen.getByRole('radio', { name: 'Dia' }));
     await screen.findByRole('button', { name: /noiva/i });
     expect(scroll).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Ir para agora' }));
-    expect(scroll).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Primeiro atendimento (18:00)' }));
-    expect(scroll).toHaveBeenCalledTimes(2);
-    // Outro dia: sem "Ir para agora".
+    expect(scroll).toHaveBeenCalledTimes(1);
+    // Outro dia: o botão acompanha o primeiro atendimento daquele dia e só rola quando tocado.
     await user.click(screen.getByRole('button', { name: 'Próximo dia' }));
     await screen.findByRole('button', { name: /amanhã/i });
-    expect(screen.queryByRole('button', { name: 'Ir para agora' })).not.toBeInTheDocument();
+    expect(scroll).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Primeiro atendimento (20:00)' }));
+    expect(scroll).toHaveBeenCalledTimes(2);
     window.scrollTo = () => undefined;
   });
 });
