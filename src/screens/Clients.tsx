@@ -1,7 +1,11 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { completedCountByClient } from '../domain/insights';
-import { CalendarPlus, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Search, Trash2, UserPlus } from 'lucide-react';
-import type { Client } from '../domain/types';
+import { CalendarDays, CalendarPlus, CirclePlus, Mail, Undo2, MapPin, MessageCircle, Pencil, Phone, Plus, Search, Trash2, UserPlus } from 'lucide-react';
+import type { Client, Transaction } from '../domain/types';
+import { clientHistory, MONEY_LABEL } from '../domain/clientHistory';
+import { formatDateShort, todayKey } from '../lib/dates';
+import { PaymentBadge } from './payments/PaymentSheets';
+import { TransactionFormSheet } from './forms/TransactionForm';
 import { useApp, useErrorHandler, useUndoAction } from '../state/AppContext';
 import { Button } from '../ui/Button';
 import { useConfirm } from '../ui/Confirm';
@@ -10,7 +14,7 @@ import { DemoBadge, EmptyState } from '../ui/Misc';
 import { Money } from '../ui/Money';
 import { Sheet } from '../ui/Sheet';
 import { useToast } from '../ui/Toast';
-import { AppointmentItem, whatsappLink } from './AppointmentItem';
+import { AppointmentActions, AppointmentItem, whatsappLink } from './AppointmentItem';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
 import { ClientFormSheet } from './forms/ClientForm';
 import { Fab, HeroSlot } from './Shell';
@@ -119,11 +123,11 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   const undoAction = useUndoAction();
   const onError = useErrorHandler();
   const [mode, setMode] = useState<'view' | 'edit' | 'schedule'>('view');
-  const history = data.appointments.filter((a) => a.clientId === client.id).sort((a, b) => b.date.localeCompare(a.date));
-  const completed = history.filter((a) => a.status === 'concluido');
-  // Soma do preço dos serviços concluídos (valor combinado), não o que entrou no caixa: na 0.4 a conclusão
-  // pode ser feita sem lançar a receita. O "total pago" separado do "pendente" chega com a 0.5.
-  const billed = completed.reduce((s, a) => s + a.price, 0);
+  // beta.3: histórico derivado dos agendamentos e dos lançamentos reais (fonte única dos valores).
+  const h = useMemo(() => clientHistory(client.id, data.appointments, data.transactions, todayKey()), [client.id, data.appointments, data.transactions]);
+  const [openAppt, setOpenAppt] = useState<string | null>(null);
+  const [openTx, setOpenTx] = useState<Transaction | null>(null);
+  const apptOpen = openAppt ? data.appointments.find((a) => a.id === openAppt) : undefined;
   const wa = whatsappLink(client.phone);
 
   async function remove() {
@@ -156,10 +160,23 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
             <a href={wa} target="_blank" rel="noopener noreferrer" className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-green-700 text-sm font-semibold text-white hover:bg-green-800"><MessageCircle size={16} aria-hidden="true" /> WhatsApp</a>
           )}
         </div>
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">{t.services} {t.completedLabelPlural}</p><p className="num text-lg font-bold">{completed.length}</p></div>
-          <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">Valor de {t.services.toLowerCase()} {t.completedLabelPlural}</p><p className="text-lg font-bold"><Money cents={billed} /></p></div>
-        </div>
+        <dl className="mb-4 grid grid-cols-2 gap-2" aria-label="Resumo do cliente" data-client-summary>
+          <div className="rounded-xl bg-surface-2 p-3"><dt className="text-sm text-muted">{t.services} {t.completedLabelPlural}</dt><dd className="num text-lg font-bold">{h.completedCount}</dd></div>
+          <div className="rounded-xl bg-surface-2 p-3"><dt className="text-sm text-muted">Último {t.service.toLowerCase()}</dt><dd className="text-lg font-bold">{h.lastCompleted ? formatDateShort(h.lastCompleted.date) : '—'}</dd></div>
+          <div className="rounded-xl bg-surface-2 p-3"><dt className="text-sm text-muted">Contratado</dt><dd className="text-lg font-bold"><Money cents={h.contracted} /></dd></div>
+          <div className="rounded-xl bg-surface-2 p-3">
+            <dt className="text-sm text-muted">Recebido</dt><dd className="text-lg font-bold"><Money cents={h.received} /></dd>
+            {h.advanceOpen > 0 && <dd className="text-xs text-muted">inclui <Money cents={h.advanceOpen} /> antecipado</dd>}
+          </div>
+          {h.refunded > 0 && <div className="rounded-xl bg-surface-2 p-3"><dt className="text-sm text-muted">Estornado</dt><dd className="text-lg font-bold text-expense"><Money cents={h.refunded} /></dd></div>}
+          <div className={h.pending > 0 ? 'rounded-xl bg-amber-50 p-3 dark:bg-amber-500/10' : 'rounded-xl bg-surface-2 p-3'}><dt className="text-sm text-muted">Pendente</dt><dd className="text-lg font-bold"><Money cents={h.pending} /></dd></div>
+        </dl>
+        {(h.notRegistered > 0 || h.inReview > 0) && (
+          <ul className="mb-4 space-y-1 text-xs text-muted">
+            {h.notRegistered > 0 && <li>{h.notRegistered} {h.notRegistered === 1 ? `${t.service.toLowerCase()} ${t.completedLabel}` : `${t.services.toLowerCase()} ${t.completedLabelPlural}`} antes da 0.5 sem pagamento registrado (fora do pendente).</li>}
+            {h.inReview > 0 && <li className="font-semibold text-red-700 dark:text-red-300">{h.inReview} com estornos para revisar.</li>}
+          </ul>
+        )}
         <ul className="mb-4 space-y-2 text-sm">
           {client.email && <li className="flex items-center gap-2"><Mail size={16} className="text-muted" aria-hidden="true" />{client.email}</li>}
           {client.address && <li className="flex items-center gap-2"><MapPin size={16} className="text-muted" aria-hidden="true" />{client.address}</li>}
@@ -170,13 +187,47 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
           <Button variant="secondary" size="sm" icon={<Pencil size={16} />} onClick={() => setMode('edit')}>Editar</Button>
           <Button variant="secondary" size="sm" className="text-red-700 dark:text-red-300" icon={<Trash2 size={16} />} onClick={remove}>Excluir</Button>
         </div>
+        {h.upcoming.length > 0 && (
+          <section aria-label="Próximos" className="mb-5">
+            <h3 className="mb-2 font-sans text-xs font-bold uppercase tracking-wider text-muted">Próximos</h3>
+            <div className="space-y-2">{h.upcoming.map((a) => <AppointmentItem key={a.id} a={a} showDate />)}</div>
+          </section>
+        )}
         <h3 className="mb-2 font-sans text-xs font-bold uppercase tracking-wider text-muted">Histórico</h3>
-        {history.length ? (
-          <div className="space-y-2">{history.map((a) => <AppointmentItem key={a.id} a={a} showDate />)}</div>
+        {h.timeline.length ? (
+          <ol className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface" aria-label="Histórico do cliente">
+            {h.timeline.map((e) => (
+              <li key={e.key}>
+                {e.kind === 'atendimento' ? (
+                  <button type="button" onClick={() => setOpenAppt(e.a.id)} className="press-soft flex w-full items-center gap-3 p-3 text-left hover:bg-surface-2" data-timeline="atendimento">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted"><CalendarDays size={18} aria-hidden="true" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className={e.a.status === 'cancelado' ? 'block font-semibold text-muted line-through' : 'block font-semibold'}>{e.a.title}</span>
+                      <span className="block text-xs text-muted">{formatDateShort(e.a.date)} · {e.a.status === 'concluido' ? t.completedLabel : e.a.status === 'cancelado' ? 'cancelado' : 'agendado'}</span>
+                    </span>
+                    <PaymentBadge a={e.a} s={e.s} />
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setOpenTx(e.tx)} className="press-soft flex w-full items-center gap-3 p-3 text-left hover:bg-surface-2" data-timeline={e.money}>
+                    <span className={e.money === 'estorno' ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted' : 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-income dark:bg-green-500/10'}>
+                      {e.money === 'estorno' ? <Undo2 size={18} aria-hidden="true" /> : <CirclePlus size={18} aria-hidden="true" />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold">{MONEY_LABEL[e.money]}</span>
+                      <span className="block text-xs text-muted">{formatDateShort(e.date)} · {e.a.title}</span>
+                    </span>
+                    <Money cents={e.tx.amount} kind={e.money === 'estorno' ? 'expense' : 'income'} className="font-semibold" />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ol>
         ) : (
           <p className="text-sm text-muted">Nenhum {t.service.toLowerCase()} registrado para este cliente.</p>
         )}
       </Sheet>
+      {apptOpen && <AppointmentActions a={apptOpen} open onClose={() => setOpenAppt(null)} />}
+      <TransactionFormSheet open={!!openTx} transaction={openTx ?? undefined} onClose={() => setOpenTx(null)} />
       <ClientFormSheet open={mode === 'edit'} client={client} onClose={() => setMode('view')} />
       <AppointmentFormSheet open={mode === 'schedule'} defaultClientId={client.id} onClose={() => setMode('view')} />
     </>
