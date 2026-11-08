@@ -4,7 +4,7 @@
 
 Aplicativo freemium para profissionais autônomos (manutenção, beleza, limpeza, alimentação e outros) organizarem clientes, agenda e finanças — e acompanharem a própria evolução profissional com níveis, missões, metas e conquistas.
 
-> Versão **0.5.0-beta.1 (em teste)** · app Android e web · dados no aparelho, com **conta Google opcional** para sincronizar e recuperar dados.
+> Versão **0.5.0-beta.2 (em teste)** · app Android e web · dados no aparelho, com **conta Google opcional** para sincronizar e recuperar dados.
 >
 > **Acesse:** https://iron026.github.io/oficio-app/
 
@@ -12,7 +12,7 @@ Aplicativo freemium para profissionais autônomos (manutenção, beleza, limpeza
 [![Android APK](https://github.com/Iron026/oficio-app/actions/workflows/android.yml/badge.svg)](https://github.com/Iron026/oficio-app/actions/workflows/android.yml)
 [![Deploy](https://github.com/Iron026/oficio-app/actions/workflows/pages.yml/badge.svg)](https://github.com/Iron026/oficio-app/actions/workflows/pages.yml)
 
-## O que tem na 0.5 (beta.1)
+## O que tem na 0.5 (beta.2)
 
 Pagamentos (serviço realizado separado do dinheiro recebido: integral, parcial, antecipado, estornos e
 valores a receber) e agenda com visões dia, semana e mês, duração e aviso de conflito. Ver
@@ -30,8 +30,8 @@ categorias, medalhões e selos permanentes, Central de Ajustes e ferramentas do 
 | Boas-vindas | Apresentação, escolha da profissão, cadastro do nome/negócio, dados de demonstração opcionais e identificados |
 | Painel | Nível, categoria e XP, receitas/despesas/saldo do mês (com botão para **ocultar valores**), meta semanal, próximos serviços, pendências, missões, atalhos |
 | Clientes | Cadastrar, editar, excluir (com **Desfazer**), buscar, ligar, WhatsApp, histórico e valor dos serviços concluídos |
-| Agenda | **0.5:** visões Lista, Dia (00–24 h), Semana e Mês; duração; aviso de conflito que não bloqueia. Agendar com atalhos de serviço, editar, concluir **escolhendo quanto recebeu** (nada pré-selecionado), cancelar, reabrir, excluir — com **Desfazer** |
-| Finanças | **0.5:** pagamentos e estornos por atendimento, “A receber” separado do saldo. Receitas e despesas (categoria obrigatória, descrição opcional), saldo mensal, ocultar valores, gastos por categoria, **extrato do mês em PDF e CSV** |
+| Agenda | **0.5:** visões Lista, Dia (00–24 h), Semana e Mês; duração opcional; aviso de conflito que não bloqueia. Agendar com atalhos de serviço, editar, concluir **escolhendo quanto recebeu** (nada pré-selecionado), cancelar, reabrir, excluir — com **Desfazer** |
+| Finanças | **0.5:** pagamentos e estornos por atendimento (estornos fora das despesas), “A receber” separado do saldo. Receitas e despesas (categoria obrigatória, descrição opcional), saldo mensal, ocultar valores, gastos por categoria, **extrato do mês em PDF e CSV** |
 | Evolução | Níveis, categorias com medalhões e comemoração única, selos permanentes, missões, metas, conquistas, histórico |
 | Ajustes | Central por categorias: aparência (tema, **8 paletas**, densidade), perfil e negócio (imagem com **galeria de personagens e ícones**, selo, metas, tipos de serviço), privacidade e acessibilidade, conta e sincronização, backup e dados (exportar, restaurar com resumo e verificação, cópias de segurança automáticas), sobre |
 

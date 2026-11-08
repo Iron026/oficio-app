@@ -122,7 +122,7 @@ export function Finance() {
                         <span className="line-clamp-2 font-medium leading-snug [overflow-wrap:anywhere]">{transactionLabel(t)}</span>
                         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-muted">
                           <span className="sr-only">{kind === 'receita' ? 'Receita,' : kind === 'estorno' ? 'Estorno,' : 'Despesa,'}</span>
-                          <LinkLabel t={t} service={profession.terms.service} feminine={profession.terms.serviceArticle === 'a'} exists={!!t.appointmentId && data.appointments.some((a) => a.id === t.appointmentId)} />
+                          <LinkLabel t={t} service={profession.terms.service} feminine={profession.terms.serviceArticle === 'a'} defaultCategory={profession.incomeCategories[0]} exists={!!t.appointmentId && data.appointments.some((a) => a.id === t.appointmentId)} />
                           {t.isDemo && <DemoBadge />}
                           <FutureServiceBadge date={futureServiceDateFor(t, data.appointments)} />
                         </span>
@@ -165,7 +165,7 @@ function FutureServiceBadge({ date }: { date: string | null }) {
  * atendimento", "Estorno de pagamento" ou "Receita de atendimento" (receita automática da 0.4), com o
  * aviso quando o serviço foi excluído. Lançamento avulso mostra a categoria (ou o tipo), como antes.
  */
-function LinkLabel({ t, service, feminine, exists }: { t: Transaction; service: string; feminine: boolean; exists: boolean }) {
+function LinkLabel({ t, service, feminine, defaultCategory, exists }: { t: Transaction; service: string; feminine: boolean; defaultCategory?: string; exists: boolean }) {
   const kind = movementKind(t);
   const svc = service.toLowerCase();
   const text = kind === 'estorno' ? 'Estorno de pagamento'
@@ -176,7 +176,7 @@ function LinkLabel({ t, service, feminine, exists }: { t: Transaction; service: 
   return (
     <>
       <span data-link-label>{text}</span>
-      {kind !== 'estorno' && t.description.trim() && <span>· {t.category}</span>}
+      {kind !== 'estorno' && t.description.trim() && t.category !== defaultCategory && <span>· {t.category}</span>}
       {t.appointmentId && !exists && <span className="text-xs">· {svc} excluíd{feminine ? 'a' : 'o'}</span>}
     </>
   );

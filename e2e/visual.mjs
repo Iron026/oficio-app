@@ -654,7 +654,9 @@ try {
         const hit = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label')?.startsWith('Desfazer:'), { x: b.x + b.width / 2, y: b.y + b.height / 2 });
         if (!hit) fail(`360x640/${theme}: o toque no "Desfazer" (${what}) não chega ao botão`);
         await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
-        if (!(await page.getByText('Ação desfeita').waitFor({ timeout: 4000 }).then(() => true, () => false))) fail(`360x640/${theme}: Desfazer (${what}) não confirmou`);
+        // O aviso "Ação desfeita" da ação anterior pode continuar na tela: confere o desta ação.
+        const done = page.locator('[data-toast]').filter({ hasText: 'Ação desfeita' }).filter({ hasText: new RegExp(`${what} excluíd`, 'i') }).first();
+        if (!(await done.waitFor({ timeout: 4000 }).then(() => true, () => false))) fail(`360x640/${theme}: Desfazer (${what}) não confirmou`);
         if (!(await back.waitFor({ timeout: 4000 }).then(() => true, () => false))) fail(`360x640/${theme}: ${what} não voltou depois de Desfazer`);
       };
       await page.goto(BASE + '#/clientes');

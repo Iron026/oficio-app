@@ -73,8 +73,19 @@ sincronização. Por isso o gerador da 0.5 não pode “preencher buracos”: el
 | `appointment.transactionId` | Não é mais gravado; o que já existe (receita automática da 0.4) conta como pago |
 | Reabrir, cancelar, excluir | Nunca apagam pagamentos, estornos **nem a receita automática legada** (diferente da 0.4, que removia esta última) |
 | Concluído na 0.4 sem receita | "Pagamento não registrado": nem pago nem pendente, fora do "a receber"; nada é gravado |
-| `appointment.duration` | Gravado só quando escolhido; antigos usam 60 min na exibição |
+| `appointment.duration` | Gravado só quando escolhido; antigos usam 60 min na exibição (até a beta.1; ver abaixo) |
 | Regras do Firestore | Sem mudança (lançamentos e serviços não são validados campo a campo) |
+
+## O que a 0.5.0-beta.2 mudou
+
+| Situação | Na 0.5.0-beta.2 |
+| --- | --- |
+| Duração | Opcional, padrão “Não informar”. Novo sem duração: campo ausente. Apagar a de um existente: `null` (aceito pelo backup, pelas regras e pela 0.4). Edição sem o campo preserva o valor |
+| Sem duração | Nada é presumido: só o início é conhecido. Conflito só se esse início cair num intervalo conhecido ou coincidir com outro início sem duração. Antigos sem duração **deixam de usar 60 min** |
+| Estornos em Finanças | Movimentação própria (pelo marcador `payment.kind = 'estorno'`): fora de “Despesas” e do “Para onde foi o dinheiro”. Saldo = receitas − estornos − despesas, o mesmo valor da beta.1. Despesa comum com a categoria “Estorno”, sem marcador, continua despesa |
+| Registros da beta.1 | Lidos da nova forma sem regravar nada (mesmo marcador); backup e sincronização inalterados |
+| Extrato | CSV e PDF com o tipo “Estorno”; o PDF ganha o quadro “Estornos” quando houver |
+| Regras do Firestore | Sem mudança |
 
 ## Riscos que continuam
 

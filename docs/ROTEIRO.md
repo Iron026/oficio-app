@@ -8,6 +8,12 @@ Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0
   apagar dinheiro, idempotência entre aparelhos; **agenda** — visões dia/semana/mês, duração, horários de
   parede (sem efeito de fuso ou horário de verão), atendimentos que atravessam a meia-noite e conflitos
   que avisam sem bloquear. Teste Android inclui a atualização por cima da 0.4.0-beta.7.
+- 0.5.0-beta.2 (ajustes após o teste da beta.1 no S26): visão Dia abre no topo, sem rolar sozinha ("Ir para
+  agora" e "Primeiro atendimento" rolam quando tocados); duração opcional, sem presumir 30/60 min nem gerar
+  conflito por fim desconhecido; "Pagamento de <serviço>" / "Estorno de pagamento" em texto no lugar do ícone
+  de corrente; estornos como movimentação própria em Finanças, Painel e extrato (fora das despesas e dos gastos
+  por categoria, deduzidos do saldo uma vez). Teste Android: 0.4.0-beta.7 → 0.5.0-beta.1 (com estorno
+  parcial) → beta.2.
 
 ## 0.4 (em desenvolvimento — branch `feat/v0.4-design`)
 Design, estética e experiência. Etapas: 0 rede de segurança visual · 1 fundamentos do design

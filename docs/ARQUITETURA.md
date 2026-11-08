@@ -42,7 +42,7 @@ src/
 5. **Datas locais `YYYY-MM-DD`** — evita deslocamentos de fuso horário em agendas e lançamentos.
 6. **Roteamento por hash** — funciona sem configuração de servidor (Pages, arquivo único, Capacitor).
 7. **Operações serializadas** — `AppService` enfileira gravações para evitar condições de corrida.
-8. **Concluir ⇄ financeiro (0.5).** Concluir exige escolher quanto foi recebido; cada recebimento é um pagamento (receita com `appointmentId` e marcador `payment`), e estornos são despesas vinculadas que apontam o pagamento (`payment.of`). Resumo derivado em `domain/payments.ts`. Reabrir, cancelar ou excluir nunca apagam dinheiro. A receita automática da 0.4 (`transactionId`) continua valendo como pagamento integral. Contrato em [COMPATIBILIDADE-0.5.md](COMPATIBILIDADE-0.5.md).
+8. **Concluir ⇄ financeiro (0.5).** Concluir exige escolher quanto foi recebido; cada recebimento é um pagamento (receita com `appointmentId` e marcador `payment`), e estornos são despesas vinculadas que apontam o pagamento (`payment.of`). Resumo derivado em `domain/payments.ts`. Em Finanças (beta.2), `domain/finance.ts#totals` separa recebimentos brutos, estornos (`refund`) e despesas; saldo = receitas − estornos − despesas. Reabrir, cancelar ou excluir nunca apagam dinheiro. A receita automática da 0.4 (`transactionId`) continua valendo como pagamento integral. Contrato em [COMPATIBILIDADE-0.5.md](COMPATIBILIDADE-0.5.md).
 9. **Conclusão antecipada.** Concluir um serviço cuja data (local) ainda não chegou pede confirmação (“Voltar” / “Concluir mesmo assim”); datas de hoje ou anteriores não perguntam nada. A receita gerada mantém a regra atual (data de hoje) e, em Finanças, exibe o selo discreto “Data futura · dd mmm”. O selo é **derivado** (`futureServiceDateFor`): não é gravado, não altera cálculos e some sozinho quando a data chega ou o serviço é reagendado. A receita ainda não distingue previsto × recebido (planejado para versões futuras).
 10. **Excluir cliente** mantém o histórico de serviços e o financeiro, apenas desvinculando o cliente.
 11. **Dados de demonstração** têm `isDemo: true`, exibem o selo “Demonstração”, geram um aviso global, não contam para XP/conquistas e podem ser removidos de uma vez.
@@ -52,7 +52,7 @@ src/
 
 ## Agenda (0.5)
 
-`src/domain/agenda.ts`: horários de parede (data + hora locais) convertidos em minutos absolutos por dia de calendário (`Date.UTC`), sem `Date` local — fuso e horário de verão não deslocam nada. Duração opcional (`appointment.duration`, padrão 60 min só na exibição), conflitos por sobreposição (nunca bloqueiam), grades de dia/semana/mês. Telas em `src/screens/agenda/`.
+`src/domain/agenda.ts`: horários de parede (data + hora locais) convertidos em minutos absolutos por dia de calendário (`Date.UTC`), sem `Date` local — fuso e horário de verão não deslocam nada. Duração opcional (`appointment.duration`; sem ela só o início é conhecido e nada é presumido), conflitos por sobreposição (nunca bloqueiam; sem duração, só quando o início cai num intervalo conhecido ou coincide com outro início), grades de dia/semana/mês. Telas em `src/screens/agenda/`.
 
 ## Conta e sincronização (v0.3)
 

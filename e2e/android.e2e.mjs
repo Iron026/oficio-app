@@ -13,6 +13,8 @@ const OUT = 'e2e-results';
 const apk = process.argv[2];
 /** APK da versão anterior (0.4.0-beta.7) para o teste de atualização por cima; opcional. */
 const previousApk = process.argv[3] || '';
+/** APK da 0.5.0-beta.1 (versão no S26 antes da beta.2): atualização em cadeia 0.4 → beta.1 → atual; opcional. */
+const beta1Apk = process.argv[4] || '';
 if (!apk) throw new Error('Informe o caminho do APK.');
 mkdirSync(OUT, { recursive: true });
 
@@ -320,8 +322,9 @@ try {
       return { clients, appointments, transactions, xpEvents, profile: await page.evaluate(() => localStorage.length) };
     };
     const before = await snap();
-    // Atualiza para a 0.5 por cima (mesma assinatura, versionCode maior), sem limpar dados.
-    adb('install', '-r', apk);
+    // Atualiza por cima (mesma assinatura, versionCode maior), sem limpar dados: para a 0.5.0-beta.1
+    // quando disponível (a versão que estava no S26) e, na etapa seguinte, para esta versão.
+    adb('install', '-r', beta1Apk || apk);
     page = await launch();
     await page.getByText(/atendimentos na semana/i).waitFor();
     const after = await snap();
@@ -336,7 +339,40 @@ try {
     assert(/Pago/.test((await item.textContent()) ?? ''), 'atendimento pago na 0.4 não aparece como "Pago" na 0.5');
     await wait(800);
     shot('00-atualizado-da-0.4');
-    console.log(`\n  dados preservados: ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
+    console.log(`\n  dados preservados${beta1Apk ? ' (0.4 → 0.5.0-beta.1)' : ''}: ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
+  });
+
+  if (previousApk && beta1Apk) await step('Atualização por cima da 0.5.0-beta.1 (com estorno parcial) sem perder dados', async () => {
+    // Na beta.1 (interface dela): estorno parcial de R$ 20,00 da receita automática da 0.4.
+    const sheetOf = () => page.getByRole('dialog', { name: 'Corte da 0.4' });
+    await tap(page.getByRole('button', { name: /corte da 0\.4/i }));
+    await tap(sheetOf().getByRole('button', { name: /^estornar r\$/i }));
+    const rf = page.getByRole('dialog', { name: /estornar pagamento/i });
+    await rf.getByLabel(/valor a estornar/i).fill('20,00');
+    await tap(rf.getByRole('button', { name: /registrar estorno/i }));
+    await rf.waitFor({ state: 'detached' });
+    await eventually(async () => (await readStore(page, 'transactions')).length === 2, 'a beta.1 não registrou o estorno');
+    const snap = async () => Object.fromEntries(await Promise.all(['clients', 'appointments', 'transactions', 'xpEvents'].map(async (k) => [k, await readStore(page, k)])));
+    const before = await snap();
+    adb('install', '-r', apk);
+    page = await launch();
+    await page.getByText(/atendimentos na semana/i).waitFor();
+    const after = await snap();
+    for (const k of Object.keys(before)) {
+      assert(JSON.stringify(after[k]) === JSON.stringify(before[k]), `${k} mudou ao atualizar da beta.1 (antes ${before[k].length}, depois ${after[k].length})`);
+    }
+    // Finanças: o estorno da beta.1 aparece como movimentação própria (fora de Despesas); saldo 80 − 20.
+    await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
+    const refunds = page.locator('[data-refunds-total]');
+    await refunds.waitFor();
+    assert(/20,00/.test((await refunds.textContent()) ?? ''), 'estorno da beta.1 não aparece na linha "Estornos"');
+    const body = (await page.locator('main').textContent()) ?? '';
+    assert(/Despesas\s*R\$\s*0,00/.test(body.replace(/\u00a0/g, ' ')), `estorno contado como despesa: ${body.slice(0, 300)}`);
+    assert(/\+?\s*(mais\s*)?R\$\s*60,00/.test(body.replace(/\u00a0/g, ' ')), 'saldo do mês diferente de R$ 60,00');
+    assert(await page.locator('[data-link-label]').filter({ hasText: 'Estorno de pagamento' }).count() === 1, 'rótulo "Estorno de pagamento" ausente');
+    await wait(800);
+    shot('00b-atualizado-da-beta1-financas');
+    console.log(`\n  dados preservados (beta.1 → atual): ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
   });
 
   await step('Instalar APK', async () => {
