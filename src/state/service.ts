@@ -416,8 +416,10 @@ export class AppService {
         status: existing?.status ?? 'agendado', completedAt: existing?.completedAt ?? null, transactionId: existing?.transactionId ?? null,
         // 0.5: serviço novo nasce com controle de pagamento; os antigos não são reinterpretados.
         ...(existing ? {} : { payments: true }),
-        // Duração só é gravada quando informada (os antigos continuam sem, usando 60 min na agenda).
-        ...(input.duration ? { duration: Number(input.duration) } : {}),
+        // Duração só é gravada quando informada; nada é presumido. "Não informar" ('') num registro que
+        // tinha duração grava null (ausência explícita, que sincroniza e passa pelas regras e pelo backup).
+        // Sem o campo na entrada (chamadas antigas), a duração existente fica como está.
+        ...(input.duration ? { duration: Number(input.duration) } : input.duration === '' && existing?.duration != null ? { duration: null } : {}),
       };
       await this.storage.appointments.put(appointment);
       const appointments = existing

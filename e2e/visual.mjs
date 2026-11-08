@@ -336,7 +336,20 @@ try {
       await page.goto(BASE + '#/agenda');
       for (const [name, id] of [['Dia', 'dia'], ['Semana', 'semana'], ['Mês', 'mes']]) {
         await page.getByRole('radio', { name, exact: true }).click();
+        if (id === 'dia') {
+          // beta.2: a visão Dia abre no topo; só rola por ação explícita.
+          await page.getByRole('list', { name: /horários de/i }).waitFor();
+          await page.waitForTimeout(300);
+          const y = await page.evaluate(() => window.scrollY);
+          if (y !== 0) fail(`${vp.id}/${theme}/agenda-dia: a visão Dia rolou sozinha (scrollY=${y})`);
+        }
         await capture(page, vp, theme, `agenda-${id}`, { keepScroll: id === 'dia' });
+        if (id === 'dia') {
+          await page.getByRole('button', { name: /^primeiro atendimento/i }).click();
+          await page.waitForFunction(() => window.scrollY > 0);
+          await capture(page, vp, theme, 'agenda-dia-primeiro', { keepScroll: true, skipChecks: true });
+          await page.evaluate(() => window.scrollTo(0, 0));
+        }
       }
       await page.getByRole('radio', { name: 'Lista', exact: true }).click();
       await page.getByRole('radio', { name: /concluíd/i }).click();

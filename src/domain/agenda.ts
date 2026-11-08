@@ -7,8 +7,12 @@
  */
 import type { Appointment } from './types';
 
-/** Duração usada quando o atendimento não tem `duration` (agendamentos antigos). Nada é gravado neles. */
-export const DEFAULT_DURATION = 60;
+/**
+ * Duração é opcional (beta.2): sem `duration` (ausente ou null) o fim é desconhecido. Nada é presumido:
+ * o atendimento ocupa só o horário de início para conflitos e aparece na grade com uma altura mínima
+ * (`UNKNOWN_DURATION_DISPLAY`), apenas visual.
+ */
+export const UNKNOWN_DURATION_DISPLAY = 45;
 export const MIN_DURATION = 5;
 export const MAX_DURATION = 1440;
 
@@ -37,29 +41,49 @@ export const weekdayIndex = (key: string) => (((dayNumber(key) + 3) % 7) + 7) % 
 
 type Ap = Pick<Appointment, 'id' | 'date' | 'time' | 'status'> & { duration?: number | null };
 
-export const durationOf = (a: { duration?: number | null }) =>
-  typeof a.duration === 'number' && a.duration >= MIN_DURATION && a.duration <= MAX_DURATION ? a.duration : DEFAULT_DURATION;
+/** Duração informada, ou null quando não foi informada (nunca um valor presumido). */
+export const durationOf = (a: { duration?: number | null }): number | null =>
+  typeof a.duration === 'number' && a.duration >= MIN_DURATION && a.duration <= MAX_DURATION ? a.duration : null;
 
-/** Intervalo em minutos absolutos [início, fim). Sem horário: null (não entra em conflitos nem na grade). */
-export function intervalOf(a: Ap): { start: number; end: number } | null {
+/**
+ * Intervalo em minutos absolutos [início, fim). Sem horário: null (não entra em conflitos nem na grade).
+ * Sem duração: `known: false` e `end === start` (só o instante de início é conhecido).
+ */
+export function intervalOf(a: Ap): { start: number; end: number; known: boolean } | null {
   if (!/^\d{2}:\d{2}$/.test(a.time)) return null;
   const [h, m] = a.time.split(':').map(Number);
   const start = dayNumber(a.date) * DAY + (h ?? 0) * 60 + (m ?? 0);
-  return { start, end: start + durationOf(a) };
+  const d = durationOf(a);
+  return { start, end: start + (d ?? 0), known: d !== null };
 }
 
-/** "23:00–01:00 (+1 dia)". */
+type Iv = { start: number; end: number; known: boolean };
+/**
+ * Sobreposição sem presumir fins desconhecidos: dois intervalos conhecidos se sobrepõem quando se
+ * cruzam (encostar não conta); um início sem duração conflita só se cair dentro de um intervalo
+ * conhecido ou coincidir com outro início sem duração.
+ */
+function overlaps(x: Iv, y: Iv): boolean {
+  if (x.known && y.known) return x.start < y.end && y.start < x.end;
+  if (!x.known && !y.known) return x.start === y.start;
+  const [p, k] = x.known ? [y, x] : [x, y];
+  return k.start <= p.start && p.start < k.end;
+}
+
+/** "23:00–01:00 (+1 dia)"; sem duração, só o início ("14:00"). */
 export function timeRange(a: Ap): string {
   const iv = intervalOf(a);
   if (!iv) return 'Sem horário';
   const fmt = (min: number) => `${String(Math.floor((((min % DAY) + DAY) % DAY) / 60)).padStart(2, '0')}:${String(((min % 60) + 60) % 60).padStart(2, '0')}`;
+  if (!iv.known) return fmt(iv.start);
   const days = Math.floor(iv.end / DAY) - Math.floor(iv.start / DAY) - (iv.end % DAY === 0 ? 1 : 0);
   return `${fmt(iv.start)}–${fmt(iv.end)}${days > 0 ? ` (+${days} dia${days > 1 ? 's' : ''})` : ''}`;
 }
 
 /**
  * Conflitos: atendimentos não cancelados com horário cujos intervalos se sobrepõem (encostar não é
- * conflito: 14:00–15:00 e 15:00–16:00 estão livres). Retorna, por id, os ids em conflito.
+ * conflito: 14:00–15:00 e 15:00–16:00 estão livres; sem duração, ver `overlaps`). Retorna, por id,
+ * os ids em conflito.
  */
 export function conflictMap(appointments: readonly Ap[]): Map<string, string[]> {
   const items = appointments
@@ -70,8 +94,12 @@ export function conflictMap(appointments: readonly Ap[]): Map<string, string[]> 
   const add = (x: string, y: string) => out.set(x, [...(out.get(x) ?? []), y]);
   const active: typeof items = [];
   for (const it of items) {
-    for (let i = active.length - 1; i >= 0; i--) if (active[i]!.end <= it.start) active.splice(i, 1);
-    for (const o of active) { add(o.id, it.id); add(it.id, o.id); }
+    // Ordenados pelo início: sai quem termina até aqui (ou, sem duração, quem começou antes).
+    for (let i = active.length - 1; i >= 0; i--) {
+      const o = active[i]!;
+      if (o.known ? o.end <= it.start : o.start < it.start) active.splice(i, 1);
+    }
+    for (const o of active) if (overlaps(o, it)) { add(o.id, it.id); add(it.id, o.id); }
     active.push(it);
   }
   return out;
@@ -84,7 +112,7 @@ export function conflictsFor(candidate: Ap, others: readonly Ap[]): string[] {
   return others.filter((o) => {
     if (o.id === candidate.id || o.status === 'cancelado') return false;
     const ov = intervalOf(o);
-    return !!ov && ov.start < iv.end && iv.start < ov.end;
+    return !!ov && overlaps(iv, ov);
   }).map((o) => o.id);
 }
 
@@ -96,6 +124,8 @@ export interface DayItem<T> {
   /** Começou no dia anterior / termina no dia seguinte. */
   fromPrev: boolean;
   toNext: boolean;
+  /** Sem duração informada: `to` é só a altura mínima da grade, não um fim presumido. */
+  unknownEnd: boolean;
   /** Coluna e total de colunas para mostrar sobrepostos lado a lado. */
   lane: number;
   lanes: number;
@@ -110,9 +140,15 @@ export function dayLayout<T extends Ap>(appointments: readonly T[], key: string)
   const d1 = d0 + DAY;
   const untimed = appointments.filter((a) => a.date === key && !intervalOf(a));
   const timed = appointments
-    .flatMap((a) => { const iv = intervalOf(a); return iv && iv.start < d1 && iv.end > d0 ? [{ a, iv }] : []; })
+    .flatMap((a) => {
+      const iv = intervalOf(a);
+      if (!iv) return [];
+      // Sem duração: ocupa na grade só uma altura mínima a partir do início, sem atravessar o dia.
+      const end = iv.known ? iv.end : Math.min(iv.start + UNKNOWN_DURATION_DISPLAY, dayNumber(a.date) * DAY + DAY);
+      return iv.start < d1 && end > d0 ? [{ a, iv: { ...iv, end } }] : [];
+    })
     .sort((x, y) => x.iv.start - y.iv.start || y.iv.end - x.iv.end)
-    .map(({ a, iv }) => ({ a, from: Math.max(iv.start, d0) - d0, to: Math.min(iv.end, d1) - d0, fromPrev: iv.start < d0, toNext: iv.end > d1, lane: 0, lanes: 1 }));
+    .map(({ a, iv }) => ({ a, from: Math.max(iv.start, d0) - d0, to: Math.min(iv.end, d1) - d0, fromPrev: iv.start < d0, toNext: iv.end > d1, unknownEnd: !iv.known, lane: 0, lanes: 1 }));
   // Colunas: grupos de sobreposição; em cada grupo, a primeira coluna livre.
   let group: DayItem<T>[] = [];
   let groupEnd = -1;
@@ -137,7 +173,7 @@ export function byDay<T extends Ap>(appointments: readonly T[], keys: readonly s
     const d0 = dayNumber(k) * DAY;
     for (const a of appointments) {
       const iv = intervalOf(a);
-      if (iv ? iv.start < d0 + DAY && iv.end > d0 : a.date === k) out.get(k)!.push(a);
+      if (iv?.known ? iv.start < d0 + DAY && iv.end > d0 : a.date === k) out.get(k)!.push(a);
     }
     out.get(k)!.sort((x, y) => (intervalOf(x)?.start ?? Infinity) - (intervalOf(y)?.start ?? Infinity));
   }

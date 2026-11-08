@@ -166,7 +166,7 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
       <Sheet open={open && !sheet && !refund} onClose={onClose} title={a.title}>
         <dl className="mb-4 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Data</dt><dd className="font-semibold">{relativeDayLabel(a.date)}</dd></div>
-          <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Horário</dt><dd className="font-semibold">{a.time ? <>{timeRange(a)}<span className="block text-xs font-normal text-muted">{formatDuration(durationOf(a))}{a.duration ? '' : ' (padrão)'}</span></> : 'Sem horário'}</dd></div>
+          <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Horário</dt><dd className="font-semibold">{a.time ? <>{timeRange(a)}<span className="block text-xs font-normal text-muted">{durationOf(a) ? formatDuration(durationOf(a)!) : 'Duração não informada'}</span></> : 'Sem horário'}</dd></div>
           <div className="col-span-2 rounded-xl bg-surface-2 p-3"><dt className="text-muted">Valor combinado</dt><dd className="font-semibold">{a.price ? <Money cents={a.price} /> : '—'}</dd></div>
           <div className="col-span-2 flex items-center gap-2 rounded-xl bg-surface-2 p-3">
             <User size={16} className="text-muted" aria-hidden="true" />

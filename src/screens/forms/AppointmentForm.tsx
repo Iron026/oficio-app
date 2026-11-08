@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pin, Settings2 } from 'lucide-react';
-import { conflictsFor, DEFAULT_DURATION, DURATION_OPTIONS, formatDuration, timeRange } from '../../domain/agenda';
+import { conflictsFor, DURATION_OPTIONS, formatDuration, timeRange } from '../../domain/agenda';
 import { applyServiceChoice, serviceChoices } from '../../domain/serviceTypes';
 import type { Appointment } from '../../domain/types';
 import { todayKey } from '../../lib/dates';
@@ -36,7 +36,7 @@ function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: 
   const [v, setV] = useState<AppointmentInput>(
     appointment
       ? { title: appointment.title, clientId: appointment.clientId ?? '', date: appointment.date, time: appointment.time, price: centsToInput(appointment.price), notes: appointment.notes, duration: appointment.duration ? String(appointment.duration) : '' }
-      : { title: '', clientId: defaultClientId ?? '', date: defaultDate ?? todayKey(), time: '', price: '', notes: '', duration: String(DEFAULT_DURATION) },
+      : { title: '', clientId: defaultClientId ?? '', date: defaultDate ?? todayKey(), time: '', price: '', notes: '', duration: '' },
   );
   const [errors, setErrors] = useState<Errors<AppointmentInput>>({});
   const [saving, setSaving] = useState(false);
@@ -53,7 +53,7 @@ function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: 
     if (hasErrors(errs)) return;
     // 0.5: conflito de horário avisa, mostra quem coincide e nunca bloqueia.
     const clash = conflictsFor(
-      { id: appointment?.id ?? '__novo', date: v.date, time: v.time, duration: v.duration ? Number(v.duration) : appointment?.duration, status: appointment?.status ?? 'agendado' },
+      { id: appointment?.id ?? '__novo', date: v.date, time: v.time, duration: v.duration ? Number(v.duration) : null, status: appointment?.status ?? 'agendado' },
       data.appointments,
     ).map((id) => data.appointments.find((a) => a.id === id)!).filter(Boolean);
     if (clash.length) {
@@ -114,8 +114,8 @@ function AppointmentForm({ appointment, defaultClientId, defaultDate, onDone }: 
         <TextField label="Data" type="date" value={v.date} onChange={set('date')} error={errors.date} />
         <TextField label="Horário" type="time" value={v.time} onChange={set('time')} error={errors.time} optional />
       </div>
-      <SelectField label="Duração" value={v.duration ?? ''} onChange={set('duration')} error={errors.duration} hint={v.time ? undefined : 'A duração vale quando há horário.'}>
-        {!v.duration && <option value="">Padrão da agenda ({formatDuration(DEFAULT_DURATION)})</option>}
+      <SelectField label="Duração" value={v.duration ?? ''} onChange={set('duration')} error={errors.duration} optional hint={v.time ? (v.duration ? undefined : 'Sem duração, a agenda mostra só o início e não presume o término.') : 'A duração vale quando há horário.'}>
+        <option value="">Não informar</option>
         {[...new Set([...DURATION_OPTIONS, ...(v.duration ? [Number(v.duration)] : [])])].sort((a, b) => a - b).map((m) => <option key={m} value={String(m)}>{formatDuration(m)}</option>)}
       </SelectField>
       <TextField label="Valor" prefix="R$" inputMode="decimal" placeholder="0,00" value={v.price} onChange={set('price')} error={errors.price} hint="Os preços sugeridos são apenas referência." optional />

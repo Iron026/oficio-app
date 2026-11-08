@@ -15,8 +15,12 @@ describe('agenda: horários de parede', () => {
     expect(weekdayIndex('2026-11-08')).toBe(6); // domingo
   });
 
-  it('duração padrão de 60 min sem gravar nada; faixa de horário com virada de dia', () => {
-    expect(timeRange(ap('a', '2026-11-07', '14:00'))).toBe('14:00–15:00');
+  it('beta.2: sem duração só o início é conhecido (nada presumido); faixa de horário com virada de dia', () => {
+    expect(timeRange(ap('a', '2026-11-07', '14:00'))).toBe('14:00');
+    expect(timeRange(ap('a', '2026-11-07', '14:00', null))).toBe('14:00');
+    expect(intervalOf(ap('a', '2026-11-07', '14:00'))).toMatchObject({ known: false });
+    expect(intervalOf(ap('a', '2026-11-07', '14:00'))!.end).toBe(intervalOf(ap('a', '2026-11-07', '14:00'))!.start);
+    expect(timeRange(ap('a', '2026-11-07', '14:00', 60))).toBe('14:00–15:00');
     expect(timeRange(ap('a', '2026-11-07', '23:00', 120))).toBe('23:00–01:00 (+1 dia)');
     expect(timeRange(ap('a', '2026-11-07', '23:00', 60))).toBe('23:00–00:00');
     expect(timeRange(ap('a', '2026-11-07', ''))).toBe('Sem horário');
@@ -38,6 +42,29 @@ describe('agenda: conflitos', () => {
     expect(m.has('d') || m.has('e')).toBe(false);
   });
 
+  it('beta.2: sem duração não gera conflito presumido — só início dentro de um intervalo conhecido ou mesmo início', () => {
+    const list = [
+      ap('corte', '2026-11-07', '14:00', 60),
+      ap('semDur', '2026-11-07', '14:30'), // começa durante o corte: conflito real
+      ap('depois', '2026-11-07', '15:00'), // começa quando o corte termina: livre
+      ap('x', '2026-11-07', '16:00'), ap('y', '2026-11-07', '16:00', null), // mesmo início, ambos sem duração
+      ap('z', '2026-11-07', '16:20'), // seria conflito se presumíssemos 30 ou 60 min para x/y
+      ap('w', '2026-11-07', '17:00'), ap('k', '2026-11-07', '17:00', 30), // mesmo início, um com duração
+    ];
+    const m = conflictMap(list);
+    expect(m.get('corte')).toEqual(['semDur']);
+    expect(m.get('semDur')).toEqual(['corte']);
+    expect(m.has('depois') || m.has('z')).toBe(false);
+    expect(m.get('x')).toEqual(['y']);
+    expect(m.get('w')).toEqual(['k']);
+    // Aviso ao salvar segue a mesma regra.
+    expect(conflictsFor(ap('novo', '2026-11-07', '13:45'), list)).toEqual([]);
+    expect(conflictsFor(ap('novo', '2026-11-07', '13:30', 60), list)).toEqual(['corte']);
+    expect(conflictsFor(ap('novo', '2026-11-07', '16:10', 30), list)).toEqual(['z']);
+    expect(conflictsFor(ap('novo', '2026-11-07', '15:50', 15), list)).toEqual(['x', 'y']);
+    expect(conflictsFor(ap('novo', '2026-11-07', '15:00'), list)).toEqual(['depois']);
+  });
+
   it('atravessando a meia-noite conflita com o primeiro atendimento do dia seguinte', () => {
     const list = [ap('noite', '2026-11-07', '23:30', 90), ap('cedo', '2026-11-08', '00:30', 30)];
     expect(conflictMap(list).get('noite')).toEqual(['cedo']);
@@ -57,6 +84,14 @@ describe('agenda: visões', () => {
     expect(byId.c).toMatchObject({ lane: 0, lanes: 1 });
     const prev = dayLayout(list, '2026-11-07').timed[0]!;
     expect(prev).toMatchObject({ from: 23 * 60, to: 1440, toNext: true });
+  });
+
+  it('beta.2: sem duração aparece na grade com altura mínima só visual, sem atravessar a meia-noite', () => {
+    const { timed } = dayLayout([ap('a', '2026-11-08', '09:00'), ap('b', '2026-11-08', '23:50')], '2026-11-08');
+    expect(timed[0]).toMatchObject({ from: 540, to: 585, unknownEnd: true, toNext: false });
+    expect(timed[1]).toMatchObject({ from: 1430, to: 1440, unknownEnd: true, toNext: false });
+    expect(dayLayout([ap('b', '2026-11-08', '23:50')], '2026-11-09').timed).toHaveLength(0);
+    expect(byDay([ap('b', '2026-11-08', '23:50')], ['2026-11-08', '2026-11-09']).get('2026-11-09')).toEqual([]);
   });
 
   it('semana de segunda a domingo e mês com semanas completas; navegação entre meses', () => {

@@ -1,10 +1,11 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, MoonStar, User } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { AlertTriangle, ArrowDown, Clock, MoonStar, User } from 'lucide-react';
 import { byDay, conflictMap, dayLayout, formatDuration, durationOf, monthGrid, timeRange, weekKeys, type DayItem } from '../../domain/agenda';
 import { paymentSummary } from '../../domain/payments';
 import type { Appointment } from '../../domain/types';
 import { todayKey } from '../../lib/dates';
 import { useApp } from '../../state/AppContext';
+import { Button } from '../../ui/Button';
 import { cx } from '../../ui/cx';
 import { AppointmentActions } from '../AppointmentItem';
 import { PaymentBadge } from '../payments/PaymentSheets';
@@ -50,17 +51,22 @@ export function DayView({ dateKey, items }: { dateKey: string; items: Appointmen
   const ref = useRef<HTMLDivElement>(null);
   const isToday = dateKey === todayKey();
   const nowMin = (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
-  // Abre rolado até o primeiro atendimento (ou até agora, hoje): madrugada e noite continuam acessíveis.
-  useLayoutEffect(() => {
-    const target = timed[0]?.from ?? (isToday ? nowMin : 8 * 60);
+  // beta.2: a visão abre no topo, sem rolar sozinha. Rolar até um horário é sempre uma ação da pessoa.
+  const goTo = (min: number) => {
     const el = ref.current;
     if (!el) return;
-    const top = el.getBoundingClientRect().top + window.scrollY + (target / 60) * HOUR - 140;
-    window.scrollTo({ top: Math.max(0, top) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateKey]);
+    const top = el.getBoundingClientRect().top + window.scrollY + (min / 60) * HOUR - 140;
+    window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth' });
+  };
+  const first = timed.find((it) => !it.fromPrev) ?? timed[0];
   return (
     <div>
+      {(isToday || first) && (
+        <div className="mb-3 flex flex-wrap gap-2" data-day-jump>
+          {isToday && <Button variant="secondary" size="sm" icon={<Clock size={16} />} onClick={() => goTo(nowMin)}>Ir para agora</Button>}
+          {first && <Button variant="secondary" size="sm" icon={<ArrowDown size={16} />} onClick={() => goTo(first.from)}>Primeiro atendimento ({String(Math.floor(first.from / 60)).padStart(2, '0')}:{String(first.from % 60).padStart(2, '0')})</Button>}
+        </div>
+      )}
       {untimed.length > 0 && (
         <section className="mb-3 space-y-2" aria-label="Sem horário">
           <h3 className="font-display text-sm font-bold text-muted">Sem horário</h3>
@@ -100,10 +106,11 @@ function DayBlock({ it, conflict, onOpen }: { it: DayItem<Appointment>; conflict
   return (
     <div role="listitem" className="absolute" style={{ top, height, left: `calc(${gutter}px + (100% - ${gutter + 4}px) * ${it.lane / it.lanes})`, width: `calc((100% - ${gutter + 4}px) / ${it.lanes} - 3px)` }}>
       <button type="button" onClick={onOpen} data-agenda-block={it.a.id}
-        className={cx('press-soft flex h-full w-full flex-col overflow-hidden rounded-lg px-2 text-left text-xs', compact ? 'justify-center gap-0.5' : 'py-1', statusTone(it.a, conflict > 0))}>
+        className={cx('press-soft flex h-full w-full flex-col overflow-hidden rounded-lg px-2 text-left text-xs', compact ? 'justify-center gap-0.5' : 'py-1', statusTone(it.a, conflict > 0), it.unknownEnd && 'rounded-b-none [mask-image:linear-gradient(to_bottom,black_70%,transparent)]')}
+        title={it.unknownEnd ? 'Duração não informada' : undefined}>
         {compact ? (
           <>
-            <span className="truncate leading-4"><span className="num font-semibold">{time}</span>{client && <span className="text-muted"> · {client.name}</span>}</span>
+            <span className="truncate leading-4"><span className="num font-semibold">{time}</span>{it.unknownEnd && <span className="sr-only">, duração não informada</span>}{client && <span className="text-muted"> · {client.name}</span>}</span>
             <span className="flex min-w-0 items-center gap-1.5 leading-5">
               <span className={cx('min-w-0 flex-1 truncate font-display text-sm font-semibold', cancelled && 'line-through')}>{it.a.title}</span>
               {conflict > 0 && (
@@ -139,7 +146,7 @@ function AgendaRow({ a, conflict, onOpen, dayKey }: { a: Appointment; conflict: 
       className={cx('press-soft flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left', statusTone(a, conflict > 0))}>
       <span className="num w-[6.5rem] shrink-0 text-sm font-semibold">
         {a.time ? timeRange(a) : 'Sem horário'}
-        {a.time && <span className="block text-xs font-normal text-muted">{formatDuration(durationOf(a))}</span>}
+        {a.time && durationOf(a) && <span className="block text-xs font-normal text-muted">{formatDuration(durationOf(a)!)}</span>}
       </span>
       <span className="min-w-0 flex-1">
         <span className={cx('block font-semibold leading-snug', a.status === 'cancelado' && 'line-through')}>

@@ -3,6 +3,7 @@
  * bloqueiam), atendimento que atravessa a meia-noite e situação financeira visível.
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { addDaysKey } from '../domain/agenda';
@@ -89,7 +90,7 @@ describe('0.5: duração e conflitos ao agendar', () => {
     const form = await screen.findByRole('dialog', { name: /agendar atendimento/i });
     await user.type(within(form).getByLabelText(/descrição/i), 'Coloração');
     await user.type(within(form).getByLabelText(/horário/i), '14:30');
-    expect(within(form).getByLabelText(/duração/i)).toHaveValue('60');
+    expect(within(form).getByLabelText(/duração/i)).toHaveValue(''); // beta.2: nada presumido
     await user.selectOptions(within(form).getByLabelText(/duração/i), '90');
     await user.click(within(form).getByRole('button', { name: /^agendar$/i }));
     const warn = await screen.findByRole('dialog', { name: /conflito de horário/i });
@@ -122,12 +123,82 @@ describe('0.5: duração e conflitos ao agendar', () => {
 
     await user.click(await screen.findByRole('button', { name: /antigo/i }));
     const sheet = await screen.findByRole('dialog', { name: 'Antigo' });
-    expect(sheet).toHaveTextContent(/08:00–09:00.*1 h \(padrão\)/);
+    expect(sheet).toHaveTextContent(/08:00.*Duração não informada/);
+    expect(sheet).not.toHaveTextContent(/08:00–/);
     await user.click(within(sheet).getByRole('button', { name: /editar/i }));
     const edit = await screen.findByRole('dialog', { name: /editar atendimento/i });
     expect(within(edit).getByLabelText(/duração/i)).toHaveValue('');
     await user.click(within(edit).getByRole('button', { name: /salvar alterações/i }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /editar atendimento/i })).not.toBeInTheDocument());
     expect((await reload()).data.appointments.find((a) => a.id === 'old')!.duration).toBeUndefined();
+  });
+});
+
+describe('beta.2: duração opcional e visão Dia sem rolagem automática', () => {
+  it('agendar sem duração não grava duração nem presume término; não acusa conflito com quem vem depois', async () => {
+    const { user, reload } = await start(async (s) => { await appt(s, 'Corte', today, '14:00', ''); });
+    await user.click(screen.getByRole('button', { name: /^agendar$/i }));
+    const form = await screen.findByRole('dialog', { name: /agendar atendimento/i });
+    await user.type(within(form).getByLabelText(/descrição/i), 'Escova');
+    await user.type(within(form).getByLabelText(/horário/i), '14:30');
+    expect(within(form).getByRole('option', { name: 'Não informar' })).toBeInTheDocument();
+    expect(form).toHaveTextContent(/não presume o término/);
+    await user.click(within(form).getByRole('button', { name: /^agendar$/i }));
+    // Sem duração no "Corte", 14:30 não é conflito: o término dele é desconhecido.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /agendar atendimento/i })).not.toBeInTheDocument());
+    expect(screen.queryByRole('dialog', { name: /conflito de horário/i })).not.toBeInTheDocument();
+    const saved = (await reload()).data.appointments;
+    for (const a of saved) expect('duration' in a).toBe(false);
+    await user.click(screen.getByRole('radio', { name: 'Dia' }));
+    const blocks = within(await screen.findByRole('list', { name: /horários de/i })).getAllByRole('button');
+    expect(blocks.map((b) => b.textContent)).toEqual([expect.stringMatching(/^14:00, duração não informada.*Corte/), expect.stringMatching(/^14:30, duração não informada.*Escova/)]);
+    expect(blocks.some((b) => /Conflito/.test(b.textContent ?? ''))).toBe(false);
+  });
+
+  it('editar e escolher "Não informar" apaga a duração (grava null); manter preserva', async () => {
+    const { user, reload } = await start(async (s) => { await appt(s, 'Corte', today, '14:00', '90'); await appt(s, 'Manicure', today, '16:00', '45'); });
+    await user.click(await screen.findByRole('button', { name: /corte/i }));
+    let sheet = await screen.findByRole('dialog', { name: 'Corte' });
+    await user.click(within(sheet).getByRole('button', { name: /editar/i }));
+    let edit = await screen.findByRole('dialog', { name: /editar atendimento/i });
+    expect(within(edit).getByLabelText(/duração/i)).toHaveValue('90');
+    await user.selectOptions(within(edit).getByLabelText(/duração/i), '');
+    await user.click(within(edit).getByRole('button', { name: /salvar alterações/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /editar atendimento/i })).not.toBeInTheDocument());
+    await user.keyboard('{Escape}');
+    await user.click(await screen.findByRole('button', { name: /manicure/i }));
+    sheet = await screen.findByRole('dialog', { name: 'Manicure' });
+    await user.click(within(sheet).getByRole('button', { name: /editar/i }));
+    edit = await screen.findByRole('dialog', { name: /editar atendimento/i });
+    await user.click(within(edit).getByRole('button', { name: /salvar alterações/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /editar atendimento/i })).not.toBeInTheDocument());
+    const data = (await reload()).data.appointments;
+    expect(data.find((a) => a.title === 'Corte')!.duration).toBeNull();
+    expect(data.find((a) => a.title === 'Manicure')!.duration).toBe(45);
+  });
+
+  it('entrar na visão Dia (e trocar de dia ou de visão) não rola a página; "Ir para agora" e "Primeiro atendimento" rolam', async () => {
+    const scroll = vi.fn();
+    window.scrollTo = scroll as unknown as typeof window.scrollTo;
+    const { user } = await start(async (s) => { await appt(s, 'Noiva', today, '18:00'); await appt(s, 'Amanhã', addDaysKey(today, 1), '20:00'); });
+    scroll.mockClear();
+    await user.click(screen.getByRole('radio', { name: 'Dia' }));
+    await screen.findByRole('list', { name: /horários de/i });
+    await user.click(screen.getByRole('button', { name: 'Próximo dia' }));
+    await screen.findByRole('button', { name: /amanhã/i });
+    await user.click(screen.getByRole('button', { name: 'Hoje' }));
+    await user.click(screen.getByRole('radio', { name: 'Semana' }));
+    await user.click(screen.getByRole('radio', { name: 'Dia' }));
+    await screen.findByRole('button', { name: /noiva/i });
+    expect(scroll).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Ir para agora' }));
+    expect(scroll).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Primeiro atendimento (18:00)' }));
+    expect(scroll).toHaveBeenCalledTimes(2);
+    // Outro dia: sem "Ir para agora".
+    await user.click(screen.getByRole('button', { name: 'Próximo dia' }));
+    await screen.findByRole('button', { name: /amanhã/i });
+    expect(screen.queryByRole('button', { name: 'Ir para agora' })).not.toBeInTheDocument();
+    window.scrollTo = () => undefined;
   });
 });
