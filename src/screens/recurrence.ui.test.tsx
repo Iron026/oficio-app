@@ -2,7 +2,7 @@
  * 0.5.0-beta.3 — recorrência na interface: criar pela Agenda, ver a regra, escolher o alcance (nada
  * pré-selecionado) ao editar e ao cancelar, e a visão Dia continuar abrindo no topo.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { App } from '../App';
