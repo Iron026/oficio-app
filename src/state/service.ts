@@ -5,7 +5,7 @@ import { compareVersions } from '../domain/compat';
 import { paymentSummary, type PaymentMark, type PaymentMethod } from '../domain/payments';
 import { refundGroups, reviewLog } from '../domain/refundReview';
 import { addDaysKey } from '../domain/agenda';
-import { effectiveRule, isPristineOccurrence, nextVersion, occurrenceId, pendingOccurrences, ruleFromRepeat, sameRule, seriesDates, seriesGroups, seriesOf } from '../domain/recurrence';
+import { effectiveRule, isPristineOccurrence, nextVersion, occurrenceId, staleOccurrences, pendingOccurrences, ruleFromRepeat, sameRule, seriesDates, seriesGroups, seriesOf } from '../domain/recurrence';
 import { MAX_SERVICE_TYPES, moveServiceType, nextServiceOrder, serviceNameKey } from '../domain/serviceTypes';
 import { isValidProfileImage } from '../domain/profileImage';
 import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
@@ -220,6 +220,9 @@ export class AppService {
   async applySyncedData(data: AppData): Promise<void> {
     await this.storage.replaceAll(data);
     this.set(data);
+    // beta.3: dados de outro aparelho podem ter encerrado ou mudado uma série; ajusta as ocorrências
+    // geradas depois desta sincronização (fila própria, sem esperar aqui).
+    queueMicrotask(() => void this.extendSeries().catch(() => undefined));
   }
 
   /** Serializa as operações para evitar condições de corrida. */
@@ -495,7 +498,7 @@ export class AppService {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Data inválida.');
     const stamp = this.stamp();
     const profession = getProfession(this._data.profile?.professionId);
-    const mark: PaymentMark = { kind: 'pagamento', method: opts.method ?? null, key: amount === 'restante' ? `quitacao:${a.id}:${s.net}` : null };
+    const mark: PaymentMark = { kind: 'pagamento', method: opts.method ?? null, key: amount === 'restante' ? `quitacao:${a.id}:${s.received}:${s.refunded}` : null };
     return {
       id: opts.opId ? `pg-${opts.opId}` : newId(), createdAt: stamp, updatedAt: stamp, ...(a.isDemo ? { isDemo: true } : {}),
       type: 'receita', amount: value, description: a.title, category: profession.incomeCategories[0]!, date, appointmentId: a.id,
@@ -570,7 +573,7 @@ export class AppService {
    *  - `manter`: os estornos aconteceram de verdade; grava a confirmação (`payment.review`) em cada estorno
    *    do grupo, presa à assinatura do conjunto (um estorno novo reabre a revisão);
    *  - `remover`: exclui o estorno escolhido (registrado por engano, por exemplo, nos dois aparelhos) e
-   *    anota no pagamento o que foi removido, quando e por quê (`payment.reviews`).
+   *    anota no pagamento o que foi removido, quando e por quê (`reviews`, fora de `payment`).
    * Nunca dá XP. Reversível pelo "Desfazer".
    */
   resolveRefundIssue(signature: string, decision: { keep: true } | { remove: string }): Promise<UndoTicket> {
@@ -596,7 +599,8 @@ export class AppService {
         if (issue.payment) {
           const p = issue.payment;
           const log = [...reviewLog(p), { at: stamp, decision: 'removido' as const, refund: { id: r.id, amount: r.amount, date: r.date, createdAt: r.createdAt } }];
-          const after: Transaction = { ...p, updatedAt: stamp, payment: { ...(p.payment ?? {}), reviews: log } };
+          // Fora de `payment`: uma receita automática da 0.4 (payment nulo) continua sendo legado.
+          const after: Transaction = { ...p, updatedAt: stamp, reviews: log as unknown as Record<string, unknown>[] };
           await this.storage.transactions.put(after);
           changes.push({ collection: 'transactions', id: p.id, before: p, after });
           transactions = transactions.map((t) => (t.id === p.id ? after : t));
@@ -648,9 +652,12 @@ export class AppService {
       if (s) {
         const rest = seriesGroups(appointments).get(s.id) ?? [];
         const rule = effectiveRule(rest);
-        if (rule && rule.through < a.date) {
+        // O limite que a excluída conhecia (o dela ou a própria data, o que for maior) passa para quem fica:
+        // excluir várias seguidas nunca "esquece" até onde a série já foi gerada.
+        const keep = s.through > a.date ? s.through : a.date;
+        if (rule && rule.through < keep) {
           const last = rest[rest.length - 1]!;
-          const after: Appointment = { ...last, updatedAt: this.stamp(), series: { ...last.series, through: a.date } };
+          const after: Appointment = { ...last, updatedAt: this.stamp(), series: { ...last.series, through: keep } };
           await this.storage.appointments.put(after);
           appointments = appointments.map((x) => (x.id === last.id ? after : x));
           changes.push({ collection: 'appointments', id: last.id, before: last, after });
@@ -673,6 +680,14 @@ export class AppService {
   }
 
   private async materialize(): Promise<Appointment[]> {
+    // Antes de gerar: ocorrências geradas e intocadas, sem pagamento, que a regra atual não prevê (série
+    // encerrada ou mudada em outro aparelho enquanto este estava offline) saem. Nada tocado é removido.
+    const stale = staleOccurrences(this._data.appointments, this.linkedIds());
+    if (stale.length) {
+      for (const a of stale) await this.storage.appointments.remove(a.id);
+      const gone = new Set(stale.map((a) => a.id));
+      this.set({ ...this._data, appointments: this._data.appointments.filter((a) => !gone.has(a.id)) });
+    }
     const created = pendingOccurrences(this._data.appointments, todayKey(this.now()));
     if (!created.length) return [];
     for (const a of created) await this.storage.appointments.put(a);
@@ -737,7 +752,7 @@ export class AppService {
       price: paid.has(a.id) ? a.price : parseMoney(input.price) ?? 0,
       ...(input.duration ? { duration: Number(input.duration) } : input.duration === '' && a.duration != null ? { duration: null } : {}),
     });
-    const next = input.repeat?.freq ? ruleFromRepeat(input.repeat, from, newId(), stamp) : null;
+    const next = input.repeat?.freq ? ruleFromRepeat(input.repeat, from, newId(), nextVersion(rule.v, stamp)) : null;
     if (!next || sameRule(next, rule)) {
       for (const a of targets) await write(a, fields(a));
     } else {
@@ -747,10 +762,12 @@ export class AppService {
       if (!first) throw new ValidationError<AppointmentInput>({ repeat: 'Esta repetição não tem nenhuma data. Revise o término.' });
       for (const a of targets) {
         if (a.id === anchor.id) continue;
-        if (paid.has(a.id)) await write(a, { ...a, updatedAt: stamp, series: { ...a.series, detached: true } });
+        // Com pagamento: passa para a série nova como exceção, reservando a data (o gerador não cria outra
+        // no mesmo dia); `through` = início da série nova, para não atrasar a geração dela.
+        if (paid.has(a.id)) await write(a, { ...a, updatedAt: stamp, series: { ...a.series, id: next.id, v: '', through: first, detached: true } });
         else await write(a, null);
       }
-      await write(anchor, { ...fields(anchor), date: first, series: { ...next, through: first, auto: false, detached: false } as unknown as Record<string, unknown> });
+      await write(anchor, { ...fields(anchor), date: first, series: { ...next, through: first, auto: seriesOf(anchor)!.auto === true, detached: false } as unknown as Record<string, unknown> });
       const old = (seriesGroups(appointments).get(s.id) ?? []).filter((a) => !seriesOf(a)!.detached || a.date < from);
       const last = old[old.length - 1];
       if (last) await write(last, { ...last, updatedAt: stamp, series: { ...last.series, until: addDaysKey(from, -1), v: nextVersion(rule.v, stamp) } });

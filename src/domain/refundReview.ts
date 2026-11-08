@@ -14,7 +14,8 @@
  * A decisão "manter" grava em cada estorno do grupo `payment.review = { ack: <assinatura>, at }`. A
  * assinatura descreve exatamente o conjunto revisado (pagamento, valor, estornos e valores): se surgir um
  * estorno novo ou um valor mudar, a assinatura muda e a revisão volta. A decisão "remover" exclui o
- * estorno escolhido e registra no pagamento (`payment.reviews`) o que foi removido, quando e por quê.
+ * estorno escolhido e registra no pagamento (`reviews`, fora de `payment` — uma receita da 0.4 continua sendo
+ * legado) o que foi removido, quando e por quê.
  */
 import { isRefund, refundOf } from './paymentMarks';
 import type { Transaction } from './types';
@@ -91,7 +92,7 @@ export function refundIssues<T extends Tx>(transactions: readonly T[]): RefundIs
 
 /** Registros de revisão gravados no pagamento (trilha de auditoria). */
 export interface RefundReviewLog { at: string; decision: 'removido'; refund: { id: string; amount: number; date: string; createdAt: string } }
-export function reviewLog(payment: { payment?: unknown } | null | undefined): RefundReviewLog[] {
-  const p = payment?.payment && typeof payment.payment === 'object' ? (payment.payment as Record<string, unknown>) : null;
-  return Array.isArray(p?.reviews) ? (p!.reviews as RefundReviewLog[]).filter((r) => r && typeof r === 'object' && typeof r.at === 'string') : [];
+export function reviewLog(payment: { reviews?: unknown } | null | undefined): RefundReviewLog[] {
+  const list = payment?.reviews;
+  return Array.isArray(list) ? (list as RefundReviewLog[]).filter((r) => r && typeof r === 'object' && typeof r.at === 'string') : [];
 }

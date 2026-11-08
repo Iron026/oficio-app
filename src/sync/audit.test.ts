@@ -39,7 +39,7 @@ describe('auditoria: conclusão do mesmo serviço em dois aparelhos offline', ()
       expect(incomes).toHaveLength(1);
       expect(totals(d.service.data.transactions).income).toBe(8000);
       // 0.5: a quitação é um pagamento com chave; o duplicado do outro aparelho é removido.
-      expect(incomes[0]!.payment).toMatchObject({ kind: 'pagamento', key: `quitacao:${appointment.id}:0` });
+      expect(incomes[0]!.payment).toMatchObject({ kind: 'pagamento', key: `quitacao:${appointment.id}:0:0` }); // beta.3: recebido:estornado
     }
   });
 });

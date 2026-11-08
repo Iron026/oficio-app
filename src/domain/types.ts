@@ -123,6 +123,8 @@ export interface Transaction extends BaseEntity {
    * Pagamentos nunca são removidos automaticamente (ver src/domain/compat.ts).
    */
   payment?: Record<string, unknown> | null;
+  /** beta.3: trilha das revisões de estornos feitas pela pessoa (ver domain/refundReview.ts). */
+  reviews?: Record<string, unknown>[];
 }
 
 /**

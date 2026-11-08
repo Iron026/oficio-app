@@ -152,9 +152,11 @@ export function pendingOccurrences(appointments: readonly Appointment[], today: 
     if (!dates.length) continue;
     const template = [...list].reverse().find((a) => !seriesOf(a)!.detached) ?? list[list.length - 1]!;
     const through = rule.until && rule.until < horizon ? rule.until : horizon;
+    // Datas já ocupadas por uma ocorrência da série (ex.: exceção com pagamento trazida de outra regra).
+    const taken = new Set(list.map((a) => a.date));
     for (const date of dates) {
       const id = occurrenceId(rule.id, date);
-      if (existing.has(id)) continue;
+      if (existing.has(id) || taken.has(date)) continue;
       const { v, ...ruleFields } = rule;
       out.push({
         id, createdAt: v, updatedAt: v,
@@ -217,3 +219,20 @@ export const sameRule = (a: Pick<SeriesRule, 'freq' | 'interval' | 'days' | 'unt
 
 /** Versão nova da regra, sempre maior que a anterior (mesmo no mesmo milissegundo): "X" < "X+" < "X++". */
 export const nextVersion = (prev: string, stamp: string) => (stamp > prev ? stamp : `${prev}+`);
+
+/**
+ * Ocorrências geradas e intocadas, sem pagamento, que a regra efetiva não prevê mais (passaram do término,
+ * da quantidade ou não caem nos dias da regra) — típico de um aparelho que gerou com a regra antiga offline.
+ * Só estas podem sair automaticamente; qualquer ocorrência tocada pela pessoa fica.
+ */
+export function staleOccurrences(appointments: readonly Appointment[], linked: ReadonlySet<string>): Appointment[] {
+  const out: Appointment[] = [];
+  for (const [, list] of seriesGroups(appointments)) {
+    const rule = effectiveRule(list);
+    if (!rule) continue;
+    const last = list[list.length - 1]!.date;
+    const allowed = new Set(seriesDates(rule, null, last));
+    for (const a of list) if (isPristineOccurrence(a) && !linked.has(a.id) && !allowed.has(a.date)) out.push(a);
+  }
+  return out;
+}

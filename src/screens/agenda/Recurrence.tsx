@@ -44,9 +44,9 @@ export function RepeatFields({ value, onChange, date, error }: { value: RepeatIn
               {DAYS.map((d, i) => {
                 const on = value.days.includes(i);
                 return (
-                  <button key={d} type="button" aria-pressed={on} aria-label={DAY_NAMES[i]} onClick={() => set({ days: on ? value.days.filter((x) => x !== i) : [...value.days, i].sort() })}
+                  <button key={d} type="button" aria-pressed={on} onClick={() => set({ days: on ? value.days.filter((x) => x !== i) : [...value.days, i].sort() })}
                     className={cx('press-soft min-h-11 min-w-11 rounded-full border px-2 text-sm font-semibold', on ? 'border-brand-500 bg-brand-600 text-white' : 'border-line')}>
-                    {d}
+                    <span aria-hidden="true">{d}</span><span className="sr-only">{DAY_NAMES[i]}</span>
                   </button>
                 );
               })}
