@@ -48,7 +48,8 @@ Os testes de `src/sync/compat05.test.ts` falhavam com o código da beta.3 (13 de
 - **Pagamento:** `receita` com `appointmentId` do serviço e `payment` não nulo (ex.: `{ "method": "pix" }`).
   Pode haver vários por serviço. Nunca é removido automaticamente.
 - **Estorno:** `despesa` com `appointmentId` do serviço e `payment` não nulo (ex.: `{ "kind": "estorno", "of": "<id do pagamento>" }`).
-  Reduz o saldo como qualquer despesa e é descontado do pago.
+  Desde a beta.2 é uma movimentação própria (fora das despesas operacionais); reduz o saldo uma vez e é
+  descontado do pago.
 - **Pago** = Σ receitas vinculadas − Σ estornos vinculados (nunca negativo). Receitas automáticas antigas,
   sem marcador, também contam como pagas — os saldos históricos não mudam.
 - A 0.5 **não** deve apontar `appointment.transactionId` para um pagamento. Se apontar, a beta.4 trata como
@@ -86,6 +87,16 @@ sincronização. Por isso o gerador da 0.5 não pode “preencher buracos”: el
 | Registros da beta.1 | Lidos da nova forma sem regravar nada (mesmo marcador); backup e sincronização inalterados |
 | Extrato | CSV e PDF com o tipo “Estorno”; o PDF ganha o quadro “Estornos” quando houver |
 | Regras do Firestore | Sem mudança |
+
+## O que a 0.5.0-beta.3 mudou
+
+| Situação | Na 0.5.0-beta.3 |
+| --- | --- |
+| Estornos incoerentes entre aparelhos | Detectados de forma determinística (`domain/refundReview.ts`): Σ estornos de um pagamento > pagamento, ou estorno cujo pagamento não existe. Nada é apagado; o serviço fica “Revisar estornos” e Finanças avisa |
+| Decisão da pessoa | “Manter”: `payment.review = { ack: <assinatura do conjunto>, at }` em cada estorno do grupo (um estorno novo ou valor diferente reabre a revisão). “Remover”: exclui o estorno escolhido e anota no pagamento `payment.reviews: [{ at, decision: 'removido', refund }]` |
+| Limpeza automática de estornos | **Removida.** A chave `estorno:<pagamento>:<estornado antes>` deixou de ser gravada e de ser usada pela sincronização. Só a quitação de pagamentos (`quitacao:…`) continua deduplicada |
+| Aparelho na beta.2 | Continua removendo estornos antigos com a mesma chave (comportamento dela). Estornos da beta.3 não têm chave, então nenhuma versão os remove |
+| Regras do Firestore | Sem mudança (os campos novos ficam dentro de `payment`, que não é validado campo a campo) |
 
 ## Riscos que continuam
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarClock, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, FileDown, Receipt, Undo2 } from 'lucide-react';
+import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, FileDown, Receipt, Undo2 } from 'lucide-react';
 import { byCategory, futureServiceDateFor, movementKind, sortByDateDesc, totals, transactionsInMonth, transactionLabel, type MovementKind } from '../domain/finance';
 import type { Transaction, TransactionType } from '../domain/types';
 import { addMonths, formatDateShort, monthKey, monthLabel, parseDateKey, relativeDayLabel } from '../lib/dates';
@@ -12,6 +12,9 @@ import { TransactionFormSheet } from './forms/TransactionForm';
 import { HeroSlot } from './Shell';
 import { isLinkedIncome, isPayment, receivables } from '../domain/payments';
 import { StatementSheet } from './StatementExport';
+import { refundIssues } from '../domain/refundReview';
+import { Sheet } from '../ui/Sheet';
+import { RefundReviewCard } from './payments/RefundReview';
 
 type Filter = 'todos' | MovementKind;
 
@@ -22,6 +25,9 @@ export function Finance() {
   const [creating, setCreating] = useState<TransactionType | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  // beta.3: estornos incoerentes entre aparelhos (todos os meses) ficam visíveis até a pessoa revisar.
+  const issues = useMemo(() => refundIssues(data.transactions), [data.transactions]);
 
   const monthTx = useMemo(() => transactionsInMonth(data.transactions, month), [data.transactions, month]);
   const sum = totals(monthTx);
@@ -75,6 +81,17 @@ export function Finance() {
             <span className="text-muted">A receber · {due.count} {due.count === 1 ? 'serviço concluído' : 'serviços concluídos'} <span className="block text-xs">Fora do saldo até ser recebido</span></span>
             <span className="font-bold"><Money cents={due.pending} /></span>
           </p>
+        )}
+        {issues.length > 0 && (
+          <button type="button" onClick={() => setReviewing(true)} data-refund-issues={issues.length}
+            className="press-soft mt-3 flex w-full items-center gap-3 rounded-xl border border-red-300 bg-red-50 px-3.5 py-2.5 text-left text-sm dark:border-red-500/40 dark:bg-red-500/10">
+            <AlertTriangle size={18} className="shrink-0 text-red-700 dark:text-red-300" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold text-red-800 dark:text-red-200">{issues.length === 1 ? 'Estornos para revisar' : `${issues.length} grupos de estornos para revisar`}</span>
+              <span className="block text-xs text-muted">Registrados em aparelhos diferentes sem internet. Os totais incluem esses valores até você revisar.</span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden="true" />
+          </button>
         )}
         {topExpenses.length > 0 && (
           <div className="mt-5 space-y-3">
@@ -140,6 +157,21 @@ export function Finance() {
       )}
       <TransactionFormSheet open={!!creating} defaultType={creating ?? 'receita'} onClose={() => setCreating(null)} />
       <TransactionFormSheet open={!!editing} transaction={editing ?? undefined} onClose={() => setEditing(null)} />
+      <Sheet open={reviewing} onClose={() => setReviewing(false)} title="Revisar estornos">
+        <div className="space-y-4">
+          {issues.length === 0 && <p className="text-sm text-muted">Tudo revisado.</p>}
+          {issues.map((issue) => {
+            const ap = data.appointments.find((a) => a.id === issue.appointmentId);
+            const client = ap?.clientId ? data.clients.find((c) => c.id === ap.clientId) : undefined;
+            return (
+              <div key={issue.signature} className="space-y-2">
+                <p className="text-sm font-semibold">{ap ? `${ap.title}${client ? ` · ${client.name}` : ''}` : `${profession.terms.service} excluíd${profession.terms.serviceArticle === 'a' ? 'a' : 'o'}`}</p>
+                <RefundReviewCard issue={issue} />
+              </div>
+            );
+          })}
+        </div>
+      </Sheet>
       <StatementSheet open={exporting} onClose={() => setExporting(false)} monthKey={month} monthTitle={monthLabel(month)} count={monthTx.length} />
     </div>
   );

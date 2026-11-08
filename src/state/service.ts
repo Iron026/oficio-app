@@ -3,6 +3,7 @@ import { getProfession } from '../domain/professions';
 import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, ServiceType, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
 import { compareVersions } from '../domain/compat';
 import { paymentSummary, type PaymentMark, type PaymentMethod } from '../domain/payments';
+import { refundGroups, reviewLog } from '../domain/refundReview';
 import { MAX_SERVICE_TYPES, moveServiceType, nextServiceOrder, serviceNameKey } from '../domain/serviceTypes';
 import { isValidProfileImage } from '../domain/profileImage';
 import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
@@ -537,7 +538,9 @@ export class AppService {
       const date = input.date ?? todayKey(this.now());
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Data inválida.');
       const stamp = this.stamp();
-      const mark: PaymentMark = { kind: 'estorno', of: paymentId, key: input.amount === 'total' ? `estorno:${paymentId}:${already}` : null };
+      // beta.3: estornos não levam chave de deduplicação — nenhuma versão os remove automaticamente.
+      // Incoerências entre aparelhos (estornos acima do pago) vão para revisão (refundReview.ts).
+      const mark: PaymentMark = { kind: 'estorno', of: paymentId, key: null };
       const tx: Transaction = {
         id: input.opId ? `es-${input.opId}` : newId(), createdAt: stamp, updatedAt: stamp, ...(p.isDemo ? { isDemo: true } : {}),
         type: 'despesa', amount: value, description: `Estorno: ${p.description || 'pagamento'}`, category: 'Estorno', date,
@@ -547,6 +550,48 @@ export class AppService {
       this.set({ ...this._data, transactions: [...this._data.transactions, tx] });
       const undo = this.recordUndo('Estorno registrado', [{ collection: 'transactions', id: tx.id, before: null, after: tx }]);
       return { transaction: tx, undo };
+    });
+  }
+
+  /**
+   * Resolve um grupo de estornos incoerente (beta.3), sempre por decisão da pessoa:
+   *  - `manter`: os estornos aconteceram de verdade; grava a confirmação (`payment.review`) em cada estorno
+   *    do grupo, presa à assinatura do conjunto (um estorno novo reabre a revisão);
+   *  - `remover`: exclui o estorno escolhido (registrado por engano, por exemplo, nos dois aparelhos) e
+   *    anota no pagamento o que foi removido, quando e por quê (`payment.reviews`).
+   * Nunca dá XP. Reversível pelo "Desfazer".
+   */
+  resolveRefundIssue(signature: string, decision: { keep: true } | { remove: string }): Promise<UndoTicket> {
+    return this.run(async () => {
+      const issue = refundGroups(this._data.transactions).find((g) => g.signature === signature);
+      if (!issue) throw new Error('Estes estornos mudaram desde a revisão. Confira de novo.');
+      const stamp = this.stamp();
+      const changes: { collection: 'transactions'; id: string; before: Transaction | null; after: Transaction | null }[] = [];
+      let transactions = this._data.transactions;
+      if ('keep' in decision) {
+        for (const r of issue.refunds) {
+          const after: Transaction = { ...r, updatedAt: stamp, payment: { ...(r.payment ?? {}), review: { ack: signature, at: stamp } } };
+          await this.storage.transactions.put(after);
+          changes.push({ collection: 'transactions', id: r.id, before: r, after });
+          transactions = transactions.map((t) => (t.id === r.id ? after : t));
+        }
+      } else {
+        const r = issue.refunds.find((x) => x.id === decision.remove);
+        if (!r) throw new Error('Estorno não encontrado.');
+        await this.storage.transactions.remove(r.id);
+        changes.push({ collection: 'transactions', id: r.id, before: r, after: null });
+        transactions = transactions.filter((t) => t.id !== r.id);
+        if (issue.payment) {
+          const p = issue.payment;
+          const log = [...reviewLog(p), { at: stamp, decision: 'removido' as const, refund: { id: r.id, amount: r.amount, date: r.date, createdAt: r.createdAt } }];
+          const after: Transaction = { ...p, updatedAt: stamp, payment: { ...(p.payment ?? {}), reviews: log } };
+          await this.storage.transactions.put(after);
+          changes.push({ collection: 'transactions', id: p.id, before: p, after });
+          transactions = transactions.map((t) => (t.id === p.id ? after : t));
+        }
+      }
+      this.set({ ...this._data, transactions });
+      return this.recordUndo('keep' in decision ? 'Estornos confirmados' : 'Estorno removido na revisão', changes);
     });
   }
 

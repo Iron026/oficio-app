@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Check, CircleDollarSign, Undo2 } from 'lucide-react';
 import { PAYMENT_METHODS, PAYMENT_STATE_LABEL, paymentSummary, type PaymentEntry, type PaymentMethod, type PaymentSummary } from '../../domain/payments';
-import type { Appointment } from '../../domain/types';
+import type { RefundIssue } from '../../domain/refundReview';
+import type { Appointment, Transaction } from '../../domain/types';
+import { RefundReviewCard } from './RefundReview';
 import { formatDateShort, todayKey } from '../../lib/dates';
 import { newId } from '../../lib/id';
 import { centsToInput, formatMoney, parseMoney } from '../../lib/money';
@@ -17,12 +19,13 @@ import { Sheet } from '../../ui/Sheet';
 import { useToast } from '../../ui/Toast';
 
 const STATE_TONE: Record<PaymentSummary['state'], StatusTone> = {
-  'sem-valor': 'neutral', 'nao-registrado': 'neutral', pendente: 'warning', parcial: 'warning', pago: 'success', excedente: 'info', cancelado: 'neutral',
+  'sem-valor': 'neutral', 'nao-registrado': 'neutral', pendente: 'warning', parcial: 'warning', pago: 'success', excedente: 'info', cancelado: 'neutral', revisar: 'danger',
 };
 
 /** Selo curto da situação financeira (lista da agenda e cabeçalho do resumo). */
 export function PaymentBadge({ a, s }: { a: Appointment; s: PaymentSummary }) {
   const hidden = useHideValues();
+  if (s.state === 'revisar') return <StatusBadge tone={STATE_TONE.revisar}>{PAYMENT_STATE_LABEL.revisar}</StatusBadge>;
   if (s.state === 'sem-valor' || s.state === 'cancelado') return null;
   if (a.status === 'agendado') {
     if (s.net <= 0) return null;
@@ -52,9 +55,10 @@ export function PaymentPanel({ a, onPay, onRefund }: { a: Appointment; onPay: ()
         {s.refunded > 0 && <div className="rounded-xl bg-surface-2 p-2.5"><dt className="text-muted">Estornado</dt><dd className="font-semibold text-expense"><Money cents={s.refunded} /></dd></div>}
         <div className={cx('rounded-xl p-2.5', s.pending > 0 ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-surface-2')}>
           <dt className="text-muted">{s.excess > 0 ? 'Acima do combinado' : pendingLabel}</dt>
-          <dd className="font-semibold">{s.state === 'nao-registrado' ? 'Não registrado' : s.state === 'cancelado' ? 'Nada a receber' : <Money cents={s.excess > 0 ? s.excess : s.pending} />}</dd>
+          <dd className="font-semibold">{s.state === 'revisar' ? 'Em revisão' : s.state === 'nao-registrado' ? 'Não registrado' : s.state === 'cancelado' ? 'Nada a receber' : <Money cents={s.excess > 0 ? s.excess : s.pending} />}</dd>
         </div>
       </dl>
+      {s.review.map((issue) => <RefundReviewCard key={issue.signature} issue={issue as RefundIssue<Transaction>} />)}
       {s.state === 'nao-registrado' && (
         <p className="text-xs text-muted">Concluído antes da 0.5 sem receita lançada. O app não presume se foi pago: registre o pagamento se tiver recebido.</p>
       )}

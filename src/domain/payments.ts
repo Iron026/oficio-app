@@ -6,6 +6,8 @@
  *  - estorno   = despesa com `appointmentId` e `payment: { kind: 'estorno', of: <id do pagamento> }`;
  *  - receita automática da 0.4 (sem marcador) = pagamento integral legado.
  */
+import { isLinkedIncome, isPayment, isRefund, mark, refundOf } from './paymentMarks';
+import { refundIssues, type RefundIssue } from './refundReview';
 import type { Appointment, Transaction } from './types';
 
 export type PaymentMethod = 'dinheiro' | 'pix' | 'cartao' | 'transferencia' | 'outra';
@@ -31,12 +33,7 @@ export interface PaymentMark {
 type Tx = Pick<Transaction, 'id' | 'type' | 'amount' | 'date' | 'appointmentId' | 'createdAt'> & { payment?: Record<string, unknown> | null };
 type Ap = Pick<Appointment, 'id' | 'price' | 'status' | 'date'> & { payments?: boolean; transactionId?: string | null };
 
-const mark = (t: { payment?: unknown }) => (t.payment && typeof t.payment === 'object' ? (t.payment as Record<string, unknown>) : null);
-export const isRefund = (t: Tx) => t.type === 'despesa' && mark(t) != null && mark(t)!.kind === 'estorno';
-/** Receita vinculada a um serviço: pagamento da 0.5 ou receita automática da 0.4. */
-export const isLinkedIncome = (t: Tx) => t.type === 'receita' && typeof t.appointmentId === 'string' && t.appointmentId !== '';
-export const isPayment = (t: Tx) => isLinkedIncome(t) && mark(t) != null;
-export const refundOf = (t: Tx): string | null => (isRefund(t) && typeof mark(t)!.of === 'string' ? (mark(t)!.of as string) : null);
+export { isLinkedIncome, isPayment, isRefund, refundOf };
 
 export type PaymentState =
   | 'sem-valor' // preço 0 e nada recebido
@@ -45,7 +42,8 @@ export type PaymentState =
   | 'parcial'
   | 'pago'
   | 'excedente' // recebido acima do combinado
-  | 'cancelado'; // cancelado: nada é devido; o que entrou continua visível
+  | 'cancelado' // cancelado: nada é devido; o que entrou continua visível
+  | 'revisar'; // beta.3: estornos incoerentes entre aparelhos (acima do pago ou sem pagamento) à espera da pessoa
 
 export interface PaymentEntry {
   tx: Tx;
@@ -73,6 +71,8 @@ export interface PaymentSummary {
   /** Algum pagamento antes da data do serviço. */
   advance: boolean;
   entries: PaymentEntry[];
+  /** beta.3: grupos de estornos deste serviço que precisam de revisão (ver refundReview.ts). */
+  review: RefundIssue[];
 }
 
 /** Lançamentos vinculados ao serviço, do mais antigo para o mais recente. */
@@ -106,9 +106,13 @@ export function paymentSummary(a: Ap, transactions: readonly Tx[]): PaymentSumma
   const legacyPaid = !!a.transactionId && linked.some((t) => t.id === a.transactionId);
   const tracked = a.payments === true || received > 0 || refunded > 0 || legacyPaid;
   const excess = Math.max(0, net - a.price);
+  const review = refundIssues(linked);
   let state: PaymentState;
   let pending = 0;
-  if (a.status === 'cancelado') state = 'cancelado';
+  if (review.length) {
+    // Valores incertos até a revisão: nada fica "a receber" nem é apresentado como quitado.
+    state = 'revisar';
+  } else if (a.status === 'cancelado') state = 'cancelado';
   else if (!tracked && a.status === 'concluido') state = 'nao-registrado';
   else if (a.price === 0 && net <= 0) state = 'sem-valor';
   else {
@@ -117,7 +121,7 @@ export function paymentSummary(a: Ap, transactions: readonly Tx[]): PaymentSumma
   }
   return {
     contracted: a.price, received, refunded, net, pending, excess, state, tracked,
-    advance: entries.some((e) => e.kind !== 'estorno' && e.early), entries,
+    advance: entries.some((e) => e.kind !== 'estorno' && e.early), entries, review,
   };
 }
 
@@ -129,6 +133,7 @@ export const PAYMENT_STATE_LABEL: Record<PaymentState, string> = {
   pago: 'Pago',
   excedente: 'Recebido acima do combinado',
   cancelado: 'Cancelado',
+  revisar: 'Revisar estornos',
 };
 
 /** Total a receber (serviços concluídos com controle ativo). Previsto (agendados) fica separado. */
@@ -157,6 +162,9 @@ export function duplicatePaymentIds(transactions: readonly { id: string; type?: 
   }
   const groups = new Map<string, { id: string; createdAt: string }[]>();
   for (const t of transactions) {
+    // beta.3: só pagamentos (quitação). Estornos nunca são removidos automaticamente — incoerências
+    // entre aparelhos vão para revisão da pessoa (refundReview.ts).
+    if (t.type !== 'receita' || mark(t)?.kind !== 'pagamento') continue;
     const key = mark(t)?.key;
     if (typeof key !== 'string' || !key) continue;
     const g = groups.get(key) ?? [];

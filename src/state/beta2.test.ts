@@ -6,6 +6,7 @@
 import { byCategory, monthTotals, movementKind, totals } from '../domain/finance';
 import { buildStatement, statementCsv } from '../domain/statement';
 import { paymentSummary } from '../domain/payments';
+import { refundIssues } from '../domain/refundReview';
 import type { Transaction } from '../domain/types';
 import { totalXp } from '../gamification/engine';
 import { statementPdf } from '../lib/statementPdf';
@@ -155,7 +156,7 @@ describe('beta.2: sincronização e modo offline', () => {
     expect([...a.sync.conflicts, ...b.sync.conflicts]).toEqual([]);
   });
 
-  it('"estornar tudo" nos dois aparelhos offline vira um único estorno', async () => {
+  it('beta.3: "estornar tudo" nos dois aparelhos offline mantém os dois e pede revisão (nada some sozinho)', async () => {
     const { remote, a, b } = await pair();
     const x = await appt(a.service, '100,00');
     const { transaction: p } = await a.service.registerPayment(x.id, { amount: 10_000 });
@@ -167,7 +168,10 @@ describe('beta.2: sincronização e modo offline', () => {
     remote.offline = false;
     await all(a, b);
     await all(a, b);
-    for (const d of [a, b]) expect(totals(d.service.data.transactions)).toEqual({ income: 10_000, refund: 10_000, expense: 0, balance: 0 });
+    for (const d of [a, b]) {
+      expect(totals(d.service.data.transactions)).toEqual({ income: 10_000, refund: 20_000, expense: 0, balance: -10_000 });
+      expect(refundIssues(d.service.data.transactions)).toMatchObject([{ kind: 'acima-do-pago', excess: 10_000 }]);
+    }
   });
 
   it('duração: apagar num aparelho (null) sincroniza; sem duração nunca vira 60 min no outro', async () => {

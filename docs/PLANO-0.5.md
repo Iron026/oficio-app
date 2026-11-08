@@ -55,3 +55,29 @@ sobrepostos de atendimentos não cancelados; aviso ao salvar e marcador nas vis�
 2. Interface: concluir sem pré-seleção; folha de pagamentos (histórico, registrar, estornar).
 3. Agenda: duração, visões, navegação, conflitos.
 4. Versão 0.5.0-beta.1, documentação, CI, varredura visual, Android (instalação por cima da 0.4.0-beta.7).
+
+## 0.5.0-beta.3 (a partir de `9ab2bfe`, beta.2 aprovada)
+
+Decisões da beta.2 que prevalecem sobre o texto antigo da proposta: duração opcional (nada presumido), visão Dia
+abrindo no topo sem rolagem automática (“Ir para agora” removido; “Primeiro atendimento” rola só quando tocado),
+estornos fora das despesas operacionais.
+
+### Auditoria
+
+| Área | Situação | Consequência |
+| --- | --- | --- |
+| Estornos | Dois aparelhos offline podem estornar acima do pago; “estornar tudo” repetido era apagado em silêncio pela chave; pagamento excluído num aparelho enquanto o outro estorna deixava estorno órfão sem aviso | Detecção determinística + revisão pela pessoa; sincronização não apaga estornos |
+| Exclusões na sincronização | Registro excluído na nuvem e criado aqui com o mesmo id volta e vira conflito “excluído na nuvem” | Ocorrência gerada e intocada (`series.auto`, `updatedAt = createdAt`) aceita a exclusão; nada reaparece |
+| Mesmo registro criado nos dois aparelhos | Sem base comum, toda diferença (inclusive `createdAt`) vira conflito | Ocorrências geradas são determinísticas (mesmo id e mesmos campos, `createdAt` da regra) |
+| XP | Missão semanal “agendamentos” conta registros criados na semana | Ocorrências geradas não contam; só a criação da série dá XP |
+| Backup | `series` precisa ser objeto | Mantido; sem formato novo |
+| Clientes | Detalhe mostra dados e lista simples | Histórico derivado (`domain/clientHistory.ts`), sem campos novos |
+| Busca | Inexistente | Índice em memória, no aparelho |
+
+### Entregas (commits separados)
+
+1. Integridade dos estornos (domínio, serviço, sincronização, interface, testes).
+2. Recorrência: domínio (datas, 29/30/31, limites), gerador sem lacunas, sincronização das ocorrências, escopos de
+   edição e cancelamento, XP, interface.
+3. Histórico do cliente. 4. Busca global. 5. Versão 0.5.0-beta.3, documentação, varredura visual (360/412) e
+   Android com atualização por cima da beta.2.
