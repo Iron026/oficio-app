@@ -4,6 +4,7 @@ import { CalendarDays, LayoutDashboard, Settings, TrendingUp, Users, Wallet, Tri
 import { useApp } from '../state/AppContext';
 import { navigate, type Route } from '../state/router';
 import { IconButton } from '../ui/Button';
+import { SearchButton } from './Search';
 import { SyncIndicator } from './Account';
 import { cx } from '../ui/cx';
 import { LOGO } from '../ui/brand';
@@ -82,6 +83,7 @@ export function Shell({ route, pageKey = route, title, children, action }: { rou
             <Logo size={28} onHero />
             <h1 ref={titleRef} tabIndex={-1} className="min-w-0 flex-1 truncate font-display text-lg font-extrabold leading-tight outline-none">{title}</h1>
             {action}
+            <SearchButton />
             <SyncIndicator onHero />
             <IconButton label="Ajustes" onClick={() => navigate('ajustes')} aria-current={route === 'ajustes' ? 'page' : undefined} className={cx('text-white hover:bg-white/15 hover:text-white', route === 'ajustes' && 'bg-white/15')}>
               <Settings size={22} />

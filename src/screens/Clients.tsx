@@ -115,7 +115,7 @@ export function Clients() {
   );
 }
 
-function ClientDetail({ client, onClose }: { client: Client; onClose: () => void }) {
+export function ClientDetail({ client, onClose }: { client: Client; onClose: () => void }) {
   const { data, service, profession } = useApp();
   const t = profession.terms;
   const confirm = useConfirm();
