@@ -56,6 +56,15 @@ describe('histórico do cliente', () => {
     expect(h.timeline.some((e) => e.kind === 'atendimento' && e.a.title === 'Escova')).toBe(false); // futuro fica em "Próximos"
   });
 
+  it('pagamento que completa o valor depois de um antecipado é "do restante", não "parcial"', async () => {
+    const { s, client } = await setup();
+    const ap = (await s.saveAppointment({ title: 'Mechas', clientId: client.id, date: '2026-11-09', time: '10:00', price: '300,00', notes: '' })).appointment;
+    await s.registerPayment(ap.id, { amount: 10_000, date: '2026-11-08' });
+    await s.completeAppointment(ap.id, { payment: { mode: 'integral', date: '2026-11-09' } });
+    const kinds = clientHistory(client.id, s.data.appointments, s.data.transactions, TODAY).timeline.filter((e) => e.kind === 'dinheiro' && e.a.id === ap.id).map((e) => (e.kind === 'dinheiro' ? e.money : ''));
+    expect(kinds.sort()).toEqual(['antecipado', 'restante']);
+  });
+
   it('serviço antigo sem receita: "não registrado" (não vira pendente); cliente excluído some do histórico; consulta não dá XP', async () => {
     const { s, client } = await setup();
     const json = JSON.parse(s.exportBackup());

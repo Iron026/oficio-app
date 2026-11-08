@@ -5,7 +5,8 @@
 import { paymentSummary, type PaymentState, type PaymentSummary } from './payments';
 import type { Appointment, Transaction } from './types';
 
-export type MoneyKind = 'antecipado' | 'parcial' | 'integral' | 'legado' | 'estorno';
+/** `restante`: completou o valor combinado depois de outro(s) pagamento(s) (quitação). */
+export type MoneyKind = 'antecipado' | 'parcial' | 'restante' | 'integral' | 'legado' | 'estorno';
 
 export type TimelineEntry =
   | { kind: 'atendimento'; key: string; date: string; a: Appointment; s: PaymentSummary }
@@ -63,9 +64,15 @@ export function clientHistory(clientId: string, appointments: readonly Appointme
     } else {
       h.timeline.push({ kind: 'atendimento', key: `a:${a.id}`, date: a.date, a, s });
     }
+    let paidBefore = 0; // líquido recebido antes deste lançamento (as entradas vêm em ordem cronológica)
     for (const e of s.entries) {
+      const before = paidBefore;
+      paidBefore += e.kind === 'estorno' ? -e.tx.amount : e.tx.amount;
       const money: MoneyKind = e.kind === 'estorno' ? 'estorno' : e.kind === 'legado' ? 'legado'
-        : e.early ? 'antecipado' : e.tx.amount >= a.price && a.price > 0 ? 'integral' : 'parcial';
+        : e.early ? 'antecipado'
+        : a.price > 0 && before <= 0 && e.tx.amount >= a.price ? 'integral'
+        : a.price > 0 && before > 0 && before + e.tx.amount >= a.price ? 'restante'
+        : 'parcial';
       h.timeline.push({ kind: 'dinheiro', key: `t:${e.tx.id}`, date: e.tx.date, a, tx: e.tx as Transaction, money });
     }
   }
@@ -79,6 +86,7 @@ export function clientHistory(clientId: string, appointments: readonly Appointme
 export const MONEY_LABEL: Record<MoneyKind, string> = {
   antecipado: 'Pagamento antecipado',
   parcial: 'Pagamento parcial',
+  restante: 'Pagamento do restante',
   integral: 'Pagamento integral',
   legado: 'Receita lançada (0.4)',
   estorno: 'Estorno',

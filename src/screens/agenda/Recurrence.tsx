@@ -37,7 +37,7 @@ export function RepeatFields({ value, onChange, date, error }: { value: RepeatIn
           {value.freq !== 'quinzenal' && (
             <TextField label={`A cada quantos ${UNIT[value.freq]![1]}`} inputMode="numeric" value={value.interval}
               onChange={(e) => set({ interval: e.target.value.replace(/\D/g, '').slice(0, 2) })}
-              hint={value.interval === '1' ? `Todo${value.freq === 'diaria' ? ' dia' : value.freq === 'semanal' ? 'a semana' : ' mês'}.` : undefined} />
+              hint={value.interval === '1' ? (value.freq === 'diaria' ? 'Todos os dias.' : value.freq === 'semanal' ? 'Toda semana.' : 'Todo mês.') : undefined} />
           )}
           {weekly && (
             <div role="group" aria-label="Dias da semana" className="flex flex-wrap gap-1.5">
