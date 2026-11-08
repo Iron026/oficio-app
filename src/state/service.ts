@@ -4,6 +4,8 @@ import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, Se
 import { compareVersions } from '../domain/compat';
 import { paymentSummary, type PaymentMark, type PaymentMethod } from '../domain/payments';
 import { refundGroups, reviewLog } from '../domain/refundReview';
+import { addDaysKey } from '../domain/agenda';
+import { effectiveRule, isPristineOccurrence, nextVersion, occurrenceId, pendingOccurrences, ruleFromRepeat, sameRule, seriesDates, seriesGroups, seriesOf } from '../domain/recurrence';
 import { MAX_SERVICE_TYPES, moveServiceType, nextServiceOrder, serviceNameKey } from '../domain/serviceTypes';
 import { isValidProfileImage } from '../domain/profileImage';
 import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
@@ -52,6 +54,8 @@ export type CompletePayment =
   | { mode: 'parcial'; amount: number; method?: PaymentMethod | null; date?: string }
   | { mode: 'nenhum' };
 export interface CompleteOptions { payment: CompletePayment; opId?: string }
+/** beta.3: alcance de uma edição ou cancelamento numa série. */
+export type EditScope = 'esta' | 'proximas' | 'serie';
 export const UNDO_TTL_MS = 30_000;
 
 type UndoCollection = 'appointments' | 'transactions' | 'clients';
@@ -400,12 +404,18 @@ export class AppService {
 
   // ------------------------------------------------------------ agenda
 
-  saveAppointment(input: AppointmentInput, id?: string): Promise<{ appointment: Appointment; feedback: Feedback }> {
+  /**
+   * Agenda ou edita. beta.3: com `input.repeat` (ao criar) nasce uma série; numa ocorrência de série, `scope`
+   * escolhe "só esta" (vira exceção), "esta e as próximas" ou "toda a série" (desde a primeira em aberto).
+   */
+  saveAppointment(input: AppointmentInput, id?: string, scope: EditScope = 'esta'): Promise<{ appointment: Appointment; feedback: Feedback }> {
     return this.run(async () => {
       const errors = validateAppointment(input);
       if (hasErrors(errors)) throw new ValidationError(errors);
       const existing = id ? this._data.appointments.find((a) => a.id === id) : undefined;
       if (id && !existing) throw new Error('Agendamento não encontrado');
+      if (!existing && input.repeat?.freq) return this.createSeries(input);
+      if (existing && seriesOf(existing) && scope !== 'esta') return this.editSeries(existing, input, scope);
       const stamp = this.stamp();
       const appointment: Appointment = {
         ...existing,
@@ -417,6 +427,8 @@ export class AppService {
         status: existing?.status ?? 'agendado', completedAt: existing?.completedAt ?? null, transactionId: existing?.transactionId ?? null,
         // 0.5: serviço novo nasce com controle de pagamento; os antigos não são reinterpretados.
         ...(existing ? {} : { payments: true }),
+        // Ocorrência de série editada sozinha vira exceção: fica fora das edições em lote e do modelo do gerador.
+        ...(existing && seriesOf(existing) ? { series: { ...existing.series, detached: true } } : {}),
         // Duração só é gravada quando informada; nada é presumido. "Não informar" ('') num registro que
         // tinha duração grava null (ausência explícita, que sincroniza e passa pelas regras e pelo backup).
         // Sem o campo na entrada (chamadas antigas), a duração existente fica como está.
@@ -628,9 +640,159 @@ export class AppService {
       const a = this._data.appointments.find((x) => x.id === id);
       if (!a) return null;
       await this.storage.appointments.remove(id);
-      this.set({ ...this._data, appointments: this._data.appointments.filter((x) => x.id !== id) });
+      let appointments = this._data.appointments.filter((x) => x.id !== id);
+      const changes: UndoEntry['changes'] = [{ collection: 'appointments', id, before: a, after: null }];
+      // beta.3: a ocorrência excluída nunca volta. Se nenhuma outra da série "lembra" até onde ela já foi
+      // gerada, grava esse limite na mais recente que sobrou (o gerador só cria depois dele).
+      const s = seriesOf(a);
+      if (s) {
+        const rest = seriesGroups(appointments).get(s.id) ?? [];
+        const rule = effectiveRule(rest);
+        if (rule && rule.through < a.date) {
+          const last = rest[rest.length - 1]!;
+          const after: Appointment = { ...last, updatedAt: this.stamp(), series: { ...last.series, through: a.date } };
+          await this.storage.appointments.put(after);
+          appointments = appointments.map((x) => (x.id === last.id ? after : x));
+          changes.push({ collection: 'appointments', id: last.id, before: last, after });
+        }
+      }
+      this.set({ ...this._data, appointments });
       const terms = getProfession(this._data.profile?.professionId).terms;
-      return this.recordUndo(`${terms.service} ${terms.serviceArticle === 'a' ? 'excluída' : 'excluído'}`, [{ collection: 'appointments', id, before: a, after: null }]);
+      return this.recordUndo(`${terms.service} ${terms.serviceArticle === 'a' ? 'excluída' : 'excluído'}`, changes);
+    });
+  }
+
+  // ------------------------------------------------------------ recorrência (beta.3)
+
+  /**
+   * Materializa as ocorrências que faltam (até 90 dias, no máximo 120 por série). Idempotente e sem XP:
+   * só a criação da série conta como agendamento. Chamado ao abrir o app e a Agenda.
+   */
+  extendSeries(): Promise<number> {
+    return this.run(async () => (await this.materialize()).length);
+  }
+
+  private async materialize(): Promise<Appointment[]> {
+    const created = pendingOccurrences(this._data.appointments, todayKey(this.now()));
+    if (!created.length) return [];
+    for (const a of created) await this.storage.appointments.put(a);
+    this.set({ ...this._data, appointments: [...this._data.appointments, ...created] });
+    return created;
+  }
+
+  private linkedIds() {
+    return new Set(this._data.transactions.map((t) => t.appointmentId).filter((x): x is string => !!x));
+  }
+
+  private async createSeries(input: AppointmentInput): Promise<{ appointment: Appointment; feedback: Feedback }> {
+    const stamp = this.stamp();
+    const base = ruleFromRepeat(input.repeat!, input.date, newId(), stamp)!;
+    const first = seriesDates(base, null, addDaysKey(input.date, 400))[0];
+    if (!first) throw new ValidationError<AppointmentInput>({ repeat: 'Esta repetição não tem nenhuma data. Revise o término.' });
+    const appointment: Appointment = {
+      id: occurrenceId(base.id, first), createdAt: stamp, updatedAt: stamp,
+      title: input.title.trim(),
+      clientId: input.clientId && this._data.clients.some((c) => c.id === input.clientId) ? input.clientId : null,
+      date: first, time: input.time, price: parseMoney(input.price) ?? 0, notes: input.notes.trim(),
+      status: 'agendado', completedAt: null, transactionId: null, payments: true,
+      ...(input.duration ? { duration: Number(input.duration) } : {}),
+      series: { ...base, through: first, auto: false, detached: false } as unknown as Record<string, unknown>,
+    };
+    await this.storage.appointments.put(appointment);
+    this.set({ ...this._data, appointments: [...this._data.appointments, appointment] });
+    await this.materialize();
+    // Uma série = um agendamento para o XP (as ocorrências geradas não contam).
+    const feedback = await this.gamify({ type: 'appointment_created', id: appointment.id, label: 'Novo agendamento', isDemo: appointment.isDemo });
+    return { appointment, feedback };
+  }
+
+  /** Primeira ocorrência atingida por "esta e as próximas" (a própria) ou "toda a série" (a primeira em aberto). */
+  private seriesStart(existing: Appointment, scope: Exclude<EditScope, 'esta'>, list: Appointment[]) {
+    return scope === 'serie' ? (list.find((a) => a.status === 'agendado')?.date ?? existing.date) : existing.date;
+  }
+
+  private async editSeries(existing: Appointment, input: AppointmentInput, scope: Exclude<EditScope, 'esta'>): Promise<{ appointment: Appointment; feedback: Feedback }> {
+    const s = seriesOf(existing)!;
+    const list = seriesGroups(this._data.appointments).get(s.id) ?? [existing];
+    const rule = effectiveRule(list)!;
+    const from = this.seriesStart(existing, scope, list);
+    const anchor = list.find((a) => a.date === from && a.status === 'agendado') ?? existing;
+    const targets = list.filter((a) => a.id === anchor.id || (a.date >= from && a.status === 'agendado' && !seriesOf(a)!.detached));
+    const paid = this.linkedIds();
+    const stamp = this.stamp();
+    const changes: UndoEntry['changes'] = [];
+    let appointments = this._data.appointments;
+    const write = async (before: Appointment, after: Appointment | null) => {
+      if (after) await this.storage.appointments.put(after);
+      else await this.storage.appointments.remove(before.id);
+      changes.push({ collection: 'appointments', id: before.id, before, after });
+      appointments = after ? appointments.map((x) => (x.id === before.id ? after : x)) : appointments.filter((x) => x.id !== before.id);
+    };
+    const fields = (a: Appointment): Appointment => ({
+      ...a, updatedAt: stamp,
+      title: input.title.trim(),
+      clientId: input.clientId && this._data.clients.some((c) => c.id === input.clientId) ? input.clientId : null,
+      time: input.time, notes: input.notes.trim(),
+      // O valor combinado de quem já tem pagamento registrado não muda em lote.
+      price: paid.has(a.id) ? a.price : parseMoney(input.price) ?? 0,
+      ...(input.duration ? { duration: Number(input.duration) } : input.duration === '' && a.duration != null ? { duration: null } : {}),
+    });
+    const next = input.repeat?.freq ? ruleFromRepeat(input.repeat, from, newId(), stamp) : null;
+    if (!next || sameRule(next, rule)) {
+      for (const a of targets) await write(a, fields(a));
+    } else {
+      // Regra nova: uma série nova a partir de `from`. Ocorrências futuras intocadas e sem pagamento saem;
+      // as que têm pagamento ficam como exceções da série antiga; a antiga termina na véspera.
+      const first = seriesDates(next, null, addDaysKey(from, 400))[0];
+      if (!first) throw new ValidationError<AppointmentInput>({ repeat: 'Esta repetição não tem nenhuma data. Revise o término.' });
+      for (const a of targets) {
+        if (a.id === anchor.id) continue;
+        if (paid.has(a.id)) await write(a, { ...a, updatedAt: stamp, series: { ...a.series, detached: true } });
+        else await write(a, null);
+      }
+      await write(anchor, { ...fields(anchor), date: first, series: { ...next, through: first, auto: false, detached: false } as unknown as Record<string, unknown> });
+      const old = (seriesGroups(appointments).get(s.id) ?? []).filter((a) => !seriesOf(a)!.detached || a.date < from);
+      const last = old[old.length - 1];
+      if (last) await write(last, { ...last, updatedAt: stamp, series: { ...last.series, until: addDaysKey(from, -1), v: nextVersion(rule.v, stamp) } });
+    }
+    this.set({ ...this._data, appointments });
+    await this.materialize();
+    const appointment = this._data.appointments.find((a) => a.id === existing.id) ?? anchor;
+    const feedback = await this.gamify();
+    return { appointment, feedback: { ...feedback, undo: this.recordUndo('Série alterada', changes) } };
+  }
+
+  /**
+   * Cancela "esta e as próximas" ou "toda a série" (desde a primeira em aberto). A ocorrência escolhida fica
+   * cancelada e encerra a regra (nada novo é gerado); as futuras intocadas e sem pagamento saem; as que têm
+   * pagamento ou foram alteradas ficam canceladas, com o dinheiro preservado. Nada é recriado depois.
+   */
+  cancelSeries(id: string, scope: Exclude<EditScope, 'esta'>): Promise<UndoTicket> {
+    return this.run(async () => {
+      const existing = this._data.appointments.find((a) => a.id === id);
+      const s = existing ? seriesOf(existing) : null;
+      if (!existing || !s) throw new Error('Agendamento não encontrado');
+      const list = seriesGroups(this._data.appointments).get(s.id) ?? [existing];
+      const from = this.seriesStart(existing, scope, list);
+      const rule = effectiveRule(list)!;
+      const anchor = list.find((a) => a.date === from && a.status === 'agendado') ?? existing;
+      const paid = this.linkedIds();
+      const stamp = this.stamp();
+      const changes: UndoEntry['changes'] = [];
+      let appointments = this._data.appointments;
+      for (const a of list) {
+        if (a.date < from || a.status !== 'agendado') continue;
+        let after: Appointment | null;
+        if (a.id === anchor.id) after = { ...a, status: 'cancelado', completedAt: null, updatedAt: stamp, series: { ...a.series, until: addDaysKey(from, -1), v: nextVersion(rule.v, stamp) } };
+        else if (isPristineOccurrence(a) && !paid.has(a.id)) after = null;
+        else after = { ...a, status: 'cancelado', completedAt: null, updatedAt: stamp };
+        if (after) await this.storage.appointments.put(after);
+        else await this.storage.appointments.remove(a.id);
+        changes.push({ collection: 'appointments', id: a.id, before: a, after });
+        appointments = after ? appointments.map((x) => (x.id === a.id ? after! : x)) : appointments.filter((x) => x.id !== a.id);
+      }
+      this.set({ ...this._data, appointments });
+      return this.recordUndo(scope === 'serie' ? 'Série cancelada' : 'Próximas canceladas', changes);
     });
   }
 

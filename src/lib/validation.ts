@@ -31,9 +31,24 @@ export function validateClient(v: ClientInput): Errors<ClientInput> {
   return e;
 }
 
+/** beta.3: repetição. `quinzenal` = semanal a cada 2 semanas. */
+export interface RepeatInput {
+  freq: '' | 'diaria' | 'semanal' | 'quinzenal' | 'mensal';
+  interval: string;
+  /** Semanal: 0 = segunda … 6 = domingo. */
+  days: number[];
+  end: 'nunca' | 'data' | 'vezes';
+  until: string;
+  count: string;
+}
+
 export interface AppointmentInput { title: string; clientId: string; date: string; time: string; price: string; notes: string;
-  /** 0.5: duração em minutos (5–1440). Vazio/ausente = não altera (agendamentos antigos usam 60 sem gravar). */
-  duration?: string }
+  /** 0.5: duração em minutos (5–1440). '' = "Não informar"; ausente = não altera (chamadas antigas). */
+  duration?: string;
+  /** beta.3: repetição (só ao criar ou ao editar "esta e as próximas" / "toda a série"). */
+  repeat?: RepeatInput }
+
+const REPEAT_MAX_INTERVAL = { diaria: 30, semanal: 8, mensal: 12 } as const;
 
 export function validateAppointment(v: AppointmentInput): Errors<AppointmentInput> {
   const e: Errors<AppointmentInput> = {};
@@ -48,6 +63,15 @@ export function validateAppointment(v: AppointmentInput): Errors<AppointmentInpu
   }
   if (v.notes.length > 500) e.notes = 'Use no máximo 500 caracteres.';
   if (v.duration && !(/^\d+$/.test(v.duration) && Number(v.duration) >= 5 && Number(v.duration) <= 1440)) e.duration = 'Duração entre 5 minutos e 24 horas.';
+  const r = v.repeat;
+  if (r?.freq) {
+    const freq = r.freq === 'quinzenal' ? 'semanal' : r.freq;
+    const max = REPEAT_MAX_INTERVAL[freq];
+    if (r.freq !== 'quinzenal' && !(/^\d+$/.test(r.interval) && Number(r.interval) >= 1 && Number(r.interval) <= max)) e.repeat = `Intervalo entre 1 e ${max}.`;
+    else if (freq === 'semanal' && !r.days.length) e.repeat = 'Escolha ao menos um dia da semana.';
+    else if (r.end === 'data' && !(DATE_RE.test(r.until) && r.until >= v.date)) e.repeat = 'O término precisa ser uma data a partir do início.';
+    else if (r.end === 'vezes' && !(/^\d+$/.test(r.count) && Number(r.count) >= 1 && Number(r.count) <= 120)) e.repeat = 'Entre 1 e 120 vezes.';
+  }
   return e;
 }
 

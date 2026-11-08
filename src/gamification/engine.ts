@@ -64,6 +64,9 @@ export interface MissionProgress {
 
 type Data = Pick<AppData, 'clients' | 'appointments' | 'transactions' | 'xpEvents'>;
 
+/** beta.3: ocorrência criada pelo gerador da recorrência — não é um agendamento feito pela pessoa (sem XP). */
+const isGenerated = (a: { series?: unknown }) => !!a.series && typeof a.series === 'object' && (a.series as Record<string, unknown>).auto === true;
+
 function metricValue(metric: MissionTemplate['metric'], data: Data, now: Date): number {
   const { start, end } = weekRange(now);
   const createdThisWeek = (iso: string) => inRange(toDateKey(new Date(iso)), start, end);
@@ -75,7 +78,7 @@ function metricValue(metric: MissionTemplate['metric'], data: Data, now: Date): 
     case 'expensesLogged':
       return data.transactions.filter((t) => t.type === 'despesa' && createdThisWeek(t.createdAt)).length;
     case 'appointmentsScheduled':
-      return data.appointments.filter((a) => a.status !== 'cancelado' && createdThisWeek(a.createdAt)).length;
+      return data.appointments.filter((a) => a.status !== 'cancelado' && !isGenerated(a) && createdThisWeek(a.createdAt)).length;
     case 'revenue':
       return data.transactions.filter((t) => t.type === 'receita' && inRange(t.date, start, end)).reduce((s, t) => s + t.amount, 0);
   }
@@ -95,7 +98,7 @@ export function starterMissions(p: ProfessionModule): MissionTemplate[] {
 function starterValue(metric: MissionTemplate['metric'], data: Data): number {
   switch (metric) {
     case 'newClients': return data.clients.length;
-    case 'appointmentsScheduled': return data.appointments.length;
+    case 'appointmentsScheduled': return data.appointments.filter((a) => !isGenerated(a)).length;
     case 'expensesLogged': return data.transactions.filter((t) => t.type === 'despesa').length;
     case 'servicesCompleted': return data.appointments.filter((a) => a.status === 'concluido').length;
     case 'revenue': return data.transactions.filter((t) => t.type === 'receita').reduce((s, t) => s + t.amount, 0);

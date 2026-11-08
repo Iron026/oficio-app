@@ -1,3 +1,4 @@
+import { isPristineOccurrence } from '../domain/recurrence';
 import { isValidServiceType } from '../domain/serviceTypes';
 import type { AppData } from '../domain/types';
 import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
@@ -571,6 +572,11 @@ export class SyncEngine implements ChangeTracker {
         changed = true;
         continue;
       }
+      if (m.deleted && isPristineOccurrence(r.data)) {
+        // beta.3: excluí aqui uma ocorrência que o outro aparelho só gerou (sem tocar): a exclusão vale.
+        this.state.records[key] = { baseRev: r.rev, base: r.data, dirty: true, deleted: true, seq: m.seq };
+        continue;
+      }
       if (m.deleted || !local) {
         // Excluído aqui. Se a nuvem tem uma versão mais nova, restaura (nada se perde).
         if (r.data) {
@@ -583,13 +589,28 @@ export class SyncEngine implements ChangeTracker {
         }
         continue;
       }
+      if (!r.data && isPristineOccurrence(local)) {
+        // beta.3: ocorrência excluída em outro aparelho e só gerada aqui (sem tocar): não reaparece.
+        map.delete(r.id);
+        this.state.records[key] = { baseRev: r.rev, base: null, dirty: false, seq: m.seq };
+        changed = true;
+        continue;
+      }
       if (!r.data) {
         // Excluído na nuvem, alterado aqui: mantém a versão local (será reenviada).
         this.state.records[key] = { ...m, baseRev: r.rev, base: null };
         if (financial) addConflict({ key, collection: r.collection, id: r.id, kind: 'excluido_na_nuvem', fields: [], local, remote: null });
         continue;
       }
-      const out = mergeRecord(r.collection, m.base, local, r.data);
+      if (!m.base && isPristineOccurrence(local)) {
+        // beta.3: a mesma ocorrência gerada nos dois aparelhos (mesmo id): fica a da nuvem, sem conflito.
+        map.set(r.id, clone(r.data));
+        this.state.records[key] = { baseRev: r.rev, base: r.data, dirty: false, seq: m.seq };
+        changed = true;
+        continue;
+      }
+      // Ocorrência gerada intocada na nuvem serve de base: só as alterações feitas aqui contam.
+      const out = mergeRecord(r.collection, m.base ?? (isPristineOccurrence(r.data) ? r.data : null), local, r.data);
       if (!same(out.value, local)) changed = true;
       map.set(r.id, out.value);
       this.state.records[key] = { baseRev: r.rev, base: r.data, dirty: !same(out.value, r.data), seq: m.seq };
