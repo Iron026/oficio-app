@@ -47,12 +47,14 @@ export function statementPdf(st: Statement, appVersion: string): Uint8Array {
   y += 22;
 
   // Resumo do mês.
-  const boxW = (W - 16) / 3;
+  // beta.2: estornos aparecem como movimentação própria (só quando houver), fora das despesas.
   const summary: [string, number, RGB][] = [
     ['Receitas', st.totals.income, INCOME],
+    ...(st.totals.refund ? [['Estornos', -st.totals.refund, EXPENSE] as [string, number, RGB]] : []),
     ['Despesas', -st.totals.expense, EXPENSE],
     ['Saldo do mês', st.totals.balance, st.totals.balance < 0 ? EXPENSE : INCOME],
   ];
+  const boxW = (W - 8 * (summary.length - 1)) / summary.length;
   summary.forEach(([label, value, c], i) => {
     const x = M + i * (boxW + 8);
     page.rect(x, y, boxW, 46, ZEBRA);
@@ -113,7 +115,7 @@ export function statementPdf(st: Statement, appVersion: string): Uint8Array {
       const ty = y + 12;
       const signed = r.type === 'receita' ? r.amount : -r.amount;
       page.text(COLS.data[0], ty, dateBR(r.date), { size: 8.5 });
-      page.text(COLS.tipo[0], ty, typeLabel(r.type), { size: 8.5, color: r.type === 'receita' ? INCOME : EXPENSE });
+      page.text(COLS.tipo[0], ty, typeLabel(r.kind), { size: 8.5, color: r.type === 'receita' ? INCOME : EXPENSE });
       page.text(COLS.categoria[0], ty, fitText(r.category, COLS.categoria[1] - 6, 8.5), { size: 8.5 });
       page.text(COLS.descricao[0], ty, fitText(rowDescription(r) || '—', COLS.descricao[1] - 6, 8.5), { size: 8.5, color: r.description ? INK : MUTED });
       page.text(COLS.valor[0], ty, centsPlain(signed), { size: 8.5, font: 'bold', color: r.type === 'receita' ? INCOME : EXPENSE, align: 'right' });

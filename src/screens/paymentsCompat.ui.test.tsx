@@ -156,12 +156,12 @@ describe('0.5: reabrir, cancelar e excluir nunca apagam dinheiro', () => {
     sheet = await openItem(user);
     await user.click(within(sheet).getByRole('button', { name: /excluir/i }));
     const del = await screen.findByRole('dialog', { name: /excluir atendimento/i });
-    expect(del).toHaveTextContent(/continuam em Finanças.*serviço excluído/);
+    expect(del).toHaveTextContent(/continuam em Finanças.*atendimento excluído/);
     await user.click(within(del).getByRole('button', { name: /^excluir$/i }));
     await screen.findByRole('button', { name: /^desfazer:/i });
     expect((await reload()).data.transactions.map((t) => t.amount).sort()).toEqual([10_000, 5_000].sort());
     window.location.hash = '#/financas';
-    expect(await screen.findAllByText(/serviço excluído/)).toHaveLength(2);
+    expect(await screen.findAllByText(/atendimento excluído/)).toHaveLength(2);
   });
 });
 

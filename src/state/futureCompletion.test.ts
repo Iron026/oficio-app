@@ -41,7 +41,7 @@ describe('conclusão antecipada (serviço com data futura)', () => {
     const { appointment } = await service.saveAppointment(appt);
     await service.completeAppointment(appointment.id, { registerIncome: true });
     await service.saveTransaction({ type: 'despesa', amount: '30,00', description: 'Produtos', category: 'Produtos', date: '2026-11-04' });
-    expect(totals(service.data.transactions)).toEqual({ income: 8000, expense: 3000, balance: 5000 });
+    expect(totals(service.data.transactions)).toEqual({ income: 8000, refund: 0, expense: 3000, balance: 5000 });
   });
 
   it('indicador some se a data do serviço for alterada para hoje (sem mexer na receita)', async () => {

@@ -575,7 +575,7 @@ export class AppService {
 
   /**
    * Exclui o agendamento. Desde a 0.5, os valores recebidos nunca somem junto: pagamentos, estornos e
-   * a receita automática legada continuam em Finanças (como "serviço excluído"); a interface avisa
+   * a receita automática legada continuam em Finanças (como "<serviço> excluído"); a interface avisa
    * antes. Reversível (beta.7), em qualquer situação; desfazer não dá XP de novo.
    */
   deleteAppointment(id: string): Promise<UndoTicket | null> {

@@ -22,6 +22,8 @@ export function completedInMonth(appointments: Appointment[], mKey: string): App
 export interface MonthSnapshot {
   month: string;
   income: number;
+  /** Estornos de pagamentos (beta.2): fora de `expense`, deduzidos de `balance`. */
+  refund: number;
   expense: number;
   balance: number;
   servicesCompleted: number;

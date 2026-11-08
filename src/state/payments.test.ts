@@ -70,7 +70,8 @@ describe('resumo: contratado, recebido, estornado, pendente', () => {
     expect(s.data.transactions.find((t) => t.id === p.id)).toMatchObject({ amount: 30_000 }); // original intacto
     expect(sum(s, a.id)).toMatchObject({ received: 30_000, refunded: 5_000, net: 25_000, pending: 5_000, state: 'parcial' });
     const t = totals(s.data.transactions);
-    expect([t.income, t.expense, t.balance]).toEqual([30_000, 5_000, 25_000]);
+    // beta.2: estorno é movimentação própria (fora das despesas) e é deduzido do saldo uma única vez.
+    expect([t.income, t.refund, t.expense, t.balance]).toEqual([30_000, 5_000, 0, 25_000]);
     await expect(s.refundPayment(p.id, { amount: 25_001 })).rejects.toThrow(/até 250,00/);
     await s.refundPayment(p.id, { amount: 'total' });
     expect(sum(s, a.id)).toMatchObject({ refunded: 30_000, net: 0, pending: 30_000 });

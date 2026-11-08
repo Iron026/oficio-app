@@ -148,7 +148,7 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
   async function remove() {
     const ok = await confirm({
       title: `Excluir ${t.service.toLowerCase()}?`,
-      message: `Este registro será excluído.${keepsMoney ? `${keepsMoney.replace(' e no histórico', '')} (como “serviço excluído”).` : ''} Logo depois, dá para desfazer pelo aviso.`,
+      message: `Este registro será excluído.${keepsMoney ? `${keepsMoney.replace(' e no histórico', '')} (como “${t.service.toLowerCase()} excluíd${t.serviceArticle === 'a' ? 'a' : 'o'}”).` : ''} Logo depois, dá para desfazer pelo aviso.`,
       confirmLabel: 'Excluir', danger: true,
     });
     if (!ok) return;

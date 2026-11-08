@@ -44,6 +44,6 @@ describe('indicador "Data futura" em Finanças', () => {
 
   it('não altera os cálculos financeiros', () => {
     const list = [tx(), tx({ id: 't2', type: 'despesa', amount: 1000, appointmentId: null })];
-    expect(totals(list)).toEqual({ income: 5000, expense: 1000, balance: 4000 });
+    expect(totals(list)).toEqual({ income: 5000, refund: 0, expense: 1000, balance: 4000 });
   });
 });

@@ -1,5 +1,5 @@
 import { monthLabel } from '../lib/dates';
-import { byCategory, totals, transactionsInMonth, type Totals } from './finance';
+import { byCategory, movementKind, totals, transactionsInMonth, type MovementKind, type Totals } from './finance';
 import type { AppData, TransactionType } from './types';
 
 /**
@@ -10,6 +10,8 @@ export interface StatementRow {
   /** aaaa-mm-dd */
   date: string;
   type: TransactionType;
+  /** beta.2: estorno de pagamento é uma movimentação própria (não é despesa). */
+  kind: MovementKind;
   category: string;
   /** Pode ser vazia (descrição opcional). */
   description: string;
@@ -34,7 +36,7 @@ export function buildStatement(data: AppData, mKey: string, now: Date): Statemen
   const month = transactionsInMonth(data.transactions, mKey);
   const rows = [...month]
     .sort((a, b) => (a.date === b.date ? a.createdAt.localeCompare(b.createdAt) : a.date.localeCompare(b.date)))
-    .map((t) => ({ date: t.date, type: t.type, category: t.category, description: t.description.trim(), amount: t.amount, isDemo: !!t.isDemo }));
+    .map((t) => ({ date: t.date, type: t.type, kind: movementKind(t), category: t.category, description: t.description.trim(), amount: t.amount, isDemo: !!t.isDemo }));
   return {
     monthKey: mKey,
     monthTitle: monthLabel(mKey),
@@ -59,7 +61,7 @@ export function centsPlain(cents: number): string {
 
 export const statementFileName = (mKey: string, ext: 'csv' | 'pdf') => `oficio-extrato-${mKey}.${ext}`;
 
-export const typeLabel = (t: TransactionType) => (t === 'receita' ? 'Receita' : 'Despesa');
+export const typeLabel = (t: TransactionType | MovementKind) => (t === 'receita' ? 'Receita' : t === 'estorno' ? 'Estorno' : 'Despesa');
 
 /** Descrição exibida no extrato (marca dados de demonstração). */
 export const rowDescription = (r: StatementRow) => `${r.description}${r.isDemo ? `${r.description ? ' ' : ''}(demonstração)` : ''}`;
@@ -76,12 +78,12 @@ export function csvText(value: string): string {
 
 /**
  * CSV para Excel/Planilhas em português: UTF-8 com BOM, separador ";", vírgula decimal,
- * datas dd/mm/aaaa e linhas CRLF. Despesas com valor negativo, para somar direto.
+ * datas dd/mm/aaaa e linhas CRLF. Despesas e estornos com valor negativo, para somar direto.
  */
 export function statementCsv(st: Statement): string {
   const lines = ['Data;Tipo;Categoria;Descrição;Valor (R$)'];
   for (const r of st.rows) {
-    lines.push([dateBR(r.date), typeLabel(r.type), csvText(r.category), csvText(rowDescription(r)), centsPlain(r.type === 'receita' ? r.amount : -r.amount)].join(';'));
+    lines.push([dateBR(r.date), typeLabel(r.kind), csvText(r.category), csvText(rowDescription(r)), centsPlain(r.type === 'receita' ? r.amount : -r.amount)].join(';'));
   }
   return `\uFEFF${lines.join('\r\n')}\r\n`;
 }

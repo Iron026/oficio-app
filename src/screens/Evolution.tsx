@@ -348,7 +348,7 @@ function HistoryTab() {
 
       <SectionTitle>Histórico de 6 meses</SectionTitle>
       <Card>
-        <div className="flex h-36 items-end justify-between gap-2" role="img" aria-label={`Receitas e despesas dos últimos 6 meses. ${history.map((h) => `${monthLabel(h.month)}: receitas ${formatMoney(h.income)}, despesas ${formatMoney(h.expense)}`).join('; ')}`}>
+        <div className="flex h-36 items-end justify-between gap-2" role="img" aria-label={`Receitas e despesas dos últimos 6 meses. ${history.map((h) => `${monthLabel(h.month)}: receitas ${formatMoney(h.income)}, despesas ${formatMoney(h.expense)}${h.refund ? `, estornos ${formatMoney(h.refund)}` : ''}`).join('; ')}`}>
           {history.map((h) => (
             <div key={h.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
               <div className="flex h-full w-full items-end justify-center gap-0.5">
@@ -363,6 +363,9 @@ function HistoryTab() {
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-500 dark:bg-brand-400" />Receitas</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-400" />Despesas</span>
         </div>
+        {history.some((h) => h.refund > 0) && (
+          <p className="mt-2 text-xs text-muted">Estornos no período: {formatMoney(history.reduce((n, h) => n + h.refund, 0))}. Eles reduzem o saldo, mas não são despesas.</p>
+        )}
       </Card>
 
       <SectionTitle>Linha do tempo</SectionTitle>

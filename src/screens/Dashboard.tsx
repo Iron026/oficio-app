@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarPlus, ChevronRight, CircleMinus, CirclePlus, Lightbulb, Target, TriangleAlert, UserPlus } from 'lucide-react';
+import { CalendarPlus, ChevronRight, CircleMinus, CirclePlus, Lightbulb, Target, TriangleAlert, Undo2, UserPlus } from 'lucide-react';
 import { monthTotals } from '../domain/finance';
 import { overdue, upcoming } from '../domain/insights';
 import { missionProgress, weeklyGoal } from '../gamification/engine';
@@ -65,6 +65,12 @@ export function Dashboard() {
             <dt className="flex items-center gap-2 text-sm text-muted"><CirclePlus size={18} className="text-income" aria-hidden="true" /> Receitas</dt>
             <dd className="text-base font-bold"><Money cents={month.income} kind="income" /></dd>
           </div>
+          {month.refund > 0 && (
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+              <dt className="flex items-center gap-2 text-sm text-muted"><Undo2 size={18} aria-hidden="true" /> Estornos</dt>
+              <dd className="text-base font-bold"><Money cents={month.refund} kind="expense" /></dd>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
             <dt className="flex items-center gap-2 text-sm text-muted"><CircleMinus size={18} className="text-expense" aria-hidden="true" /> Despesas</dt>
             <dd className="text-base font-bold"><Money cents={month.expense} kind="expense" /></dd>
