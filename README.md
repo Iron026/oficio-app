@@ -4,7 +4,7 @@
 
 Aplicativo freemium para profissionais autônomos (manutenção, beleza, limpeza, alimentação e outros) organizarem clientes, agenda e finanças — e acompanharem a própria evolução profissional com níveis, missões, metas e conquistas.
 
-> Versão **0.5.0-beta.2 (em teste)** · app Android e web · dados no aparelho, com **conta Google opcional** para sincronizar e recuperar dados.
+> Versão **0.5.0-beta.3 (em teste)** · app Android e web · dados no aparelho, com **conta Google opcional** para sincronizar e recuperar dados.
 >
 > **Acesse:** https://iron026.github.io/oficio-app/
 
@@ -12,10 +12,12 @@ Aplicativo freemium para profissionais autônomos (manutenção, beleza, limpeza
 [![Android APK](https://github.com/Iron026/oficio-app/actions/workflows/android.yml/badge.svg)](https://github.com/Iron026/oficio-app/actions/workflows/android.yml)
 [![Deploy](https://github.com/Iron026/oficio-app/actions/workflows/pages.yml/badge.svg)](https://github.com/Iron026/oficio-app/actions/workflows/pages.yml)
 
-## O que tem na 0.5 (beta.2)
+## O que tem na 0.5 (beta.3)
 
 Pagamentos (serviço realizado separado do dinheiro recebido: integral, parcial, antecipado, estornos e
-valores a receber) e agenda com visões dia, semana e mês, duração e aviso de conflito. Ver
+valores a receber; estornos de aparelhos diferentes revisados pela pessoa), agenda com visões dia, semana e mês,
+duração opcional, aviso de conflito e atendimentos recorrentes, histórico completo do cliente e busca global
+offline. Ver
 [Plano da 0.5](docs/PLANO-0.5.md). Tudo o que a 0.4 trouxe continua igual:
 
 ## O que tem na 0.4 (beta.7)

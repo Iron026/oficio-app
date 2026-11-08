@@ -54,6 +54,12 @@ src/
 
 `src/domain/agenda.ts`: horários de parede (data + hora locais) convertidos em minutos absolutos por dia de calendário (`Date.UTC`), sem `Date` local — fuso e horário de verão não deslocam nada. Duração opcional (`appointment.duration`; sem ela só o início é conhecido e nada é presumido), conflitos por sobreposição (nunca bloqueiam; sem duração, só quando o início cai num intervalo conhecido ou coincide com outro início), grades de dia/semana/mês. Telas em `src/screens/agenda/`.
 
+**0.5.0-beta.3.** `domain/recurrence.ts`: séries dentro de cada ocorrência (`appointment.series`), ids
+`<série>-<aaaammdd>`, gerador só depois de `through` (90 dias, 120 por série), regra efetiva = maior versão;
+a sincronização deixa a ocorrência gerada e intocada ceder à exclusão de outro aparelho. `domain/refundReview.ts`:
+estornos acima do pago ou sem pagamento ficam para revisão (nunca removidos automaticamente).
+`domain/clientHistory.ts` e `domain/search.ts`: derivados, em memória, sem gravar nada e sem rede.
+
 ## Conta e sincronização (v0.3)
 
 Ver [SINCRONIZACAO.md](SINCRONIZACAO.md). Resumo: `TrackedStorage` registra alterações locais; `SyncEngine` envia/recebe pelo `RemoteStore` (Firestore) com controle de revisão e mesclagem em 3 vias; `AccountController` orquestra login e associação. Sem Firebase configurado, o app é 100% local.

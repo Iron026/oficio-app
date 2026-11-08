@@ -14,6 +14,12 @@ Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0
   de corrente; estornos como movimentação própria em Finanças, Painel e extrato (fora das despesas e dos gastos
   por categoria, deduzidos do saldo uma vez). Teste Android: 0.4.0-beta.7 → 0.5.0-beta.1 (com estorno
   parcial) → beta.2.
+- 0.5.0-beta.3 (a partir de `9ab2bfe`, beta.2 aprovada no S26): **estornos** incoerentes entre aparelhos
+  (acima do pago ou de pagamento excluído) detectados de forma determinística e revisados pela pessoa — nada é
+  apagado sozinho; **recorrência** diária, semanal (dias da semana), quinzenal e mensal (29/30/31 no último dia),
+  com término, horizonte de 90 dias, ids determinísticos, “só esta / esta e as próximas / toda a série”, sem
+  duplicar nem recriar entre aparelhos e sem XP repetido; **histórico do cliente** derivado dos lançamentos;
+  **busca global** offline na lupa do cabeçalho. Teste Android: 0.4.0-beta.7 → 0.5.0-beta.2 → beta.3.
 
 ## 0.4 (em desenvolvimento — branch `feat/v0.4-design`)
 Design, estética e experiência. Etapas: 0 rede de segurança visual · 1 fundamentos do design

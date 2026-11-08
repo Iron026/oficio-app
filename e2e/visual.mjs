@@ -358,6 +358,30 @@ try {
       await capture(page, vp, theme, 'agenda-pagamento', { skipChecks: true });
       await page.keyboard.press('Escape');
       await page.getByRole('dialog').waitFor({ state: 'detached' });
+      // beta.3: formulário com "Repetir", histórico do cliente e busca global.
+      await page.getByRole('button', { name: /^agendar/i }).first().click();
+      const rep = page.getByRole('dialog', { name: /^agendar/i });
+      await rep.getByLabel(/^repetir/i).selectOption('semanal');
+      await rep.locator('[data-repeat]').scrollIntoViewIfNeeded();
+      await capture(page, vp, theme, 'agendar-repetir', { keepScroll: true });
+      await page.keyboard.press('Escape');
+      await rep.waitFor({ state: 'detached' });
+      await page.goto(BASE + '#/clientes');
+      await page.locator('main ul li button').first().click();
+      await page.locator('[data-client-summary]').waitFor();
+      await capture(page, vp, theme, 'cliente-historico');
+      await page.keyboard.press('Escape');
+      await page.getByRole('dialog').waitFor({ state: 'detached' });
+      await page.getByRole('button', { name: 'Buscar' }).click();
+      const busca = page.getByRole('dialog', { name: 'Buscar' });
+      await busca.getByRole('searchbox').fill('ma');
+      await busca.locator('section').first().waitFor();
+      await capture(page, vp, theme, 'busca-resultados');
+      await busca.getByRole('searchbox').fill('zzzz');
+      await busca.locator('[data-search-empty]').waitFor();
+      await capture(page, vp, theme, 'busca-vazia');
+      await page.keyboard.press('Escape');
+      await busca.waitFor({ state: 'detached' });
       // Central de Ajustes: páginas internas (rodada 5).
       for (const sub of ['aparencia', 'aparencia/paleta', 'perfil', 'privacidade', 'conta', 'dados', 'sobre']) {
         await page.goto(BASE + '#/ajustes/' + sub);
