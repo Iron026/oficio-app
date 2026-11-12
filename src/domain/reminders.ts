@@ -18,6 +18,12 @@ export type ReminderOffset = (typeof REMINDER_OFFSETS)[number];
 export const REMINDER_DAYS = 30;
 /** Teto de avisos agendados de uma vez (bem abaixo do limite de alarmes do Android). */
 export const REMINDER_MAX = 120;
+/**
+ * Avisos não exatos podem chegar depois da hora marcada (no Android 12+, até ~1 h). Um aviso que já passou da hora
+ * mas continua pendente no aparelho é mantido por até 2 h — desde que o atendimento ainda não tenha começado e
+ * continue igual —; nunca é agendado de novo.
+ */
+export const REMINDER_LATE_GRACE_MS = 2 * 3_600_000;
 
 export interface ReminderPrefs {
   enabled: boolean;
@@ -99,11 +105,31 @@ export function planReminders(
   return out.sort((x, y) => x.at - y.at).slice(0, REMINDER_MAX);
 }
 
+/** Avisos cuja hora já passou, mas que ainda valem se o Android não os entregou (ver REMINDER_LATE_GRACE_MS). */
+export function lateReminders(
+  appointments: readonly Appointment[],
+  clients: readonly Pick<Client, 'id' | 'name'>[],
+  prefs: ReminderPrefs,
+  now: Date,
+  serviceTerm?: string,
+): PlannedReminder[] {
+  const t = now.getTime();
+  return planReminders(appointments, clients, prefs, new Date(t - REMINDER_LATE_GRACE_MS), serviceTerm)
+    .filter((p) => p.at <= t && p.at + p.offset * 60_000 > t);
+}
+
 export interface PendingReminder { id: number; at: number | null; title: string; body: string }
 
-/** Diferença entre o agendado no aparelho e o planejado: só cancela/agenda o que mudou (sem duplicar). */
-export function diffReminders(pending: readonly PendingReminder[], planned: readonly PlannedReminder[]): { cancel: number[]; schedule: PlannedReminder[] } {
-  const want = new Map(planned.map((p) => [p.id, p]));
+/**
+ * Diferença entre o agendado no aparelho e o planejado: só cancela/agenda o que mudou (sem duplicar).
+ * `late`: avisos atrasados que continuam valendo — mantidos se ainda pendentes e idênticos, nunca agendados.
+ */
+export function diffReminders(
+  pending: readonly PendingReminder[],
+  planned: readonly PlannedReminder[],
+  late: readonly PlannedReminder[] = [],
+): { cancel: number[]; schedule: PlannedReminder[] } {
+  const want = new Map([...late, ...planned].map((p) => [p.id, p]));
   const have = new Map(pending.map((p) => [p.id, p]));
   const same = (h: PendingReminder, p: PlannedReminder) => h.at === p.at && h.title === p.title && h.body === p.body;
   const cancel = pending.filter((h) => { const p = want.get(h.id); return !p || !same(h, p); }).map((h) => h.id);

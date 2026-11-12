@@ -1,4 +1,4 @@
-import { diffReminders, planReminders, type PendingReminder, type PlannedReminder, type ReminderPrefs } from '../domain/reminders';
+import { diffReminders, lateReminders, planReminders, type PendingReminder, type PlannedReminder, type ReminderPrefs } from '../domain/reminders';
 import type { Appointment, Client } from '../domain/types';
 import { isNative } from './native';
 
@@ -74,9 +74,11 @@ export async function reconcileReminders(
 ): Promise<ReconcileResult> {
   if (!platform.available()) return { scheduled: 0, cancelled: 0, total: 0, permission: 'indisponivel' };
   const permission = await platform.checkPermission();
-  const planned = permission === 'granted' ? planReminders(input.appointments, input.clients, input.prefs, input.now, input.serviceTerm) : [];
+  const granted = permission === 'granted';
+  const planned = granted ? planReminders(input.appointments, input.clients, input.prefs, input.now, input.serviceTerm) : [];
+  const late = granted ? lateReminders(input.appointments, input.clients, input.prefs, input.now, input.serviceTerm) : [];
   const pending = await platform.pending();
-  const { cancel, schedule } = diffReminders(pending, planned);
+  const { cancel, schedule } = diffReminders(pending, planned, late);
   await platform.cancel(cancel);
   await platform.schedule(schedule);
   return { scheduled: schedule.length, cancelled: cancel.length, total: planned.length, permission };

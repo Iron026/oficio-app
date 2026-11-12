@@ -4,7 +4,7 @@
  */
 import type { Appointment } from './types';
 import {
-  DEFAULT_REMINDERS, REMINDER_DAYS, REMINDER_MAX, diffReminders, localStart, planReminders, readReminderPrefs, reminderId,
+  DEFAULT_REMINDERS, REMINDER_DAYS, REMINDER_MAX, diffReminders, lateReminders, localStart, planReminders, readReminderPrefs, reminderId,
   type ReminderPrefs,
 } from './reminders';
 
@@ -118,5 +118,26 @@ describe('diffReminders', () => {
   });
   it('removido do plano (cancelado/excluído): só cancela', () => {
     expect(diffReminders(plan.map(asPending), plan.slice(1))).toEqual({ cancel: [plan[0]!.id], schedule: [] });
+  });
+});
+
+describe('lateReminders (aviso não exato atrasado)', () => {
+  it('vale só depois da hora do aviso e antes do início do atendimento', () => {
+    const a = appt({ id: 'late', date: '2026-11-12', time: '10:00' });
+    const at = (h: number, m: number) => new Date(2026, 10, 12, h, m);
+    expect(lateReminders([a], clients, on([60, 15]), at(9, 30)).map((p) => p.offset)).toEqual([60]); // 9:00 passou; 9:45 não
+    expect(lateReminders([a], clients, on([60, 15]), at(9, 50)).map((p) => p.offset)).toEqual([60, 15]);
+    expect(lateReminders([a], clients, on([60, 15]), at(10, 0))).toEqual([]); // já começou
+  });
+  it('limite de 2 h de atraso', () => {
+    const a = appt({ id: 'dia', date: '2026-11-13', time: '10:00' }); // aviso de 1 dia: 12/11 10:00
+    expect(lateReminders([a], clients, on([1440]), new Date(2026, 10, 12, 11, 59))).toHaveLength(1);
+    expect(lateReminders([a], clients, on([1440]), new Date(2026, 10, 12, 12, 1))).toEqual([]);
+  });
+  it('mantém o pendente idêntico, sem agendar o que não está pendente', () => {
+    const late = lateReminders([appt({ id: 'k', date: '2026-11-12', time: '10:00' })], clients, on([15]), new Date(2026, 10, 12, 9, 50));
+    const asPending = late.map((p) => ({ id: p.id, at: p.at, title: p.title, body: p.body }));
+    expect(diffReminders(asPending, [], late)).toEqual({ cancel: [], schedule: [] });
+    expect(diffReminders([], [], late)).toEqual({ cancel: [], schedule: [] });
   });
 });
