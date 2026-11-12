@@ -1,5 +1,6 @@
 import type { SealAward } from '../domain/types';
 import { isPaymentRecord } from '../domain/compat';
+import { DEFAULT_DASHBOARD, mergeDashboard } from '../domain/dashboard';
 import { mergeAward } from '../gamification/seals';
 import type { MetaData } from './types';
 import { FINANCIAL_COLLECTIONS, type Entity, type SyncCollection } from './types';
@@ -127,6 +128,14 @@ export function mergeMeta(base: MetaData | null, local: MetaData, remote: MetaDa
       ? (merge3((base?.profile ?? null) as Entity | null, local.profile as unknown as Entity, remote.profile as unknown as Entity, 'remote').value as unknown as MetaData['profile'])
       : (remote.profile ?? local.profile);
   const settings = merge3(base?.settings as unknown as Entity | null, local.settings as unknown as Entity, remote.settings as unknown as Entity, 'remote').value as unknown as MetaData['settings'];
+  // beta.5: o Painel tem mesclagem própria (por cartão), para mudanças em aparelhos diferentes não se perderem.
+  if (local.settings?.dashboard !== undefined || remote.settings?.dashboard !== undefined) {
+    // Base sem `dashboard` = ninguém personalizou ainda = organização padrão (não "sem base").
+    const baseDashboard = base ? (base.settings?.dashboard ?? DEFAULT_DASHBOARD) : undefined;
+    const dashboard = mergeDashboard(baseDashboard, local.settings?.dashboard, remote.settings?.dashboard);
+    if (dashboard === undefined) delete settings.dashboard;
+    else settings.dashboard = dashboard;
+  }
   return { profile, settings };
 }
 

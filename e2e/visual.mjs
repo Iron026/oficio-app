@@ -33,6 +33,7 @@ const BASE = `http://localhost:${PORT}/`;
 const NOW = new Date('2026-11-04T10:30:00-03:00');
 
 const VIEWPORTS = [
+  { id: 'celular-320', width: 320, height: 640, mobile: true }, // beta.5: celulares pequenos e fonte ampliada
   { id: 'celular-360', width: 360, height: 780, mobile: true }, // Galaxy S26
   { id: 'celular-412', width: 412, height: 915, mobile: true }, // celulares maiores
   { id: 'tablet-820', width: 820, height: 1180, mobile: true },
@@ -401,6 +402,21 @@ try {
         await page.locator('[data-reports] details summary').first().click();
         await capture(page, vp, theme, 'relatorios-inteira', { full: true, skipChecks: true });
       }
+      // beta.5: Personalizar Painel (folha) e Painel com os cartões opcionais visíveis.
+      await page.goto(BASE + '#/painel');
+      await page.getByRole('button', { name: /personalizar painel/i }).click();
+      const pers = page.getByRole('dialog', { name: 'Personalizar Painel' });
+      await pers.waitFor();
+      await capture(page, vp, theme, 'painel-personalizar');
+      await pers.getByRole('switch', { name: /^a receber/i }).click();
+      await pers.getByRole('switch', { name: /^meta do mês/i }).click();
+      await pers.getByRole('button', { name: /^subir a receber/i }).click();
+      await page.keyboard.press('Escape');
+      await pers.waitFor({ state: 'detached' });
+      await capture(page, vp, theme, 'painel-personalizado', { full: vp.id === 'celular-360', skipChecks: vp.id === 'celular-360' });
+      await page.getByRole('button', { name: /personalizar painel/i }).click();
+      await page.getByRole('dialog', { name: 'Personalizar Painel' }).getByRole('button', { name: /restaurar padrão/i }).click();
+      await page.keyboard.press('Escape');
       // Central de Ajustes: páginas internas (rodada 5).
       for (const sub of ['aparencia', 'aparencia/paleta', 'perfil', 'lembretes', 'privacidade', 'conta', 'dados', 'sobre']) {
         await page.goto(BASE + '#/ajustes/' + sub);

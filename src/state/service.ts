@@ -12,6 +12,7 @@ import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePre
 import { awardsToSave, mergeAward } from '../gamification/seals';
 import { tierForLevel, tierKey, type Tier } from '../gamification/tiers';
 import { DEFAULT_SETTINGS } from '../domain/types';
+import { readDashboard, type DashboardLayout } from '../domain/dashboard';
 import { actionAward, evaluate, totalXp, type ActionType } from '../gamification/engine';
 import { levelInfo } from '../gamification/levels';
 import { CELEBRATION_KEY, isCelebrationDue, nextCelebration, readCelebration, type CelebrationRecord } from '../gamification/celebration';
@@ -349,6 +350,19 @@ export class AppService {
   updateSettings(patch: Partial<Settings>): Promise<void> {
     return this.run(async () => {
       const settings = { ...this._data.settings, ...patch };
+      await this.storage.saveSettings(settings);
+      this.set({ ...this._data, settings });
+    });
+  }
+
+  /**
+   * Painel personalizável (beta.5): aplica uma mudança ao layout atual (fila do serviço, sem corrida entre toques
+   * rápidos) e grava em `settings.dashboard`. Não mexe em dados nem em XP.
+   */
+  updateDashboard(change: (layout: DashboardLayout, at: string) => DashboardLayout): Promise<void> {
+    return this.run(async () => {
+      const dashboard = change(readDashboard(this._data.settings.dashboard), this.stamp());
+      const settings = { ...this._data.settings, dashboard };
       await this.storage.saveSettings(settings);
       this.set({ ...this._data, settings });
     });
