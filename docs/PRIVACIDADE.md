@@ -42,7 +42,7 @@ Ao tocar em **Continuar com Google** e confirmar a conexão:
 - **Dados de demonstração** (fictícios) não são enviados.
 - **Foto de perfil, selos e tipos de serviço (versão 0.4):** a foto escolhida no Ofício é recortada e
   reduzida no próprio aparelho (até 64 KB, sem localização ou outros metadados da câmera). Até a versão
-  0.5.0-beta.4 a foto, os selos e os tipos de serviço personalizados ficam **só no aparelho e no arquivo
+  0.5.0-beta.5 a foto, os selos e os tipos de serviço personalizados ficam **só no aparelho e no arquivo
   de backup** — não são enviados para a nuvem, mesmo com conta conectada. Se isso mudar numa versão futura, esta política será atualizada antes.
   A foto da conta Google não é usada como foto de perfil do Ofício.
 
@@ -50,6 +50,9 @@ Ao tocar em **Continuar com Google** e confirmar a conexão:
 - **Exportar backup** gera um arquivo JSON com todos os seus dados. Ele é salvo no local que você
   escolher (“Salvar no aparelho”) ou enviado ao aplicativo que você escolher (“Compartilhar”).
   A partir daí, a guarda do arquivo é sua: proteja-o como qualquer documento com dados pessoais.
+- Desde a versão 0.5.0-beta.5, o arquivo leva uma **soma de verificação (SHA-256)** do conteúdo. Ao restaurar, o
+  aplicativo confere a soma e recusa arquivos alterados ou corrompidos. A soma verifica a integridade; não identifica
+  quem criou o arquivo.
 - O aplicativo **não pede permissão ampla de armazenamento**: ao salvar, ele só recebe acesso ao
   arquivo que você criou na janela do Android.
 - Antes de conectar uma conta ou importar um backup, o aplicativo guarda automaticamente até

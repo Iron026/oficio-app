@@ -26,6 +26,11 @@ Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0
   “não é nota fiscal”) e **lembretes** locais no Android (opcionais, desligados por padrão, 15 min/30 min/1 h/1 dia,
   não exatos, só o horário no aviso por padrão — sem descrição, cliente ou valores). Teste Android: 0.4.0-beta.7 → 0.5.0-beta.3 → beta.4, com avisos
   reais com o app aberto, em segundo plano e fechado.
+- 0.5.0-beta.5 (a partir de `91122a9`, beta.4 aprovada no S26): **Painel personalizável** (mostrar/ocultar,
+  subir/descer, restaurar padrão; sincroniza sem perder mudanças de aparelhos diferentes; avisos críticos fixos),
+  **backup com SHA-256** e restauração com pré-visualização completa, confirmação explícita e gravação segura
+  também com conta conectada, e **configuração inicial por profissão** (opcional, só para cadastros novos, também em
+  Ajustes). Teste Android: 0.4.0-beta.7 → 0.5.0-beta.4 (com lembrete agendado) → beta.5.
 
 ## 0.4 (em desenvolvimento — branch `feat/v0.4-design`)
 Design, estética e experiência. Etapas: 0 rede de segurança visual · 1 fundamentos do design

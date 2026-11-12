@@ -13,7 +13,7 @@ const OUT = 'e2e-results';
 const apk = process.argv[2];
 /** APK da versão anterior (0.4.0-beta.7) para o teste de atualização por cima; opcional. */
 const previousApk = process.argv[3] || '';
-/** APK da versão intermediária aprovada (hoje a 0.5.0-beta.3, a que está no S26): cadeia 0.4 → ela → atual; opcional. */
+/** APK da versão intermediária aprovada (hoje a 0.5.0-beta.4, a que está no S26): cadeia 0.4 → ela → atual; opcional. */
 const midApk = process.argv[4] || '';
 if (!apk) throw new Error('Informe o caminho do APK.');
 mkdirSync(OUT, { recursive: true });
@@ -311,6 +311,74 @@ async function launch({ newProcess = true } = {}) {
 let page;
 let backupJson = '';
 try {
+  // ---- beta.4: lembretes reais (notificações locais não exatas) ----
+  const delivered = []; // horários dos avisos entregues
+  const openReminders = async () => {
+    await tap(page.getByRole('button', { name: /^ajustes$/i }));
+    await tap(page.getByRole('button', { name: /^lembretes/i }));
+    await page.waitForFunction(() => location.hash === '#/ajustes/lembretes');
+  };
+  const reminderCount = async () => Number(await page.locator('[data-reminders-count]').getAttribute('data-reminders-count', { timeout: 2000 }));
+  /** Neste fluxo, logo depois de agendar há exatamente 1 aviso pendente (os anteriores já dispararam). */
+  const expectPending = (n, msg) => eventually(async () => (await reminderCount()) === n, msg, 20_000);
+  /** Agenda um atendimento (com cliente) cujo aviso de 15 min dispara em 1–2 min, e espera o app agendar o aviso. */
+  const scheduleSoon = async (title, client = 'Cliente Persistente') => {
+    const at = deviceLocalIn(16 * 60);
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
+    await tap(page.getByRole('button', { name: /^agendar$/i }));
+    const form = page.getByRole('dialog');
+    await form.getByLabel(/descrição/i).fill(title);
+    await form.getByLabel(/^cliente/i).selectOption({ label: client });
+    await form.getByLabel(/^data/i).fill(at.date);
+    await form.getByLabel(/^horário/i).fill(at.time);
+    await form.getByLabel(/valor/i).fill('123,45');
+    await tap(form.getByRole('button', { name: /^agendar$/i }));
+    await form.waitFor({ state: 'detached' });
+    await openReminders();
+    return at;
+  };
+  /** Espera o aviso do atendimento (identificado pelo horário "· HH:MM" no título) e confere a privacidade. */
+  const waitNotification = async (title, at, state) => {
+    const t0 = Date.now();
+    const mark = `15 minutos · ${at.time}`;
+    const text = await eventually(() => { const n = appNotifications(); return n.includes(mark) ? n : null; }, `aviso de "${title}" (${mark}) não chegou (${state})`, 9 * 60_000);
+    const block = text.split(/\n(?=\s*NotificationRecord\()/).find((b) => b.includes(mark)) ?? '';
+    // Padrão: só o horário. Nada da descrição, do cliente ou do valor (a tela bloqueada pode mostrar o conteúdo).
+    assert(!block.includes(title), 'o aviso mostra a descrição do atendimento (deveria estar desligado por padrão)');
+    assert(!/Cliente Persistente|Cliente da 0\.4/.test(block), 'o aviso mostra o nome do cliente');
+    assert(!/123,45|R\$/.test(block), 'o aviso mostra valores');
+    assert(/Toque para ver os detalhes no Ofício/.test(block), 'texto padrão do aviso ausente');
+    assert(/vis=PRIVATE/.test(block), 'aviso não marcado como privado');
+    delivered.push(mark);
+    console.log(`\n  aviso "${title}" (${state}) chegou após ${Math.round((Date.now() - t0) / 1000)} s`);
+    return block;
+  };
+
+  /** Liga os lembretes (só 15 min antes), aceitando o pedido de permissão do Android. */
+  const enableReminders = async (shots = false) => {
+    adb('shell', 'svc', 'power', 'stayon', 'true');
+    adb('shell', 'settings', 'put', 'system', 'screen_off_timeout', '1800000');
+    await openReminders();
+    const sw = page.getByRole('switch', { name: /lembretes de atendimentos/i });
+    assert((await sw.getAttribute('aria-checked')) === 'false', 'lembretes ligados por padrão');
+    assert(!permissionDialogOpen(), 'a tela de Lembretes pediu permissão sem a pessoa ligar');
+    if (shots) shot('09-lembretes-desligados');
+    await tap(sw);
+    await eventually(() => permissionDialogOpen(), 'o pedido de permissão do Android não abriu ao ligar');
+    await wait(1000);
+    if (shots) shot('09b-pedido-permissao');
+    const allow = await eventually(() => findUiNode((n) => /permission_allow_button/.test(n.id) || (/^(allow|permitir)$/i.test(n.text) && n.enabled)), 'botão Permitir não encontrado', 15_000);
+    adb('shell', 'input', 'tap', String(allow.x), String(allow.y));
+    await eventually(() => resumedPackage() === PKG, 'o app não voltou após permitir');
+    await eventually(async () => (await sw.getAttribute('aria-checked')) === 'true', 'lembretes não ligaram após permitir');
+    assert(notificationsGranted(), 'permissão não registrada pelo Android');
+    // Só 15 minutos antes (desmarca os 30 minutos padrão).
+    await tap(page.getByRole('button', { name: '15 minutos antes' }));
+    await tap(page.getByRole('button', { name: '30 minutos antes' }));
+    await eventually(async () => (await page.getByRole('button', { name: '15 minutos antes' }).getAttribute('aria-pressed')) === 'true'
+      && (await page.getByRole('button', { name: '30 minutos antes' }).getAttribute('aria-pressed')) === 'false', 'antecedências não salvas');
+  };
+
   await step('Preparar emulador', async () => {
     // Emuladores do CI às vezes exibem "app não está respondendo" do launcher,
     // que cobre a tela e consome toques. Oculta esses avisos do sistema.
@@ -385,24 +453,25 @@ try {
     assert(/Pago/.test((await item.textContent()) ?? ''), 'atendimento pago na 0.4 não aparece como "Pago" na 0.5');
     await wait(800);
     shot('00-atualizado-da-0.4');
-    console.log(`\n  dados preservados${midApk ? ' (0.4 → 0.5.0-beta.3)' : ''}: ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
+    console.log(`\n  dados preservados${midApk ? ' (0.4 → 0.5.0-beta.4)' : ''}: ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
   });
 
-  if (previousApk && midApk) await step('Atualização por cima da 0.5.0-beta.3 (cliente, agendamento, pagamento e estorno) sem perder dados', async () => {
-    // Na beta.3 (interface dela): um agendamento futuro com cliente e o estorno parcial de R$ 20,00 da receita da 0.4.
+  if (previousApk && midApk) await step('Atualização por cima da 0.5.0-beta.4 (cliente, agendamento, pagamento, estorno e lembrete) sem perder dados', async () => {
+    // Na beta.4 (interface dela): um agendamento futuro com cliente, o estorno parcial de R$ 20,00 da receita da 0.4 e
+    // um lembrete real agendado antes de atualizar.
     const t = new Date(Date.now() + 86_400_000);
     const amanha = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
     await tap(page.getByRole('button', { name: /^agendar$/i }));
     const novo = page.getByRole('dialog');
-    await novo.getByLabel(/descrição/i).fill('Escova da beta.3');
+    await novo.getByLabel(/descrição/i).fill('Escova da beta.4');
     await novo.getByLabel(/^cliente/i).selectOption({ label: 'Cliente da 0.4' });
     await novo.getByLabel(/^data/i).fill(amanha);
     await novo.getByLabel(/^horário/i).fill('10:00');
     await novo.getByLabel(/valor/i).fill('90,00');
     await tap(novo.getByRole('button', { name: /^agendar$/i }));
     await novo.waitFor({ state: 'detached' });
-    await eventually(async () => (await readStore(page, 'appointments')).some((a) => a.title === 'Escova da beta.3'), 'a beta.3 não gravou o agendamento');
+    await eventually(async () => (await readStore(page, 'appointments')).some((a) => a.title === 'Escova da beta.4'), 'a beta.4 não gravou o agendamento');
     await tap(page.getByRole('navigation').getByRole('link', { name: /agenda/i }));
     await tap(page.getByRole('radio', { name: /concluíd/i }));
     const sheetOf = () => page.getByRole('dialog', { name: 'Corte da 0.4' });
@@ -412,7 +481,12 @@ try {
     await rf.getByLabel(/valor a estornar/i).fill('20,00');
     await tap(rf.getByRole('button', { name: /registrar estorno/i }));
     await rf.waitFor({ state: 'detached' });
-    await eventually(async () => (await readStore(page, 'transactions')).length === 2, 'a beta.3 não registrou o estorno');
+    await eventually(async () => (await readStore(page, 'transactions')).length === 2, 'a beta.4 não registrou o estorno');
+    // Lembrete real na beta.4, agendado antes da atualização (aviso de 15 min em 1–2 min).
+    await page.keyboard.press('Escape');
+    await enableReminders();
+    const atMid = await scheduleSoon('Lembrete da beta.4', 'Cliente da 0.4');
+    const pendingMid = (await eventually(async () => { const n = await reminderCount(); return n >= 2 ? { n } : null; }, 'a beta.4 não agendou os lembretes')).n;
     const snap = async () => Object.fromEntries(await Promise.all(['clients', 'appointments', 'transactions', 'xpEvents'].map(async (k) => [k, await readStore(page, k)])));
     const before = await snap();
     adb('install', '-r', apk);
@@ -420,23 +494,31 @@ try {
     await page.getByText(/atendimentos na semana/i).waitFor();
     const after = await snap();
     for (const k of Object.keys(before)) {
-      assert(JSON.stringify(after[k]) === JSON.stringify(before[k]), `${k} mudou ao atualizar da beta.3 (antes ${before[k].length}, depois ${after[k].length})`);
+      assert(JSON.stringify(after[k]) === JSON.stringify(before[k]), `${k} mudou ao atualizar da beta.4 (antes ${before[k].length}, depois ${after[k].length})`);
     }
-    // beta.4: atualizar não pede permissão de notificações nem liga lembretes.
+    // beta.5: quem atualiza não vê a configuração inicial e mantém o Painel aprovado; nada pede permissão de novo.
     assert(!permissionDialogOpen(), 'a atualização abriu o pedido de permissão de notificações');
-    assert(!notificationsGranted(), 'notificações concedidas sem a pessoa pedir');
+    assert(await page.getByRole('dialog', { name: /sugestões para/i }).count() === 0, 'a configuração inicial apareceu para quem atualizou');
+    const cardsAfter = await page.locator('[data-dashboard-card]').evaluateAll((els) => els.map((e) => e.getAttribute('data-dashboard-card')));
+    assert(JSON.stringify(cardsAfter.filter((c) => !['missoes'].includes(c))) === JSON.stringify(['saldo', 'nivel', 'atalhos', 'semana', 'proximos', 'dica']), `Painel diferente do aprovado: ${cardsAfter}`);
+    assert(notificationsGranted(), 'a atualização perdeu a permissão de notificações');
     assert(!/SCHEDULE_EXACT_ALARM|USE_EXACT_ALARM/.test(packageDump()), 'o app declara permissão de alarme exato');
-    // Finanças: o estorno da beta.3 continua como movimentação própria (fora de Despesas); saldo 80 − 20.
+    // Lembretes da beta.4 continuam: mesma quantidade (sem duplicar) e o aviso chega depois da atualização.
+    await openReminders();
+    await expectPending(pendingMid, 'a quantidade de lembretes mudou ao atualizar');
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
+    await waitNotification('Lembrete da beta.4', atMid, 'agendado na beta.4, entregue depois de atualizar');
+    // Finanças: o estorno da beta.4 continua como movimentação própria (fora de Despesas); saldo 80 − 20.
     await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
     const refunds = page.locator('[data-refunds-total]');
     await refunds.waitFor();
-    assert(/20,00/.test((await refunds.textContent()) ?? ''), 'estorno da beta.3 não aparece na linha "Estornos"');
+    assert(/20,00/.test((await refunds.textContent()) ?? ''), 'estorno da beta.4 não aparece na linha "Estornos"');
     const body = (await page.locator('main').textContent()) ?? '';
     assert(/Despesas\s*R\$\s*0,00/.test(body.replace(/\u00a0/g, ' ')), `estorno contado como despesa: ${body.slice(0, 300)}`);
     assert(/\+?\s*(mais\s*)?R\$\s*60,00/.test(body.replace(/\u00a0/g, ' ')), 'saldo do mês diferente de R$ 60,00');
     assert(await page.locator('[data-link-label]').filter({ hasText: 'Estorno de pagamento' }).count() === 1, 'rótulo "Estorno de pagamento" ausente');
     await wait(800);
-    shot('00b-atualizado-da-beta3-financas');
+    shot('00b-atualizado-da-beta4-financas');
     // beta.3: a busca do cabeçalho encontra o atendimento da 0.4 sem internet (só dados do aparelho).
     await tap(page.getByRole('button', { name: 'Buscar' }));
     const busca = page.getByRole('dialog', { name: 'Buscar' });
@@ -450,7 +532,7 @@ try {
     await page.keyboard.press('Escape');
     await busca.waitFor({ state: 'detached' });
 
-    // beta.4 — Relatórios com os dados reais da beta.3: mesmos números de Finanças (80 − 20 = 60).
+    // beta.4 — Relatórios com os dados reais vindos da beta.4: mesmos números de Finanças (80 − 20 = 60).
     await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
     await tap(page.getByRole('button', { name: /^relatórios/i }));
     await page.waitForFunction(() => location.hash === '#/financas/relatorios');
@@ -486,12 +568,15 @@ try {
     for (const k of Object.keys(before)) {
       assert(JSON.stringify(afterReceipt[k]) === JSON.stringify(before[k]), `emitir o recibo alterou ${k}`);
     }
-    console.log(`\n  dados preservados (beta.3 → atual): ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
+    console.log(`\n  dados preservados (beta.4 → atual): ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
   });
 
   await step('Instalar APK', async () => {
     adb('install', '-r', apk);
     adb('shell', 'pm', 'clear', PKG);
+    // Instalação "nova": a permissão de notificações dada na etapa de atualização volta a não concedida.
+    try { adb('shell', 'pm', 'revoke', PKG, 'android.permission.POST_NOTIFICATIONS'); } catch { /* já revogada */ }
+    try { adb('shell', 'pm', 'clear-permission-flags', PKG, 'android.permission.POST_NOTIFICATIONS', 'user-set', 'user-fixed'); } catch { /* sem flags */ }
   });
 
   await step('Abrir app e mostrar boas-vindas', async () => {
@@ -815,76 +900,13 @@ try {
     await page.getByText('Cliente Persistente').waitFor();
   });
 
-  // ---- beta.4: lembretes reais (notificações locais não exatas) ----
-  const delivered = []; // horários dos avisos entregues
-  const openReminders = async () => {
-    await tap(page.getByRole('button', { name: /^ajustes$/i }));
-    await tap(page.getByRole('button', { name: /^lembretes/i }));
-    await page.waitForFunction(() => location.hash === '#/ajustes/lembretes');
-  };
-  const reminderCount = async () => Number(await page.locator('[data-reminders-count]').getAttribute('data-reminders-count', { timeout: 2000 }));
-  /** Neste fluxo, logo depois de agendar há exatamente 1 aviso pendente (os anteriores já dispararam). */
-  const expectPending = (n, msg) => eventually(async () => (await reminderCount()) === n, msg, 20_000);
-  /** Agenda um atendimento (com cliente) cujo aviso de 15 min dispara em 1–2 min, e espera o app agendar o aviso. */
-  const scheduleSoon = async (title) => {
-    const at = deviceLocalIn(16 * 60);
-    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
-    await tap(page.getByRole('button', { name: /^agendar$/i }));
-    const form = page.getByRole('dialog');
-    await form.getByLabel(/descrição/i).fill(title);
-    await form.getByLabel(/^cliente/i).selectOption({ label: 'Cliente Persistente' });
-    await form.getByLabel(/^data/i).fill(at.date);
-    await form.getByLabel(/^horário/i).fill(at.time);
-    await form.getByLabel(/valor/i).fill('123,45');
-    await tap(form.getByRole('button', { name: /^agendar$/i }));
-    await form.waitFor({ state: 'detached' });
-    await openReminders();
-    return at;
-  };
-  /** Espera o aviso do atendimento (identificado pelo horário "· HH:MM" no título) e confere a privacidade. */
-  const waitNotification = async (title, at, state) => {
-    const t0 = Date.now();
-    const mark = `15 minutos · ${at.time}`;
-    const text = await eventually(() => { const n = appNotifications(); return n.includes(mark) ? n : null; }, `aviso de "${title}" (${mark}) não chegou (${state})`, 9 * 60_000);
-    const block = text.split(/\n(?=\s*NotificationRecord\()/).find((b) => b.includes(mark)) ?? '';
-    // Padrão: só o horário. Nada da descrição, do cliente ou do valor (a tela bloqueada pode mostrar o conteúdo).
-    assert(!block.includes(title), 'o aviso mostra a descrição do atendimento (deveria estar desligado por padrão)');
-    assert(!/Cliente Persistente/.test(block), 'o aviso mostra o nome do cliente');
-    assert(!/123,45|R\$/.test(block), 'o aviso mostra valores');
-    assert(/Toque para ver os detalhes no Ofício/.test(block), 'texto padrão do aviso ausente');
-    assert(/vis=PRIVATE/.test(block), 'aviso não marcado como privado');
-    delivered.push(mark);
-    console.log(`\n  aviso "${title}" (${state}) chegou após ${Math.round((Date.now() - t0) / 1000)} s`);
-    return block;
-  };
-
   await step('Lembretes: permissão só ao ligar, sem alarme exato', async () => {
-    // Tela ligada durante as esperas (o aviso não exato pode levar alguns minutos).
-    adb('shell', 'svc', 'power', 'stayon', 'true');
-    adb('shell', 'settings', 'put', 'system', 'screen_off_timeout', '1800000');
     const dump = packageDump();
     assert(!/SCHEDULE_EXACT_ALARM|USE_EXACT_ALARM/.test(dump), 'o app declara permissão de alarme exato');
     assert(/android\.permission\.POST_NOTIFICATIONS/.test(dump), 'o app não declara POST_NOTIFICATIONS');
     assert(!notificationsGranted(), 'notificações concedidas antes de ligar os lembretes');
-    await openReminders();
-    const sw = page.getByRole('switch', { name: /lembretes de atendimentos/i });
-    assert((await sw.getAttribute('aria-checked')) === 'false', 'lembretes ligados por padrão');
-    assert(!permissionDialogOpen(), 'a tela de Lembretes pediu permissão sem a pessoa ligar');
-    shot('09-lembretes-desligados');
-    await tap(sw);
-    await eventually(() => permissionDialogOpen(), 'o pedido de permissão do Android não abriu ao ligar');
-    await wait(1000);
-    shot('09b-pedido-permissao');
-    const allow = await eventually(() => findUiNode((n) => /permission_allow_button/.test(n.id) || (/^(allow|permitir)$/i.test(n.text) && n.enabled)), 'botão Permitir não encontrado', 15_000);
-    adb('shell', 'input', 'tap', String(allow.x), String(allow.y));
-    await eventually(() => resumedPackage() === PKG, 'o app não voltou após permitir');
-    await eventually(async () => (await sw.getAttribute('aria-checked')) === 'true', 'lembretes não ligaram após permitir');
-    assert(notificationsGranted(), 'permissão não registrada pelo Android');
-    // Só 15 minutos antes (desmarca os 30 minutos padrão).
-    await tap(page.getByRole('button', { name: '15 minutos antes' }));
-    await tap(page.getByRole('button', { name: '30 minutos antes' }));
-    await eventually(async () => (await page.getByRole('button', { name: '15 minutos antes' }).getAttribute('aria-pressed')) === 'true'
-      && (await page.getByRole('button', { name: '30 minutos antes' }).getAttribute('aria-pressed')) === 'false', 'antecedências não salvas');
+    delivered.length = 0; // conta só os avisos desta instalação nova
+    await enableReminders(true);
     await wait(800);
     shot('09c-lembretes-ligados');
   });

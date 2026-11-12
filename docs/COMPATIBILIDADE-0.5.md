@@ -115,6 +115,19 @@ sincronização. Por isso o gerador da 0.5 não pode “preencher buracos”: el
 | Aparelho na beta.3 | Não vê relatórios, recibos nem lembretes; os dados continuam idênticos |
 | Regras do Firestore | Sem mudança |
 
+## O que a 0.5.0-beta.5 mudou
+
+| Situação | Na 0.5.0-beta.5 |
+| --- | --- |
+| Painel | `settings.dashboard = { v: 1, order: string[], hidden: string[], orderAt?, hiddenAt? }` (preferências da conta, sincronizadas; sem coleção nova, regras sem mudança). Valor antigo ou inválido = padrão; ids e campos desconhecidos preservados. A beta.4 só preserva o campo |
+| Mesclagem do Painel | Visibilidade cartão a cartão (vale quem mexeu no cartão; os dois → mais recente); ordem: mudou de um lado → esse lado; dos dois → `orderAt` mais recente. Base sem `dashboard` = padrão |
+| Backup: soma | `checksum = { algorithm: "SHA-256", value }` no topo do arquivo. Cobre **todo o arquivo exceto `checksum`** (`format`, `version`, `appVersion`, `exportedAt`, `data`), em JSON canônico (chaves em ordem crescente, sem espaços, arrays na ordem do arquivo, números e textos como `JSON.stringify`), codificado em UTF-8. Verifica integridade, não autoria. Formato continua 1; a beta.4 ignora o campo e importa normalmente |
+| Backup sem soma | Arquivos anteriores à beta.5: aceitos depois da validação estrutural, mostrados como “sem verificação de integridade”. Soma presente e diferente, malformada ou de outro algoritmo: arquivo recusado |
+| Validação | Além da anterior: ids vazios ou repetidos numa coleção, `time`/`clientId` que não sejam texto, preferências que não sejam objeto e conquistas sem data recusam o arquivo inteiro |
+| Restauração com conta | Marcações de envio/exclusão desfeitas se a gravação local falhar; o envio só é agendado depois de gravar |
+| Tipos de serviço sugeridos | Id `sugestao-<profissão>-<nome normalizado>` (mesmo formato de id; continuam fora da nuvem até as regras novas) |
+| Preferências do aparelho | `agendaView` (visão inicial da Agenda; padrão Lista) e a marca `setup:offer` (configuração inicial pendente), só no aparelho |
+
 ## Riscos que continuam
 
 - **Aparelho ainda na beta.3 ou anterior.** Ele não tem estas proteções. Antes de usar a 0.5, todos os

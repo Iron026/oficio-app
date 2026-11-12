@@ -66,6 +66,14 @@ registrada; número estável) e lembretes: `domain/reminders.ts` (planejamento p
 (plugin de notificações locais, não exato; reconciliação idempotente) e `platform/reminderSync.ts` (controlador
 que reconcilia ao abrir, ao voltar ao app e a cada mudança de dados ou preferências; só no app nativo).
 
+**0.5.0-beta.5.** `domain/dashboard.ts`: layout do Painel em `settings.dashboard` e `mergeDashboard` (chamada por
+`sync/merge.ts` › `mergeMeta`: visibilidade por cartão, ordem pela mudança mais recente). `lib/sha256.ts` (SHA-256 e
+JSON canônico), `storage/backup.ts` › `inspectBackup` (soma, estrutura, erros por tipo) e `domain/backupPreview.ts`
+(contagens e perdas); `sync/engine.ts` › `beforeReplaceAll` devolve `commit/rollback` e `TrackedStorage.replaceAll`
+desfaz as marcações se a gravação local falhar. `domain/initialSetup.ts` + `AppService.applyInitialSetup`
+(configuração inicial; ids `sugestao-<profissão>-<nome>`). Lembretes: a primeira reconciliação depois de abrir o app
+reagenda tudo (`force`).
+
 ## Conta e sincronização (v0.3)
 
 Ver [SINCRONIZACAO.md](SINCRONIZACAO.md). Resumo: `TrackedStorage` registra alterações locais; `SyncEngine` envia/recebe pelo `RemoteStore` (Firestore) com controle de revisão e mesclagem em 3 vias; `AccountController` orquestra login e associação. Sem Firebase configurado, o app é 100% local.
