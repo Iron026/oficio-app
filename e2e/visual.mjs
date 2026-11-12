@@ -101,6 +101,14 @@ async function settle(page, keepScroll = false) {
   await page.waitForTimeout(150);
 }
 
+
+/** beta.5: depois do cadastro, a configuração inicial aparece uma vez; os fluxos seguem pelo "Pular". */
+async function skipSetup(page) {
+  const sheet = page.getByRole('dialog', { name: /sugestões para/i });
+  await sheet.waitFor();
+  await sheet.getByRole('button', { name: 'Pular' }).click();
+  await sheet.waitFor({ state: 'detached' });
+}
 // ---------------------------------------------------------------- dados pela interface
 async function seed(page) {
   await page.goto(BASE);
@@ -110,6 +118,7 @@ async function seed(page) {
   await page.getByLabel(/seu nome/i).fill('Ana Souza');
   await page.getByLabel(/nome do negócio/i).fill('Studio Ana Beleza');
   await page.getByRole('button', { name: /entrar no ofício/i }).click();
+  await skipSetup(page);
   await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
   // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
   await page.waitForFunction(() => location.hash === '#/painel');
@@ -323,6 +332,10 @@ try {
       await fresh.page.getByRole('button', { name: /continuar/i }).click();
       await fresh.page.getByLabel(/seu nome/i).fill('Ana Souza');
       await fresh.page.getByRole('button', { name: /entrar no ofício/i }).click();
+      // beta.5: configuração inicial por profissão (capturada antes de pular).
+      await fresh.page.getByRole('dialog', { name: /sugestões para/i }).waitFor();
+      await capture(fresh.page, vp, theme, 'configuracao-inicial');
+      await skipSetup(fresh.page);
       for (const s of SCREENS.filter((x) => ['painel', 'agenda', 'clientes', 'financas'].includes(x.id))) {
         await fresh.page.goto(BASE + s.hash);
         await fresh.page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
@@ -587,6 +600,7 @@ try {
       await page.getByRole('button', { name: /continuar/i }).click();
       await page.getByLabel(/seu nome/i).fill('Ana Souza');
       await page.getByRole('button', { name: /entrar no ofício/i }).click();
+      await skipSetup(page);
       await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
       // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
       await page.waitForFunction(() => location.hash === '#/painel');
@@ -660,6 +674,7 @@ try {
       await page.getByRole('button', { name: /continuar/i }).click();
       await page.getByLabel(/seu nome/i).fill('Ana Souza');
       await page.getByRole('button', { name: /entrar no ofício/i }).click();
+      await skipSetup(page);
       await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
       // O cadastro termina indo para o Painel: só depois disso a rota pode ser trocada pelo teste.
       await page.waitForFunction(() => location.hash === '#/painel');

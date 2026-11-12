@@ -18,6 +18,7 @@ import { useProfile } from '../state/useProfile';
 import { HeroSlot } from './Shell';
 import { AppointmentItem } from './AppointmentItem';
 import { DashboardCustomizer } from './DashboardCustomizer';
+import { InitialSetupSheet } from './InitialSetupSheet';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
 import { ClientFormSheet } from './forms/ClientForm';
 import { TransactionFormSheet } from './forms/TransactionForm';
@@ -44,9 +45,12 @@ function Alert({ href, tone, icon, children, id }: { href: string; tone: 'amber'
 }
 
 export function Dashboard() {
-  const { data, profession } = useApp();
+  const { data, profession, service } = useApp();
   const cloud = useCloud();
   const [sheet, setSheet] = useState<Sheet>(null);
+  // beta.5: configuração inicial oferecida uma vez, logo depois do cadastro.
+  const [setup, setSetup] = useState(() => service.setupOffer);
+  const endSetup = () => { setSetup(false); if (service.setupOffer) void service.dismissInitialSetup(); };
   const now = new Date();
   const profile = data.profile!;
   const t = profession.terms;
@@ -272,6 +276,7 @@ export function Dashboard() {
       <ClientFormSheet open={sheet === 'cliente'} onClose={() => setSheet(null)} />
       <TransactionFormSheet open={sheet === 'receita' || sheet === 'despesa'} defaultType={sheet === 'despesa' ? 'despesa' : 'receita'} onClose={() => setSheet(null)} />
       <DashboardCustomizer open={sheet === 'personalizar'} onClose={() => setSheet(null)} />
+      <InitialSetupSheet open={setup} onClose={endSetup} welcome />
     </div>
   );
 }

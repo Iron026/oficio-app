@@ -10,7 +10,6 @@ import { Button, IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { TextField } from '../ui/Field';
 import { ProfessionIcon } from '../ui/icons';
-import { useToast } from '../ui/Toast';
 import { Logo } from './Shell';
 import { GoogleButton, useAccountFlow } from './Account';
 import { useCloud } from '../state/CloudContext';
@@ -135,7 +134,6 @@ function ProfessionStep({ value, onChange, onBack, onNext }: { value: Profession
 function ProfileStep({ professionId, onBack }: { professionId: ProfessionId; onBack: () => void }) {
   const { service } = useApp();
   const onError = useErrorHandler();
-  const toast = useToast();
   const [v, setV] = useState<ProfileInput>({ name: '', businessName: '' });
   const [errors, setErrors] = useState<Errors<ProfileInput>>({});
   const [demo, setDemo] = useState(false);
@@ -148,10 +146,10 @@ function ProfileStep({ professionId, onBack }: { professionId: ProfessionId; onB
     if (hasErrors(errs)) return;
     setSaving(true);
     try {
-      await service.completeOnboarding({ ...v, professionId });
+      await service.completeOnboarding({ ...v, professionId }, { offerSetup: true });
       if (demo) await service.loadDemoData();
       navigate('painel');
-      toast({ title: 'Tudo pronto!', description: 'Bem-vindo(a) ao Ofício.', tone: 'success' });
+      // beta.5: as boas-vindas ficam na configuração inicial, que abre em seguida (o aviso cobriria o rodapé dela).
     } catch (err) {
       onError(err);
       setSaving(false);

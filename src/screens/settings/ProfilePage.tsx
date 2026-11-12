@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Award, Check, ListChecks, Pencil, Target, UserRound } from 'lucide-react';
+import { InitialSetupSheet } from '../InitialSetupSheet';
+import { Award, Check, ListChecks, Pencil, Target, UserRound, Sparkles } from 'lucide-react';
 import { PROFESSION_LIST } from '../../domain/professions';
 import { avatarOf, featuredSealOf } from '../../domain/preferences';
 import type { ProfessionId, SealId } from '../../domain/types';
@@ -24,7 +25,7 @@ import { ProfileImageSheet } from '../ProfileImageSheet';
 import { ServiceTypesSheet } from '../ServiceTypesSheet';
 import { OptionRow, SettingsSubpage } from './shared';
 
-type ProfileSheetId = null | 'perfil' | 'profissao' | 'imagem' | 'selo' | 'metas' | 'servicos';
+type ProfileSheetId = null | 'perfil' | 'profissao' | 'imagem' | 'selo' | 'metas' | 'servicos' | 'sugestoes';
 
 export function ProfilePage() {
   const { data, profession } = useApp();
@@ -56,6 +57,7 @@ export function ProfilePage() {
           detail={data.serviceTypes.length ? `${data.serviceTypes.length} ${data.serviceTypes.length === 1 ? 'tipo' : 'tipos'} · ${data.serviceTypes.filter((s) => s.pinned).length} fixado(s)` : 'Atalhos de nome e valor para agendar'}
           icon={<ListChecks size={18} />}
         />
+        <OptionRow onClick={() => setSheet('sugestoes')} label={`Sugestões para ${profession.name.toLowerCase()}`} detail="Serviços comuns, Painel, Agenda, cor e imagem" icon={<Sparkles size={18} />} />
       </Card>
       <ProfileSheet open={sheet === 'perfil'} onClose={close} />
       <ProfessionSheet open={sheet === 'profissao'} onClose={close} />
@@ -63,6 +65,7 @@ export function ProfilePage() {
       <FeaturedSealSheet open={sheet === 'selo'} seals={seals} onClose={close} />
       <GoalsSheet open={sheet === 'metas'} onClose={close} />
       <ServiceTypesSheet open={sheet === 'servicos'} onClose={close} />
+      <InitialSetupSheet open={sheet === 'sugestoes'} onClose={close} />
     </SettingsSubpage>
   );
 }

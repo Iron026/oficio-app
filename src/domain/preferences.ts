@@ -1,4 +1,5 @@
 import { SEAL_IDS } from '../gamification/seals';
+import { AGENDA_VIEWS, type AgendaView } from './initialSetup';
 import type { AccentId, AvatarChoice, SealId, Settings, ThemePreference } from './types';
 import { DEFAULT_REMINDERS, readReminderPrefs, type ReminderPrefs } from './reminders';
 
@@ -28,13 +29,15 @@ export interface DevicePrefs {
   haptics: boolean;
   /** Lembretes de atendimentos (beta.4): por aparelho, desligados por padrão. */
   reminders: ReminderPrefs;
+  /** Visão em que a Agenda abre (beta.5, configuração inicial). Padrão: Lista, como antes. */
+  agendaView: AgendaView;
 }
 
 export const DEVICE_PREFS_KEY = 'prefs:device:v1';
 export const ACCENTS: readonly AccentId[] = ['petroleo', 'oceano', 'safira', 'indigo', 'ameixa', 'vinho', 'grafite', 'oliva'];
 const THEMES: readonly ThemePreference[] = ['system', 'light', 'dark'];
 
-export const DEFAULT_DEVICE_PREFS: DevicePrefs = { version: 1, theme: 'system', density: 'confortavel', hideValues: false, motion: 'sistema', haptics: false, reminders: DEFAULT_REMINDERS };
+export const DEFAULT_DEVICE_PREFS: DevicePrefs = { version: 1, theme: 'system', density: 'confortavel', hideValues: false, motion: 'sistema', haptics: false, reminders: DEFAULT_REMINDERS, agendaView: 'lista' };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -54,6 +57,7 @@ export function readDevicePrefs(stored: unknown, legacyTheme: ThemePreference | 
     // Só `true` explícito liga: quem atualiza de versões anteriores fica sem vibração.
     haptics: stored.haptics === true,
     reminders: readReminderPrefs(stored.reminders),
+    agendaView: AGENDA_VIEWS.includes(stored.agendaView as AgendaView) ? (stored.agendaView as AgendaView) : 'lista',
   };
 }
 

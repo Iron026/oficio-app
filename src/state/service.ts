@@ -5,13 +5,14 @@ import { paymentSummary, type PaymentMark, type PaymentMethod } from '../domain/
 import { refundGroups, reviewLog } from '../domain/refundReview';
 import { addDaysKey } from '../domain/agenda';
 import { effectiveRule, isPristineOccurrence, nextVersion, occurrenceId, staleOccurrences, pendingOccurrences, ruleFromRepeat, sameRule, seriesDates, seriesGroups, seriesOf } from '../domain/recurrence';
-import { MAX_SERVICE_TYPES, moveServiceType, nextServiceOrder, serviceNameKey } from '../domain/serviceTypes';
+import { MAX_SERVICE_TYPES, isDuration, moveServiceType, nextServiceOrder, serviceNameKey } from '../domain/serviceTypes';
 import { isValidProfileImage } from '../domain/profileImage';
-import { DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
+import { ACCENTS, DEFAULT_DEVICE_PREFS, DEVICE_PREFS_KEY, readDevicePrefs, type DevicePrefs } from '../domain/preferences';
 import { awardsToSave, mergeAward } from '../gamification/seals';
 import { tierForLevel, tierKey, type Tier } from '../gamification/tiers';
 import { DEFAULT_SETTINGS } from '../domain/types';
-import { readDashboard, type DashboardLayout } from '../domain/dashboard';
+import { isDefaultDashboard, readDashboard, type DashboardLayout } from '../domain/dashboard';
+import { AGENDA_VIEWS, professionDashboard, suggestedServiceId, type SetupChoice } from '../domain/initialSetup';
 import { actionAward, evaluate, totalXp, type ActionType } from '../gamification/engine';
 import { levelInfo } from '../gamification/levels';
 import { CELEBRATION_KEY, isCelebrationDue, nextCelebration, readCelebration, type CelebrationRecord } from '../gamification/celebration';
@@ -104,6 +105,8 @@ export interface BackupPreview {
 
 /** Chave (só neste aparelho) da data do último backup exportado. */
 export const LAST_EXPORT_KEY = 'export:lastBackup';
+/** Marca local: oferecer a configuração inicial (beta.5) uma vez, depois do cadastro. */
+export const SETUP_OFFER_KEY = 'setup:offer';
 
 export class AppService {
   private listeners = new Set<Listener>();
@@ -112,6 +115,7 @@ export class AppService {
   private _prefs: DevicePrefs = DEFAULT_DEVICE_PREFS;
   private _celebration: CelebrationRecord | null = null;
   private _lastExport: string | null = null;
+  private _setupOffer = false;
   private _undo: UndoEntry | null = null;
   private undoSeq = 0;
 
@@ -133,7 +137,82 @@ export class AppService {
     if (!service._celebration && data.profile) await service.recordCelebration(true);
     const last = await storage.kvGet<unknown>(LAST_EXPORT_KEY);
     service._lastExport = typeof last === 'string' && !Number.isNaN(Date.parse(last)) ? last : null;
+    service._setupOffer = (await storage.kvGet<unknown>(SETUP_OFFER_KEY)) === true && !!data.profile;
     return service;
+  }
+
+  /**
+   * Configuração inicial (beta.5): oferecida uma vez, só a quem acabou de fazer o cadastro pela tela de boas-vindas
+   * (nunca a quem atualiza, nem a quem recupera a conta pelo Google). Marca local, deste aparelho.
+   */
+  get setupOffer(): boolean {
+    return this._setupOffer;
+  }
+  offerInitialSetup(): Promise<void> {
+    return this.run(async () => {
+      this._setupOffer = true;
+      await this.storage.kvSet(SETUP_OFFER_KEY, true);
+      this.listeners.forEach((l) => l(this._data));
+    });
+  }
+  dismissInitialSetup(): Promise<void> {
+    return this.run(async () => {
+      this._setupOffer = false;
+      await this.storage.kvDelete(SETUP_OFFER_KEY);
+      this.listeners.forEach((l) => l(this._data));
+    });
+  }
+
+  /**
+   * Aplica só o que a pessoa confirmou na configuração inicial. Tipos de serviço: nomes que já existem são pulados
+   * (nunca sobrescreve um tipo seu), id determinístico (repetir não duplica), sem duração presumida. Não cria
+   * clientes, atendimentos, lançamentos nem XP, e não muda o perfil.
+   */
+  applyInitialSetup(choice: SetupChoice): Promise<{ created: number; skipped: number }> {
+    return this.run(async () => {
+      const professionId = this._data.profile?.professionId ?? 'outros';
+      const stamp = this.stamp();
+      const keys = new Set(this._data.serviceTypes.map((t) => serviceNameKey(t.name)));
+      const ids = new Set(this._data.serviceTypes.map((t) => t.id));
+      const created: ServiceType[] = [];
+      let skipped = 0;
+      choice.services.forEach((sv, i) => {
+        const errors = validateServiceType({ name: sv.name, price: sv.price });
+        if (hasErrors(errors)) throw new ValidationError({ [`servico${i}`]: errors.name ?? errors.price ?? 'Confira este serviço.' });
+        const dur = sv.duration.trim() ? Number(sv.duration) : null;
+        if (dur !== null && !isDuration(dur)) throw new ValidationError({ [`servico${i}`]: 'Duração inválida.' });
+        const name = sv.name.trim().replace(/\s+/g, ' ');
+        const id = suggestedServiceId(professionId, name);
+        if (keys.has(serviceNameKey(name)) || ids.has(id)) { skipped++; return; }
+        keys.add(serviceNameKey(name));
+        ids.add(id);
+        created.push({
+          id, name, price: sv.price.trim() ? parseMoney(sv.price)! : null, pinned: sv.pinned,
+          order: nextServiceOrder([...this._data.serviceTypes, ...created]),
+          ...(dur !== null ? { duration: dur } : {}),
+          createdAt: stamp, updatedAt: stamp,
+        });
+      });
+      if (this._data.serviceTypes.length + created.length > MAX_SERVICE_TYPES) throw new Error(`Limite de ${MAX_SERVICE_TYPES} tipos de serviço.`);
+      for (const t of created) await this.storage.serviceTypes.put(t);
+
+      let settings = this._data.settings;
+      if (choice.accent && ACCENTS.includes(choice.accent)) settings = { ...settings, accent: choice.accent };
+      if (choice.avatarId) settings = { ...settings, avatar: { kind: 'interno', id: choice.avatarId } };
+      // O Painel só é organizado se ainda estiver no padrão: nunca desfaz uma personalização.
+      if (choice.organizeDashboard && isDefaultDashboard(readDashboard(settings.dashboard))) settings = { ...settings, dashboard: professionDashboard(professionId, stamp) };
+      if (settings !== this._data.settings) await this.storage.saveSettings(settings);
+      this.set({ ...this._data, settings, serviceTypes: [...this._data.serviceTypes, ...created] });
+
+      if (choice.agendaView && AGENDA_VIEWS.includes(choice.agendaView)) {
+        this._prefs = { ...this._prefs, agendaView: choice.agendaView };
+        await this.storage.kvSet(DEVICE_PREFS_KEY, this._prefs);
+        this.prefsListeners.forEach((l) => l(this._prefs));
+      }
+      this._setupOffer = false;
+      await this.storage.kvDelete(SETUP_OFFER_KEY);
+      return { created: created.length, skipped };
+    });
   }
 
   /** Categoria atual (derivada do nível; não é gravada). */
@@ -299,10 +378,15 @@ export class AppService {
 
   // ------------------------------------------------------------ perfil
 
-  completeOnboarding(input: Pick<Profile, 'name' | 'businessName' | 'professionId'>): Promise<Profile> {
+  completeOnboarding(input: Pick<Profile, 'name' | 'businessName' | 'professionId'>, opts: { offerSetup?: boolean } = {}): Promise<Profile> {
     return this.run(async () => {
       const errors = validateProfile(input);
       if (hasErrors(errors)) throw new ValidationError(errors);
+      // Cadastro pela tela de boas-vindas: oferece a configuração inicial uma vez (antes de o Painel aparecer).
+      if (opts.offerSetup) {
+        this._setupOffer = true;
+        await this.storage.kvSet(SETUP_OFFER_KEY, true);
+      }
       const profile: Profile = {
         name: input.name.trim(), businessName: input.businessName.trim(), professionId: input.professionId,
         createdAt: this.stamp(), weeklyGoalServices: 5, monthlyGoalRevenue: 300_000,
@@ -1085,6 +1169,8 @@ export class AppService {
       await this.storage.kvDelete(DEVICE_PREFS_KEY);
       await this.storage.kvDelete(CELEBRATION_KEY);
       await this.storage.kvDelete(LAST_EXPORT_KEY);
+      await this.storage.kvDelete(SETUP_OFFER_KEY);
+      this._setupOffer = false;
       this._celebration = null;
       this._lastExport = null;
       this._prefs = { ...DEFAULT_DEVICE_PREFS };

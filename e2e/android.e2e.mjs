@@ -542,6 +542,14 @@ try {
     await tap(page.getByRole('button', { name: /continuar/i }));
     await page.getByLabel(/seu nome/i).fill('Ana Teste');
     await tap(page.getByRole('button', { name: /entrar no ofício/i }));
+    // beta.5: configuração inicial por profissão, opcional; "Pular" não aplica nada.
+    const setup = page.getByRole('dialog', { name: /sugestões para beleza/i });
+    await setup.waitFor();
+    await wait(1200);
+    shot('02a-configuracao-inicial');
+    await tap(setup.getByRole('button', { name: 'Pular' }));
+    await setup.waitFor({ state: 'detached' });
+    assert((await readStore(page, 'serviceTypes')).length === 0, '"Pular" criou tipos de serviço');
     await page.getByText(/atendimentos na semana/i).waitFor();
     await wait(1500);
     shot('02-painel-claro');

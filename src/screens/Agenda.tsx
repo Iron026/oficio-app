@@ -3,7 +3,7 @@ import { CalendarPlus, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { addDaysKey, addMonthsKey, weekKeys } from '../domain/agenda';
 import type { Appointment } from '../domain/types';
 import { relativeDayLabel, todayKey } from '../lib/dates';
-import { useApp } from '../state/AppContext';
+import { useApp, usePrefs } from '../state/AppContext';
 import { Button, IconButton } from '../ui/Button';
 import { EmptyState, Segmented } from '../ui/Misc';
 import { AppointmentItem } from './AppointmentItem';
@@ -40,7 +40,9 @@ export function Agenda() {
   useEffect(() => { void service.extendSeries().catch(() => undefined); }, [service]);
   const t = profession.terms;
   const [tab, setTab] = useState<Tab>('abertos');
-  const [view, setView] = useState<View>('lista');
+  const prefs = usePrefs();
+  // beta.5: visão inicial escolhida na configuração inicial (preferência deste aparelho; padrão Lista).
+  const [view, setView] = useState<View>(() => prefs.agendaView);
   const [cursor, setCursor] = useState(() => todayKey());
   const [creating, setCreating] = useState(false);
   const todayCount = data.appointments.filter((a) => a.status === 'agendado' && a.date === todayKey()).length;

@@ -25,6 +25,8 @@ describe('fluxo principal', () => {
 
     await user.type(screen.getByLabelText(/seu nome/i), 'Joana');
     await user.click(screen.getByRole('button', { name: /entrar no ofício/i }));
+    // beta.5: configuração inicial opcional logo depois do cadastro.
+    await user.click(within(await screen.findByRole('dialog', { name: /sugestões para alimentação/i })).getByRole('button', { name: 'Pular' }));
 
     expect(await screen.findByText('Joana')).toBeInTheDocument();
     // terminologia de alimentação
@@ -61,6 +63,8 @@ describe('Android: botão Voltar fecha painéis', () => {
     await user.click(screen.getByRole('button', { name: /continuar/i }));
     await user.type(screen.getByLabelText(/seu nome/i), 'Rita');
     await user.click(screen.getByRole('button', { name: /entrar no ofício/i }));
+    await user.click(within(await screen.findByRole('dialog', { name: /sugestões para limpeza/i })).getByRole('button', { name: 'Pular' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await screen.findByText('Rita');
     await user.click(screen.getByRole('button', { name: /^agendar$/i }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
