@@ -112,6 +112,9 @@ const sameList = (a: readonly unknown[] | undefined, b: readonly unknown[] | und
  */
 export function mergeDashboard(base: unknown, local: unknown, remote: unknown): unknown {
   if (local === undefined && remote === undefined) return undefined;
+  // Layout de uma versão futura na nuvem (v ≠ 1) é preservado como está (revisão beta.5); só lixo ou ausência na
+  // nuvem dá lugar ao layout local.
+  if (isObj(remote) && remote.v !== 1 && typeof remote.v === 'number' && remote.v > 1) return remote;
   if (!isObj(remote) || remote.v !== 1) return isObj(local) && local.v === 1 ? local : remote ?? local;
   if (!isObj(local) || local.v !== 1) return remote;
   const b = isObj(base) && base.v === 1 ? readDashboard(base) : null;

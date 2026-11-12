@@ -1155,9 +1155,15 @@ export class AppService {
       const data = { ...parsed, sealAwards: [...byId.values()] };
       await this.storage.replaceAll(data);
       this.set(data);
-      await this.awardSeals();
-      // Categoria vinda do backup não é comemorada como conquista nova.
-      await this.recordCelebration(true);
+      // Depois da troca dos dados, o resto é complementar: uma falha aqui não pode fazer a tela dizer que nada mudou
+      // (revisão beta.5). Selos e comemoração são recalculados de novo na próxima ação ou abertura.
+      try {
+        await this.awardSeals();
+        // Categoria vinda do backup não é comemorada como conquista nova.
+        await this.recordCelebration(true);
+      } catch (err) {
+        console.error('Selos/comemoração após restaurar', err);
+      }
     });
   }
 

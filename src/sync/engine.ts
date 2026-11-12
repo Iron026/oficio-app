@@ -227,6 +227,9 @@ export class SyncEngine implements ChangeTracker {
     this.status = s;
     this.listeners.forEach((l) => l());
   }
+  /** Restauração de backup aguardando a gravação local (ver beforeReplaceAll). */
+  private replacing = false;
+
   private async save() {
     await this.storage.kvSet(STATE_KEY, this.state);
     this.listeners.forEach((l) => l());
@@ -284,6 +287,14 @@ export class SyncEngine implements ChangeTracker {
     // beta.5: se a gravação local falhar, as marcações abaixo são desfeitas — senão a nuvem receberia exclusões de
     // registros que continuam no aparelho (pagamentos e estornos inclusive).
     const snapshot = structuredClone({ records: this.state.records, meta: this.state.meta });
+    const restore = () => {
+      this.state.records = snapshot.records;
+      this.state.meta = snapshot.meta;
+      this.replacing = false;
+    };
+    // Envios ficam suspensos até a gravação local terminar (commit) ou ser desfeita (rollback).
+    this.replacing = true;
+    try {
     const present = new Set<string>();
     for (const c of SYNC_COLLECTIONS) if (this.syncs(c)) for (const e of data[c] ?? []) present.add(recordKey(c, e.id));
     for (const key of new Set([...present, ...Object.keys(this.state.records)])) {
@@ -297,12 +308,19 @@ export class SyncEngine implements ChangeTracker {
     this.state.meta.dirty = true;
     this.state.meta.seq++;
     await this.save();
+    } catch (err) {
+      // Revisão beta.5: falha ao gravar o estado → as marcações em memória também são desfeitas.
+      restore();
+      throw err;
+    }
     return {
       // Envio só depois de a gravação local dar certo.
-      commit: () => this.schedule(),
+      commit: () => {
+        this.replacing = false;
+        this.schedule();
+      },
       rollback: async () => {
-        this.state.records = snapshot.records;
-        this.state.meta = snapshot.meta;
+        restore();
         await this.save();
       },
     };
@@ -491,6 +509,8 @@ export class SyncEngine implements ChangeTracker {
   }
 
   private async pushPending(uid: string) {
+    // Restauração em andamento: nada sai até a gravação local terminar (o envio é agendado no commit).
+    if (this.replacing) return;
     const items: PushItem[] = [];
     const seqs = new Map<string, number>();
     for (const [key, r] of Object.entries(this.state.records)) {
@@ -515,7 +535,8 @@ export class SyncEngine implements ChangeTracker {
         results.forEach((res, j) => {
           const it = chunk[j]!;
           const key = recordKey(it.collection, it.id);
-          const r = this.state.records[key]!;
+          const r = this.state.records[key];
+          if (!r) return; // estado substituído durante o envio (restauração desfeita)
           if (res.ok) {
             r.baseRev = res.rev;
             r.base = it.data;

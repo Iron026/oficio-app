@@ -111,3 +111,11 @@ describe('mesclagem entre aparelhos', () => {
     expect(mergeDashboard(undefined, 'lixo', a)).toEqual(a);
   });
 });
+
+describe('revisão independente (beta.5)', () => {
+  it('layout de versão futura na nuvem (v 2) não é sobrescrito pelo local', () => {
+    const futuro = { v: 2, cartoes: [{ id: 'x' }] };
+    expect(mergeDashboard(undefined, setCardVisible(DEFAULT_DASHBOARD, 'dica', false, T1), futuro)).toEqual(futuro);
+    expect(readDashboard(futuro)).toEqual(DEFAULT_DASHBOARD); // nesta versão, a tela usa o padrão
+  });
+});

@@ -3,6 +3,7 @@ import { Check, Star } from 'lucide-react';
 import { accentOf, avatarOf } from '../domain/preferences';
 import { choiceSummary, setupSuggestions, type AgendaView, type SetupChoice } from '../domain/initialSetup';
 import { centsToInput } from '../lib/money';
+import { serviceNameKey } from '../domain/serviceTypes';
 import { useApp, useErrorHandler, usePrefs } from '../state/AppContext';
 import { ValidationError } from '../state/service';
 import { getInternalAvatar } from '../ui/avatarCatalog';
@@ -58,13 +59,18 @@ function SetupForm({ onClose, onSkip, welcome }: { onClose: () => void; onSkip: 
   const summary = choiceSummary(choice);
   const set = (i: number, patch: Partial<ServiceRow>) => setServices((list) => list.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const palette = getPalette(sug.accent);
+  const existingKeys = useMemo(() => new Set(data.serviceTypes.map((x) => serviceNameKey(x.name))), [data.serviceTypes]);
 
   async function apply() {
     setBusy(true);
     setErrors({});
     try {
       const r = await service.applyInitialSetup(choice);
-      toast({ title: 'Personalização aplicada', description: r.created ? `${r.created} ${r.created === 1 ? 'tipo de serviço criado' : 'tipos de serviço criados'}.` : undefined, tone: 'success' });
+      const parts = [
+        r.created ? `${r.created} ${r.created === 1 ? 'tipo de serviço criado' : 'tipos de serviço criados'}` : '',
+        r.skipped ? `${r.skipped} já ${r.skipped === 1 ? 'existia e não foi duplicado' : 'existiam e não foram duplicados'}` : '',
+      ].filter(Boolean);
+      toast({ title: 'Personalização aplicada', description: parts.length ? `${parts.join('; ')}.` : undefined, tone: 'success' });
       onClose();
     } catch (err) {
       if (err instanceof ValidationError) {
@@ -123,7 +129,8 @@ function SetupForm({ onClose, onSkip, welcome }: { onClose: () => void; onSkip: 
                 {errors[String(i)] && !s.editing && <p role="alert" className="mt-1 text-red-700 dark:text-red-300">{errors[String(i)]}</p>}
                 {s.selected && !s.exists && s.editing && (
                   <div className="mt-2 grid gap-2">
-                    <TextField label="Nome" value={s.name} onChange={(e) => set(i, { name: e.target.value })} maxLength={60} error={errors[String(i)]} />
+                    <TextField label="Nome" value={s.name} onChange={(e) => set(i, { name: e.target.value })} maxLength={60}
+                      error={errors[String(i)] ?? (existingKeys.has(serviceNameKey(s.name)) ? 'Você já tem um tipo com esse nome; ele não será duplicado.' : undefined)} />
                     <div className="grid grid-cols-2 gap-2">
                       <TextField label="Valor de referência" prefix="R$" inputMode="decimal" value={s.price} onChange={(e) => set(i, { price: e.target.value })} optional />
                       <SelectField label="Duração" value={s.duration} onChange={(e) => set(i, { duration: e.target.value })} optional>

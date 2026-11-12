@@ -34,7 +34,7 @@ export function RestoreSheet({ text, preview, onClose }: { text: string; preview
   const compat = {
     mesma: `Feito nesta mesma versão (${v}).`,
     anterior: `Feito numa versão anterior (${v}). Compatível com esta.`,
-    'mais-nova': `Feito numa versão mais nova (${v}) que esta (v${__APP_VERSION__}). Os dados foram conferidos; informações que esta versão não usa são mantidas sem alteração.`,
+    'mais-nova': `Feito numa versão mais nova (${v}) que esta (v${__APP_VERSION__}). Os dados foram conferidos. Campos extras nos registros e nas preferências são mantidos; tipos de dados que esta versão não conhece são ignorados.`,
     desconhecida: 'Versão do app não informada no arquivo (backups anteriores à 0.4.0-beta.3). A estrutura foi conferida.',
   }[preview.compatibility];
   const r = loss.removed;
