@@ -25,26 +25,28 @@ const asPermission = (v: string | undefined): NotifyPermission => (v === 'grante
 
 /** Plataforma nativa (Android). Carregada sob demanda: o plugin só existe no app. */
 export function nativeReminderPlatform(): ReminderPlatform {
-  const plugin = async () => (await import('@capacitor/local-notifications')).LocalNotifications;
+  // O plugin do Capacitor é um Proxy que "tem" qualquer método, inclusive `then`: devolvê-lo direto de uma função
+  // async faria o `await` chamar `LocalNotifications.then()` (falha no Android). Por isso vai dentro de um objeto.
+  const plugin = async () => ({ ln: (await import('@capacitor/local-notifications')).LocalNotifications });
   let channel = false;
   return {
     available: () => isNative(),
     async checkPermission() {
-      return asPermission((await (await plugin()).checkPermissions()).display);
+      return asPermission((await (await plugin()).ln.checkPermissions()).display);
     },
     async requestPermission() {
-      return asPermission((await (await plugin()).requestPermissions()).display);
+      return asPermission((await (await plugin()).ln.requestPermissions()).display);
     },
     async pending() {
-      const { notifications } = await (await plugin()).getPending();
+      const { notifications } = await (await plugin()).ln.getPending();
       return notifications.map((n) => ({ id: n.id, at: n.schedule?.at ? new Date(n.schedule.at).getTime() : null, title: n.title ?? '', body: n.body ?? '' }));
     },
     async cancel(ids) {
-      if (ids.length) await (await plugin()).cancel({ notifications: ids.map((id) => ({ id })) });
+      if (ids.length) await (await plugin()).ln.cancel({ notifications: ids.map((id) => ({ id })) });
     },
     async schedule(list) {
       if (!list.length) return;
-      const ln = await plugin();
+      const { ln } = await plugin();
       if (!channel) {
         // Visibilidade privada: na tela bloqueada o Android mostra só que há um aviso do Ofício.
         await ln.createChannel({ id: CHANNEL_ID, name: 'Lembretes de atendimentos', description: 'Avisos antes dos atendimentos agendados', importance: 4, visibility: 0 });
