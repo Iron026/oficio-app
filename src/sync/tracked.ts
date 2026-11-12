@@ -6,7 +6,7 @@ import type { SyncCollection } from './types';
 export interface ChangeTracker {
   touch(collection: SyncCollection, id: string, deleted: boolean): Promise<void>;
   touchMeta(): Promise<void>;
-  beforeReplaceAll(data: AppData): Promise<void>;
+  beforeReplaceAll(data: AppData): Promise<{ commit: () => void; rollback: () => Promise<void> }>;
   afterClearAll(): Promise<void>;
 }
 
@@ -96,8 +96,15 @@ export class TrackedStorage implements StorageAdapter {
     return this.inner.loadAll();
   }
   async replaceAll(data: AppData) {
-    await this.active?.beforeReplaceAll(data);
-    await this.inner.replaceAll(data);
+    const pending = await this.active?.beforeReplaceAll(data);
+    try {
+      await this.inner.replaceAll(data);
+    } catch (err) {
+      // Gravação local falhou (a transação não alterou nada): a sincronização volta ao estado anterior.
+      await pending?.rollback();
+      throw err;
+    }
+    pending?.commit();
   }
   async clearAll() {
     await this.inner.clearAll();

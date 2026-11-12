@@ -3,6 +3,7 @@
  * imediato, mantido ao reabrir, restaurar padrão, avisos críticos sempre visíveis e "Ocultar valores".
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { signed } from '../test/backupFile';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { todayKey } from '../lib/dates';
@@ -81,7 +82,7 @@ describe('beta.5: Painel personalizável', () => {
       const json = JSON.parse(s.exportBackup());
       const r = json.data.transactions.find((t: { payment?: { kind?: string } }) => t.payment?.kind === 'estorno');
       json.data.transactions.push({ ...r, id: 'outro', amount: 5_000 });
-      await s.importBackup(JSON.stringify(json));
+      await s.importBackup(signed(json));
       await s.updateDashboard((l, at) => ({ ...l, hidden: [...l.order], hiddenAt: at }));
     });
     await open(db);

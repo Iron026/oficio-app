@@ -3,6 +3,7 @@
  * decisões com confirmação e Desfazer, e respeito a "Ocultar valores".
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { signed } from '../test/backupFile';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { refundIssues } from '../domain/refundReview';
@@ -28,7 +29,7 @@ async function start(hash: string) {
   const json = JSON.parse(s.exportBackup());
   const first = json.data.transactions.find((t: { type: string }) => t.type === 'despesa');
   json.data.transactions.push({ ...first, id: 'outro-aparelho', amount: 4_000, createdAt: new Date(Date.now() + 1000).toISOString() });
-  await s.importBackup(JSON.stringify(json));
+  await s.importBackup(signed(json));
   window.location.hash = hash;
   render(<App storageFactory={async () => ({ storage: await createIndexedDbAdapter(dbName), persistent: true })} />);
   await screen.findByRole('navigation', { name: /navegação principal/i });

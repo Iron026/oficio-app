@@ -7,6 +7,7 @@
  * docs/COMPATIBILIDADE-0.5.md.
  */
 import { totals } from '../domain/finance';
+import { signed } from '../test/backupFile';
 import type { AppData, Appointment, ServiceType, Transaction } from '../domain/types';
 import { paidForAppointment } from '../domain/compat';
 import { AppService } from '../state/service';
@@ -289,20 +290,20 @@ describe('beta.4: backup com campos da 0.5', () => {
     const json = JSON.parse(a.service.exportBackup());
     json.data.appointments[0].duration = -5;
     const before = JSON.stringify(a.service.data);
-    await expect(a.service.importBackup(JSON.stringify(json))).rejects.toThrow(/appointments.*duração/);
+    await expect(a.service.importBackup(signed(json))).rejects.toThrow(/appointments.*duração/);
     expect(JSON.stringify(a.service.data)).toBe(before);
     json.data.appointments[0].duration = 60;
     json.data.transactions = [{ ...payment('x', ap.id, 100, '2026-11-01'), payment: 'pix' }];
-    await expect(a.service.importBackup(JSON.stringify(json))).rejects.toThrow(/transactions.*pagamento/);
+    await expect(a.service.importBackup(signed(json))).rejects.toThrow(/transactions.*pagamento/);
   });
 
   it('a prévia avisa quando o arquivo vem de uma versão mais nova do app', async () => {
     const { a } = await pair();
     const json = JSON.parse(a.service.exportBackup());
-    expect(a.service.previewBackup(JSON.stringify(json)).newerApp).toBe(false);
+    expect(a.service.previewBackup(signed(json)).newerApp).toBe(false);
     json.appVersion = '0.5.0';
-    expect(a.service.previewBackup(JSON.stringify(json)).newerApp).toBe(true);
+    expect(a.service.previewBackup(signed(json)).newerApp).toBe(true);
     json.version = 2;
-    expect(() => a.service.previewBackup(JSON.stringify(json))).toThrow(/versão mais nova/);
+    expect(() => a.service.previewBackup(signed(json))).toThrow(/versão mais nova/);
   });
 });

@@ -2,6 +2,7 @@
  * 0.5.0-beta.3 — regressões encontradas na revisão de código independente (uma por achado).
  */
 import { refundIssues, reviewLog } from '../domain/refundReview';
+import { signed } from '../test/backupFile';
 import { paymentSummary } from '../domain/payments';
 import { seriesOf } from '../domain/recurrence';
 import type { AppointmentInput, RepeatInput } from '../lib/validation';
@@ -118,7 +119,7 @@ describe('revisão: estornos de receita da 0.4', () => {
     json.data.transactions.push({ id: 'leg', type: 'receita', amount: 5_000, description: 'Manicure', category: 'Atendimento', date: '2026-11-02', appointmentId: ap.id, createdAt: 'a', updatedAt: 'a' });
     json.data.transactions.push({ id: 'r1', type: 'despesa', amount: 5_000, description: 'Estorno', category: 'Estorno', date: '2026-11-02', appointmentId: ap.id, payment: { kind: 'estorno', of: 'leg' }, createdAt: 'b', updatedAt: 'b' });
     json.data.transactions.push({ id: 'r2', type: 'despesa', amount: 2_000, description: 'Estorno', category: 'Estorno', date: '2026-11-02', appointmentId: ap.id, payment: { kind: 'estorno', of: 'leg' }, createdAt: 'c', updatedAt: 'c' });
-    await s.importBackup(JSON.stringify(json));
+    await s.importBackup(signed(json));
     const [issue] = refundIssues(s.data.transactions);
     await s.resolveRefundIssue(issue!.signature, { remove: 'r2' });
     const leg = s.data.transactions.find((t) => t.id === 'leg')!;

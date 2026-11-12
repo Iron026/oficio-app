@@ -4,6 +4,7 @@
  * backup e integridade do XP. Tudo em centavos inteiros.
  */
 import { totals } from '../domain/finance';
+import { signed } from '../test/backupFile';
 import { duplicatePaymentIds, paymentSummary, receivables } from '../domain/payments';
 import { totalXp } from '../gamification/engine';
 import { createMemoryAdapter } from '../storage/memory';
@@ -175,7 +176,7 @@ describe('dados legados (0.4) não são reinterpretados', () => {
       { ...base, id: 'old-agenda', title: 'Manicure', date: '2026-11-20', price: 4_000, status: 'agendado', completedAt: null, transactionId: null },
     );
     json.data.transactions.push({ id: 'old-tx', type: 'receita', amount: 6_000, description: 'Corte', category: 'Serviços', date: '2026-10-01', appointmentId: 'old-pago', createdAt: base.createdAt, updatedAt: base.updatedAt });
-    await s.importBackup(JSON.stringify(json));
+    await s.importBackup(signed(json));
     return s;
   }
 

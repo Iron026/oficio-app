@@ -3,6 +3,7 @@
  * gráfico com equivalente em texto, estornos em revisão sinalizados e "Ocultar valores".
  */
 import { render, screen, within } from '@testing-library/react';
+import { signed } from '../test/backupFile';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { toDateKey } from '../lib/dates';
@@ -30,7 +31,7 @@ async function start({ hide = false, conflict = false } = {}) {
     const json = JSON.parse(s.exportBackup());
     const r = json.data.transactions.find((t: { payment?: { kind?: string } }) => t.payment?.kind === 'estorno');
     json.data.transactions.push({ ...r, id: 'outro', amount: 5_000, createdAt: new Date(Date.now() + 1000).toISOString() });
-    await s.importBackup(JSON.stringify(json));
+    await s.importBackup(signed(json));
   }
   if (hide) await s.updateDevicePrefs({ hideValues: true });
   window.location.hash = '#/financas';

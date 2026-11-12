@@ -57,6 +57,13 @@ mkdirSync(OUT, { recursive: true });
 const report = { geradoEm: new Date().toISOString(), relogio: NOW.toISOString(), estrito: STRICT, capturas: [], falhas: [], avisos: [] };
 const fail = (msg) => { report.falhas.push(msg); console.log(`  ✗ ${msg}`); };
 const warn = (msg) => { report.avisos.push(msg); console.log(`  ! ${msg}`); };
+/** beta.5: restaurar pela folha "Restaurar backup" (confirmação explícita). */
+async function restoreFromSheet(page) {
+  const sheet = page.getByRole('dialog', { name: 'Restaurar backup' });
+  await sheet.getByRole('checkbox', { name: /entendi/i }).check();
+  await sheet.getByRole('button', { name: /^restaurar$/i }).click();
+  await sheet.waitFor({ state: 'detached' });
+}
 
 // ---------------------------------------------------------------- servidor local (dist/)
 // A porta precisa estar livre: um servidor antigo serviria outro build sem aviso.
@@ -417,6 +424,15 @@ try {
       await page.getByRole('button', { name: /personalizar painel/i }).click();
       await page.getByRole('dialog', { name: 'Personalizar Painel' }).getByRole('button', { name: /restaurar padrão/i }).click();
       await page.keyboard.press('Escape');
+      // beta.5: restauração com pré-visualização (arquivo antigo sem soma, com dados a perder).
+      await page.goto(BASE + '#/ajustes/dados');
+      await page.getByRole('button', { name: /exportar backup/i }).waitFor();
+      await page.locator('input[type=file]').first().setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(veteranBackup('petroleo')) });
+      const rest = page.getByRole('dialog', { name: 'Restaurar backup' });
+      await rest.waitFor();
+      await capture(page, vp, theme, 'restaurar-backup');
+      await rest.getByRole('button', { name: 'Cancelar' }).click();
+      await rest.waitFor({ state: 'detached' });
       // Central de Ajustes: páginas internas (rodada 5).
       for (const sub of ['aparencia', 'aparencia/paleta', 'perfil', 'lembretes', 'privacidade', 'conta', 'dados', 'sobre']) {
         await page.goto(BASE + '#/ajustes/' + sub);
@@ -577,8 +593,7 @@ try {
       await page.goto(BASE + '#/ajustes/dados');
       await page.getByRole('button', { name: /exportar backup/i }).waitFor();
       await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(veteranBackup(theme === 'escuro' ? 'oceano' : 'petroleo')) });
-      await page.getByRole('button', { name: /^importar$/i }).click();
-      await page.getByText(/backup importado/i).first().waitFor();
+      await restoreFromSheet(page);
       await page.goto(BASE + '#/painel');
       await capture(page, vp, theme, 'experiente-painel');
       await page.goto(BASE + '#/evolucao');
@@ -621,8 +636,7 @@ try {
         await page.goto(BASE + '#/ajustes/dados');
         await page.getByRole('button', { name: /exportar backup/i }).waitFor();
         await page.locator('input[type=file]').first().setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(veteranBackup('petroleo', 32500 - 4244)) });
-        await page.getByRole('button', { name: /^importar$/i }).click();
-        await page.getByText(/backup importado/i).first().waitFor();
+        await restoreFromSheet(page);
         await page.goto(BASE + '#/evolucao');
         await page.getByText(/Diamante III/).first().waitFor();
         await capture(page, vp, theme, 'diamante-iii-evolucao');

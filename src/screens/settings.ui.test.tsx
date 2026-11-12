@@ -264,16 +264,40 @@ describe('Backup e dados — ações destrutivas protegidas', () => {
     await other.saveClient({ name: 'Bruna Alves', phone: '', email: '', address: '', notes: '' });
     await other.saveClient({ name: 'Carla Dias', phone: '', email: '', address: '', notes: '' });
     await user.upload(input, new File([other.exportBackup()], 'b.json', { type: 'application/json' }));
-    const dialog = await screen.findByRole('dialog', { name: /importar e restaurar/i });
-    const clientsRow = within(dialog).getByText('Clientes').parentElement!;
-    expect(within(clientsRow).getByText('1')).toBeInTheDocument(); // agora
-    expect(within(clientsRow).getByText('2')).toBeInTheDocument(); // no arquivo
-    expect(within(dialog).getByText(/cópia de segurança/i)).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Restaurar backup' });
+    const clientsRow = within(dialog).getByRole('row', { name: /^clientes/i });
+    expect(within(clientsRow).getAllByRole('cell').map((c) => c.textContent)).toEqual(['1', '2']); // agora, no arquivo
+    expect(within(dialog).getByText(/integridade verificada/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/cópia de segurança dos dados atuais/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 cliente não está no arquivo e será removido/i)).toBeInTheDocument();
+    // "Restaurar" só depois da confirmação explícita.
+    expect(within(dialog).getByRole('button', { name: /^restaurar$/i })).toBeDisabled();
     await user.click(within(dialog).getByRole('button', { name: /cancelar/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     const after = await reload(dbName);
     expect(after.data.clients.map((c) => c.name)).toEqual(['Cliente Guardada']);
     expect(after.data.profile?.name).toBe('Ana Souza');
+  });
+
+  it('beta.5: arquivo alterado é recusado pela soma; arquivo válido restaura só depois de marcar a confirmação', async () => {
+    const { dbName, user } = await open('#/ajustes/dados', withClient);
+    const input = document.querySelector('input[type=file]') as HTMLInputElement;
+    const other = await AppService.load(await createIndexedDbAdapter(`other-${Math.random()}`));
+    await other.completeOnboarding({ name: 'Outra', businessName: '', professionId: 'beleza' });
+    await other.saveClient({ name: 'Bruna Alves', phone: '', email: '', address: '', notes: '' });
+    const text = other.exportBackup();
+    await user.upload(input, new File([text.replace('Bruna Alves', 'Bruna Alvez')], 'x.json', { type: 'application/json' }));
+    expect(await screen.findByText(/verificação de integridade falhou/i)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Restaurar backup' })).not.toBeInTheDocument();
+
+    await user.upload(input, new File([text], 'b.json', { type: 'application/json' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Restaurar backup' });
+    await user.click(within(dialog).getByRole('checkbox', { name: /entendi que os dados atuais/i }));
+    await user.click(within(dialog).getByRole('button', { name: /^restaurar$/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Restaurar backup' })).not.toBeInTheDocument());
+    const after = await reload(dbName);
+    expect(after.data.clients.map((c) => c.name)).toEqual(['Bruna Alves']);
+    expect(after.data.profile?.name).toBe('Outra');
   });
 
   it('cópias de segurança automáticas: lista real (vazia no início)', async () => {

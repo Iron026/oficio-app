@@ -3,6 +3,7 @@
  * em revisão), meses vazios, valores altos e coerência com Finanças e o extrato.
  */
 import { monthTotals } from '../domain/finance';
+import { signed } from '../test/backupFile';
 import { buildStatement } from '../domain/statement';
 import { cashHistory, monthReport } from '../domain/reports';
 import { totalXp } from '../gamification/engine';
@@ -100,7 +101,7 @@ describe('relatórios: fórmulas', () => {
     const json = JSON.parse(s.exportBackup());
     const pay = json.data.transactions.find((t: { description: string; type: string }) => t.type === 'receita' && t.description === 'corte');
     json.data.transactions.push({ ...json.data.transactions.find((t: { type: string; payment?: { kind?: string } }) => t.payment?.kind === 'estorno'), id: 'outro', amount: 6_000, date: '2026-11-09', createdAt: '2026-11-09T10:00:00Z' });
-    await s.importBackup(JSON.stringify(json));
+    await s.importBackup(signed(json));
     const r = monthReport(s.data, '2026-11');
     expect(r.review).toEqual({ count: 1, inMonth: true });
     expect(r.totals.refunds).toBe(7_000);

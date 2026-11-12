@@ -13,8 +13,10 @@ async function sample() {
   return s;
 }
 type Raw = { transactions: Record<string, unknown>[]; appointments: Record<string, unknown>[]; xpEvents: Record<string, unknown>[]; clients: Record<string, unknown>[] };
+/** Arquivo antigo (sem soma de verificação, anterior à beta.5) alterado: só a validação estrutural o protege. */
 const tamper = (json: string, fn: (d: Raw) => void) => {
   const raw = JSON.parse(json);
+  delete raw.checksum;
   fn(raw.data);
   return JSON.stringify(raw);
 };
@@ -27,6 +29,7 @@ describe('Backup: integridade antes de restaurar', () => {
     expect(s.previewBackup(json).appVersion).toBe(__APP_VERSION__);
     const old = JSON.parse(json);
     delete old.appVersion;
+    delete old.checksum;
     delete old.data.serviceTypes;
     delete old.data.sealAwards;
     delete old.data.profileImages;

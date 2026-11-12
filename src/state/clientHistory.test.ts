@@ -3,6 +3,7 @@
  * estornos, cliente excluído e nenhum XP.
  */
 import { clientHistory } from '../domain/clientHistory';
+import { signed } from '../test/backupFile';
 import { totals } from '../domain/finance';
 import { totalXp } from '../gamification/engine';
 import { createMemoryAdapter } from '../storage/memory';
@@ -69,7 +70,7 @@ describe('histórico do cliente', () => {
     const { s, client } = await setup();
     const json = JSON.parse(s.exportBackup());
     json.data.appointments.push({ id: 'velho', title: 'Antigo', clientId: client.id, date: '2026-10-01', time: '', price: 4_000, status: 'concluido', notes: '', completedAt: 'x', transactionId: null, createdAt: 'x', updatedAt: 'x' });
-    await s.importBackup(JSON.stringify(json));
+    await s.importBackup(signed(json));
     const xp = totalXp(s.data.xpEvents);
     const h = clientHistory(client.id, s.data.appointments, s.data.transactions, TODAY);
     expect(h).toMatchObject({ notRegistered: 1, pending: 22_000, completedCount: 4 }); // o antigo não soma ao pendente

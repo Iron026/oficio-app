@@ -33,7 +33,8 @@ describe('Backup e dados — sem alterar dados', () => {
     const json = other.exportBackup();
     const before = JSON.stringify(service.data);
     const p = service.previewBackup(json);
-    expect(p.file).toEqual({ clients: 0, appointments: 0, transactions: 0 });
+    expect(p.file).toMatchObject({ clients: 0, appointments: 0, transactions: 0, payments: 0, refunds: 0 });
+    expect(p.integrity).toBe('verificada'); // beta.5: arquivo novo leva soma SHA-256
     expect(p.current.clients).toBe(1);
     expect(p.exportedAt).toBe(new Date(2026, 9, 1, 9).toISOString());
     expect(JSON.stringify(service.data)).toBe(before);

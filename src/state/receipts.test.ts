@@ -3,6 +3,7 @@
  * (rodapé, acentos, valores altos, nomes longos e quebra de página) e nenhum efeito colateral.
  */
 import { receiptFor } from '../domain/receipt';
+import { signed } from '../test/backupFile';
 import { totalXp } from '../gamification/engine';
 import { textWidth, wrapText } from '../lib/pdf';
 import { RECEIPT_FOOTER, receiptPdf } from '../lib/receiptPdf';
@@ -58,7 +59,7 @@ describe('recibos: quando existem', () => {
     const json = JSON.parse(s.exportBackup());
     const r = json.data.transactions.find((t: { payment?: { kind?: string } }) => t.payment?.kind === 'estorno');
     json.data.transactions.push({ ...r, id: 'outro', createdAt: '2026-11-12T13:00:00Z' });
-    await s.importBackup(JSON.stringify(json));
+    await s.importBackup(signed(json));
     expect(receiptFor(s.data, p!.id)!.inReview).toBe(true);
   });
 
@@ -66,7 +67,7 @@ describe('recibos: quando existem', () => {
     const { s, ap } = await setup();
     const json = JSON.parse(s.exportBackup());
     json.data.transactions.push({ id: 'leg', type: 'receita', amount: 30_000, description: 'Coloração', category: 'Atendimento', date: '2026-10-01', appointmentId: ap.id, createdAt: 'a', updatedAt: 'a' });
-    await s.importBackup(JSON.stringify(json));
+    await s.importBackup(signed(json));
     expect(receiptFor(s.data, 'leg')).toMatchObject({ kind: 'legado', partial: null, client: 'Conceição Araújo' });
     const { transaction: av } = await s.saveTransaction({ type: 'receita', amount: '50,00', description: 'Venda de produto', category: 'Venda de produtos', date: '2026-11-12' });
     expect(receiptFor(s.data, av.id)).toMatchObject({ kind: 'avulso', client: null, service: 'Venda de produto' });

@@ -1,3 +1,4 @@
+import { canonicalJson, sha256Hex } from '../lib/sha256';
 import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
 import { MAX_SERVICE_TYPES, isDuration, isValidServiceType, uniqueById } from '../domain/serviceTypes';
 import { isProfessionId } from '../domain/professions';
@@ -5,37 +6,91 @@ import { DEFAULT_SETTINGS, type AppData } from '../domain/types';
 
 export const BACKUP_FORMAT = 'oficio-backup';
 export const BACKUP_VERSION = 1;
+export const CHECKSUM_ALGORITHM = 'SHA-256';
 
 /**
- * Versão do app que gerou o arquivo (informativa: mostrada antes de restaurar). Versões antigas do
- * Ofício ignoram campos que não conhecem, então o formato continua sendo o 1.
+ * Soma de verificação (beta.5). Cobre **todo o conteúdo do arquivo, exceto o próprio campo `checksum`**: `format`,
+ * `version`, `appVersion`, `exportedAt` e `data`, serializados de forma canônica (`canonicalJson`: chaves em ordem,
+ * sem espaços, arrays na ordem do arquivo), codificados em UTF-8. Detecta alteração acidental e corrupção; não prova
+ * quem criou o arquivo (qualquer pessoa pode recalcular a soma de um arquivo editado).
+ */
+export function backupChecksum(file: Record<string, unknown>): string {
+  const rest: Record<string, unknown> = { ...file };
+  delete rest.checksum;
+  return sha256Hex(canonicalJson(rest));
+}
+
+/**
+ * Versão do app que gerou o arquivo (informativa) e soma de verificação. Versões antigas do Ofício ignoram campos
+ * que não conhecem, então o formato continua sendo o 1.
  */
 export function serializeBackup(data: AppData, now = new Date(), appVersion: string = __APP_VERSION__): string {
-  return JSON.stringify({ format: BACKUP_FORMAT, version: BACKUP_VERSION, appVersion, exportedAt: now.toISOString(), data }, null, 2);
+  const body = { format: BACKUP_FORMAT, version: BACKUP_VERSION, appVersion, exportedAt: now.toISOString(), data };
+  // Ida e volta pelo JSON: a soma é calculada sobre exatamente o que vai para o arquivo.
+  const plain = JSON.parse(JSON.stringify(body)) as Record<string, unknown>;
+  return JSON.stringify({ ...plain, checksum: { algorithm: CHECKSUM_ALGORITHM, value: backupChecksum(plain) } }, null, 2);
+}
+
+export type BackupErrorKind = 'json' | 'formato' | 'versao' | 'integridade' | 'estrutura';
+
+/** Arquivo recusado. `kind` separa as causas para a tela ("sem soma" não é erro; "soma inválida" é). */
+export class BackupError extends Error {
+  constructor(public readonly kind: BackupErrorKind, message: string) {
+    super(message);
+    this.name = 'BackupError';
+  }
+}
+
+/** Resultado da verificação de integridade: com soma conferida, ou arquivo antigo sem soma (validação estrutural). */
+export type BackupIntegrity = 'verificada' | 'sem-soma';
+
+export interface BackupInspection {
+  data: AppData;
+  integrity: BackupIntegrity;
+  exportedAt: string | null;
+  appVersion: string | null;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const arrOf = (v: unknown, required: string[]): boolean =>
-  Array.isArray(v) && v.every((item) => isObj(item) && required.every((k) => k in item) && typeof item.id === 'string');
+const LABEL: Record<string, string> = { clients: 'clientes', appointments: 'atendimentos', transactions: 'lançamentos', xpEvents: 'XP', achievements: 'conquistas' };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_CENTS = 100_000_000_000; // folga sobre o limite do app (R$ 1 milhão por registro)
 const cents = (v: unknown, min: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= MAX_CENTS;
+const optStr = (v: unknown) => v === undefined || v === null || typeof v === 'string';
 
 /**
- * Integridade dos campos que entram nos totais (valores, datas, tipo e situação). Um arquivo
- * editado à mão ou corrompido é recusado antes de qualquer alteração — nada é restaurado pela metade.
- * Os campos conferidos sempre existiram no formato 1 (0.2 em diante), então backups reais passam.
- * Campos reservados para a 0.5 (beta.4) são opcionais, mas, se existirem, precisam ter o tipo
- * esperado: um arquivo de versão mais nova não é aceito só por ter o formato 1.
+ * Estrutura de cada coleção: lista de objetos com id em texto (1 a 128 caracteres), sem ids repetidos, com os
+ * campos obrigatórios. Ids repetidos tornariam a restauração ambígua (qual registro vale?) e nunca existem num
+ * backup real (o armazenamento é indexado pelo id).
+ */
+function checkCollection(d: Record<string, unknown>, key: string, required: string[]) {
+  const list = d[key];
+  if (!Array.isArray(list)) throw new BackupError('estrutura', `Dados inválidos em "${key}" (${LABEL[key] ?? key}): a lista está ausente.`);
+  const seen = new Set<string>();
+  list.forEach((item, i) => {
+    if (!isObj(item) || typeof item.id !== 'string' || item.id.length === 0 || item.id.length > 128 || !required.every((k) => k in item)) {
+      throw new BackupError('estrutura', `Dados inválidos em "${key}" (item ${i + 1}: registro incompleto).`);
+    }
+    if (seen.has(item.id)) throw new BackupError('estrutura', `Registros repetidos em "${key}" (${LABEL[key] ?? key}): o id do item ${i + 1} aparece mais de uma vez.`);
+    seen.add(item.id);
+  });
+}
+
+/**
+ * Integridade dos campos que entram nos totais (valores, datas, tipo e situação). Um arquivo editado à mão ou
+ * corrompido é recusado antes de qualquer alteração — nada é restaurado pela metade. Campos da 0.5 são opcionais,
+ * mas, se existirem, precisam ter o tipo esperado: um arquivo de versão mais nova não é aceito só por ter o formato 1.
  */
 function checkIntegrity(d: Record<string, unknown>) {
-  const bad = (key: string, i: number, field: string) => new Error(`Dados inválidos em "${key}" (item ${i + 1}: ${field}).`);
+  const bad = (key: string, i: number, field: string) => new BackupError('estrutura', `Dados inválidos em "${key}" (item ${i + 1}: ${field}).`);
   (d.appointments as Record<string, unknown>[]).forEach((a, i) => {
     if (typeof a.title !== 'string') throw bad('appointments', i, 'descrição');
     if (typeof a.date !== 'string' || !DATE_RE.test(a.date)) throw bad('appointments', i, 'data');
     if (!['agendado', 'concluido', 'cancelado'].includes(a.status as string)) throw bad('appointments', i, 'situação');
     if (!cents(a.price, 0)) throw bad('appointments', i, 'valor');
+    if (!optStr(a.time)) throw bad('appointments', i, 'horário');
+    if (!optStr(a.clientId)) throw bad('appointments', i, 'cliente');
     if (a.duration !== undefined && !isDuration(a.duration)) throw bad('appointments', i, 'duração');
     if (a.series !== undefined && a.series !== null && !isObj(a.series)) throw bad('appointments', i, 'recorrência');
     if (a.payments !== undefined && typeof a.payments !== 'boolean') throw bad('appointments', i, 'controle de pagamento');
@@ -46,7 +101,7 @@ function checkIntegrity(d: Record<string, unknown>) {
     if (typeof t.date !== 'string' || !DATE_RE.test(t.date)) throw bad('transactions', i, 'data');
     if (t.category !== undefined && typeof t.category !== 'string') throw bad('transactions', i, 'categoria');
     if (t.description !== undefined && typeof t.description !== 'string') throw bad('transactions', i, 'descrição');
-    if (t.appointmentId !== undefined && t.appointmentId !== null && typeof t.appointmentId !== 'string') throw bad('transactions', i, 'serviço vinculado');
+    if (!optStr(t.appointmentId)) throw bad('transactions', i, 'serviço vinculado');
     if (t.payment !== undefined && t.payment !== null && !isObj(t.payment)) throw bad('transactions', i, 'pagamento');
   });
   (d.clients as Record<string, unknown>[]).forEach((c, i) => {
@@ -55,39 +110,58 @@ function checkIntegrity(d: Record<string, unknown>) {
   (d.xpEvents as Record<string, unknown>[]).forEach((e, i) => {
     if (typeof e.key !== 'string' || typeof e.xp !== 'number' || !Number.isFinite(e.xp)) throw bad('xpEvents', i, 'XP');
   });
+  (d.achievements as Record<string, unknown>[]).forEach((a, i) => {
+    if (typeof a.unlockedAt !== 'string') throw bad('achievements', i, 'data da conquista');
+  });
 }
 
-/** Valida e converte um arquivo de backup. Lança erro com mensagem amigável se inválido. */
-export function parseBackup(text: string): AppData {
+/**
+ * Lê, verifica e valida um arquivo de backup sem alterar nada. Ordem: JSON → formato → versão → soma de
+ * verificação (se houver) → estrutura. Qualquer falha lança `BackupError` com mensagem para a pessoa.
+ */
+export function inspectBackup(text: string): BackupInspection {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
-    throw new Error('O arquivo não é um JSON válido.');
+    throw new BackupError('json', 'O arquivo não é um JSON válido: está incompleto ou corrompido.');
   }
-  if (!isObj(raw) || raw.format !== BACKUP_FORMAT) throw new Error('Este arquivo não é um backup do Ofício.');
+  if (!isObj(raw) || raw.format !== BACKUP_FORMAT) throw new BackupError('formato', 'Este arquivo não é um backup do Ofício.');
   if (typeof raw.version !== 'number' || raw.version > BACKUP_VERSION) {
-    throw new Error('Backup criado por uma versão mais nova do app.');
+    throw new BackupError('versao', 'Backup criado por uma versão mais nova do app, num formato que esta versão não lê.');
   }
+
+  let integrity: BackupIntegrity = 'sem-soma';
+  if ('checksum' in raw) {
+    const c = raw.checksum;
+    const ok = isObj(c) && c.algorithm === CHECKSUM_ALGORITHM && typeof c.value === 'string' && /^[0-9a-f]{64}$/.test(c.value) && c.value === backupChecksum(raw);
+    if (!ok) throw new BackupError('integridade', 'A verificação de integridade falhou: o conteúdo do arquivo foi alterado ou está corrompido. Nada foi restaurado.');
+    integrity = 'verificada';
+  }
+
   const d = raw.data;
-  if (!isObj(d)) throw new Error('Backup sem dados.');
+  if (!isObj(d)) throw new BackupError('estrutura', 'Backup sem dados.');
   const profile = d.profile;
-  if (profile !== null && (!isObj(profile) || typeof profile.name !== 'string' || !isProfessionId(profile.professionId))) {
-    throw new Error('Perfil inválido no backup.');
+  if (profile !== null && (!isObj(profile) || typeof profile.name !== 'string' || !isProfessionId(profile.professionId) || !optStr(profile.businessName))) {
+    throw new BackupError('estrutura', 'Perfil inválido no backup.');
   }
-  const checks: [keyof AppData, string[]][] = [
+  if (d.settings !== undefined && !isObj(d.settings)) throw new BackupError('estrutura', 'Preferências inválidas no backup.');
+  const checks: [string, string[]][] = [
     ['clients', ['name']],
     ['appointments', ['title', 'date', 'status', 'price']],
     ['transactions', ['type', 'amount', 'date']],
     ['xpEvents', ['key', 'xp']],
     ['achievements', ['unlockedAt']],
   ];
-  for (const [key, req] of checks) {
-    if (!arrOf(d[key], req)) throw new Error(`Dados inválidos em "${key}".`);
-  }
+  for (const [key, req] of checks) checkCollection(d, key, req);
   checkIntegrity(d);
-  return {
+
+  const exportedAt = typeof raw.exportedAt === 'string' && !Number.isNaN(Date.parse(raw.exportedAt)) ? raw.exportedAt : null;
+  // Só informativo; arquivos anteriores à 0.4.0-beta.3 não têm.
+  const appVersion = typeof raw.appVersion === 'string' && /^\d+\.\d+\.\d+[\w.-]*$/.test(raw.appVersion) && raw.appVersion.length <= 32 ? raw.appVersion : null;
+  const data: AppData = {
     profile: profile as AppData['profile'],
+    // Preferências da conta (inclusive o Painel e campos de versões futuras) vêm inteiras.
     settings: { ...DEFAULT_SETTINGS, ...(isObj(d.settings) ? d.settings : {}) },
     clients: d.clients as AppData['clients'],
     appointments: d.appointments as AppData['appointments'],
@@ -100,4 +174,10 @@ export function parseBackup(text: string): AppData {
     // Rodada 3 (opcional): tipos de serviço; inválidos e repetidos são descartados.
     serviceTypes: Array.isArray(d.serviceTypes) ? uniqueById(d.serviceTypes.filter(isValidServiceType)).slice(0, MAX_SERVICE_TYPES) : [],
   };
+  return { data, integrity, exportedAt, appVersion };
+}
+
+/** Valida e converte um arquivo de backup. Lança `BackupError` com mensagem amigável se inválido. */
+export function parseBackup(text: string): AppData {
+  return inspectBackup(text).data;
 }

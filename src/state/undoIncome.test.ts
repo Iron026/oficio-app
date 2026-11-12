@@ -3,6 +3,7 @@
  * duplicar nem dar XP, e "Desfazer" que reverte de verdade (dados, vínculos, totais, sincronização).
  */
 import { totals } from '../domain/finance';
+import { signed } from '../test/backupFile';
 import { totalXp } from '../gamification/engine';
 import { missingIncome } from '../screens/AppointmentItem';
 import { createMemoryAdapter } from '../storage/memory';
@@ -88,7 +89,7 @@ describe('concluir, excluir a receita e lançar de novo', () => {
     await s.completeAppointment(a.id, { registerIncome: false });
     const json = JSON.parse(s.exportBackup());
     json.data.transactions.push({ id: 'pg-1', createdAt: 'x', updatedAt: 'x', type: 'receita', amount: 10_000, description: 'Sinal', category: 'Serviços', date: '2026-11-01', appointmentId: a.id, payment: { method: 'pix' } });
-    await s.importBackup(JSON.stringify(json));
+    await s.importBackup(signed(json));
     expect(missingIncome(ap(s, a.id), s.data.transactions)).toBe(false); // há pagamento: não está "sem receita"
     const r = await s.registerAppointmentIncome(a.id);
     expect(r.transaction?.amount).toBe(20_000);
@@ -269,7 +270,7 @@ describe('7. backups e versões anteriores', () => {
     const json = JSON.parse(s.exportBackup());
     json.appVersion = '0.4.0-beta.4';
     const t = await app();
-    await t.importBackup(JSON.stringify(json));
+    await t.importBackup(signed(json));
     const restored = t.data.appointments[0]!;
     expect(restored).toMatchObject({ status: 'concluido', transactionId: null });
     expect(missingIncome(restored, t.data.transactions)).toBe(true);

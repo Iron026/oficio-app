@@ -770,14 +770,34 @@ try {
     shot('06-clientes-apos-reabrir');
   });
 
-  await step('Importar backup (ex.: vindo da versão web)', async () => {
-    const data = JSON.parse(backupJson);
-    data.data.clients.push({ ...data.data.clients[0], id: 'importado-1', name: 'Cliente Importado' });
+  await step('Backup alterado é recusado pela soma de verificação (nada muda)', async () => {
+    // beta.5: o arquivo salvo pela janela do Android leva SHA-256; um nome trocado no conteúdo invalida a soma.
+    assert(JSON.parse(backupJson).checksum?.algorithm === 'SHA-256', 'backup exportado sem soma de verificação');
+    const edited = backupJson.replace('Cliente Persistente', 'Cliente Alterado');
+    const before = JSON.stringify(await readStore(page, 'clients'));
     await tap(page.getByRole('button', { name: /^ajustes$/i }));
     await tap(page.getByRole('button', { name: /backup e dados/i }));
+    await page.locator('input[type=file]').setInputFiles({ name: 'alterado.json', mimeType: 'application/json', buffer: Buffer.from(edited) });
+    await page.getByText(/verificação de integridade falhou/i).first().waitFor();
+    assert(await page.getByRole('dialog', { name: 'Restaurar backup' }).count() === 0, 'arquivo alterado abriu a restauração');
+    assert(JSON.stringify(await readStore(page, 'clients')) === before, 'arquivo alterado mudou os clientes');
+    shot('06b-backup-alterado-recusado');
+  });
+
+  await step('Importar backup (ex.: vindo da versão web)', async () => {
+    // Arquivo de uma versão anterior à beta.5 (sem soma): aceito depois da validação estrutural.
+    const data = JSON.parse(backupJson);
+    delete data.checksum;
+    data.data.clients.push({ ...data.data.clients[0], id: 'importado-1', name: 'Cliente Importado' });
     await page.locator('input[type=file]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
-    await tap(page.getByRole('button', { name: /^importar$/i }));
-    await noteToast(page, /backup importado/i);
+    const sheet = page.getByRole('dialog', { name: 'Restaurar backup' });
+    await sheet.waitFor();
+    assert(/sem verificação de integridade/i.test((await sheet.textContent()) ?? ''), 'arquivo sem soma não foi identificado');
+    await wait(800);
+    shot('06c-restaurar-backup');
+    await tap(page.getByRole('dialog', { name: 'Restaurar backup' }).getByRole('checkbox', { name: /entendi/i }));
+    await tap(page.getByRole('dialog', { name: 'Restaurar backup' }).getByRole('button', { name: /^restaurar$/i }));
+    await noteToast(page, /backup restaurado/i);
     await eventually(async () => {
       const names = namesIn(await readStore(page, 'clients'));
       return names.includes('Cliente Importado') && names.filter((n) => n === 'Cliente Persistente').length === 1;

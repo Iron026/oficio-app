@@ -1,4 +1,5 @@
 import type { XpEvent } from '../domain/types';
+import { signed } from '../test/backupFile';
 import { createMemoryAdapter } from '../storage/memory';
 import { AppService } from '../state/service';
 import { CELEBRATION_KEY, isCelebrationDue, nextCelebration, readCelebration, tierRankValue } from './celebration';
@@ -55,7 +56,7 @@ describe('comemoração de categoria: no app', () => {
     const { service, storage } = await serviceWith(totalXpForLevel(3), 'bronze:1');
     const backup = JSON.parse(service.exportBackup()) as { data: { xpEvents: XpEvent[] } };
     backup.data.xpEvents.push(xp(totalXpForLevel(13)));
-    await service.importBackup(JSON.stringify(backup));
+    await service.importBackup(signed(backup));
     expect(service.celebrationDue()).toBeNull();
     expect(await storage.kvGet(CELEBRATION_KEY)).toEqual({ tier: 'platina:1' });
     await service.resetAll();

@@ -3,6 +3,7 @@
  * pagamento, estorno, reabrir/excluir preservando valores, legado "não registrado" e ocultar valores.
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { signed } from '../test/backupFile';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { paymentSummary } from '../domain/payments';
@@ -170,7 +171,7 @@ describe('0.5: legado e privacidade', () => {
     const { user } = await start('#/agenda', async (s) => {
       const json = JSON.parse(s.exportBackup()) as { data: AppData };
       json.data.appointments.push({ id: 'old', title: 'Coloração', clientId: null, date: today, time: '', price: 30_000, status: 'concluido', notes: '', completedAt: new Date().toISOString(), transactionId: null, createdAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-01T10:00:00.000Z' });
-      await s.importBackup(JSON.stringify(json));
+      await s.importBackup(signed(json));
     });
     await user.click(await screen.findByRole('radio', { name: /concluíd/i }));
     const item = await screen.findByRole('button', { name: /coloração/i });

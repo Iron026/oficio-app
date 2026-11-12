@@ -276,10 +276,14 @@ export class SyncEngine implements ChangeTracker {
   }
 
   /** Importação de backup com conta associada: tudo vira pendência; o que sumiu vira exclusão. */
-  async beforeReplaceAll(data: AppData) {
+  async beforeReplaceAll(data: AppData): Promise<{ commit: () => void; rollback: () => Promise<void> }> {
     // Cópia de segurança automática dos dados atuais antes de importar um backup.
     await this.saveBackup('Antes de importar backup');
-    if (!this.state.linkedUid) return;
+    const none = { commit: () => undefined, rollback: async () => undefined };
+    if (!this.state.linkedUid) return none;
+    // beta.5: se a gravação local falhar, as marcações abaixo são desfeitas — senão a nuvem receberia exclusões de
+    // registros que continuam no aparelho (pagamentos e estornos inclusive).
+    const snapshot = structuredClone({ records: this.state.records, meta: this.state.meta });
     const present = new Set<string>();
     for (const c of SYNC_COLLECTIONS) if (this.syncs(c)) for (const e of data[c] ?? []) present.add(recordKey(c, e.id));
     for (const key of new Set([...present, ...Object.keys(this.state.records)])) {
@@ -293,7 +297,15 @@ export class SyncEngine implements ChangeTracker {
     this.state.meta.dirty = true;
     this.state.meta.seq++;
     await this.save();
-    this.schedule();
+    return {
+      // Envio só depois de a gravação local dar certo.
+      commit: () => this.schedule(),
+      rollback: async () => {
+        this.state.records = snapshot.records;
+        this.state.meta = snapshot.meta;
+        await this.save();
+      },
+    };
   }
 
   /** "Apagar todos os dados" deste aparelho: desassocia a conta, sem tocar na nuvem. */

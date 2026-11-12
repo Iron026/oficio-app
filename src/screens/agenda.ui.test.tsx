@@ -3,6 +3,7 @@
  * bloqueiam), atendimento que atravessa a meia-noite e situação financeira visível.
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { signed } from '../test/backupFile';
 import { vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
@@ -111,7 +112,7 @@ describe('0.5: duração e conflitos ao agendar', () => {
       await appt(s, 'Corte', today, '14:00');
       const json = JSON.parse(s.exportBackup());
       json.data.appointments.push({ id: 'old', title: 'Antigo', clientId: null, date: today, time: '08:00', price: 0, status: 'agendado', notes: '', completedAt: null, transactionId: null, createdAt: 'x', updatedAt: 'x' });
-      await s.importBackup(JSON.stringify(json));
+      await s.importBackup(signed(json));
     });
     await user.click(screen.getByRole('button', { name: /^agendar$/i }));
     const form = await screen.findByRole('dialog', { name: /agendar atendimento/i });

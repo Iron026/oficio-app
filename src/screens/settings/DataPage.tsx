@@ -4,7 +4,7 @@ import { isNative } from '../../platform/native';
 import { useApp, useErrorHandler } from '../../state/AppContext';
 import { useCloud } from '../../state/CloudContext';
 import { navigate } from '../../state/router';
-import type { BackupCounts } from '../../state/service';
+import type { BackupPreview } from '../../state/service';
 import type { BackupEntry } from '../../sync/engine';
 import { Button } from '../../ui/Button';
 import { useConfirm } from '../../ui/Confirm';
@@ -12,6 +12,7 @@ import { Card } from '../../ui/Misc';
 import { Sheet } from '../../ui/Sheet';
 import { useToast } from '../../ui/Toast';
 import { useBackupExport } from '../BackupExport';
+import { RestoreSheet } from './RestoreSheet';
 import { Group, OptionRow, SettingsSubpage } from './shared';
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -26,36 +27,6 @@ export function relativeDay(iso: string, now = new Date()): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
 }
 
-function CountsTable({ file, current, serviceLabel, exportedAt, appVersion, newerApp }: { file: BackupCounts; current: BackupCounts; serviceLabel: string; exportedAt: string | null; appVersion: string | null; newerApp: boolean }) {
-  const rows: [string, keyof BackupCounts][] = [['Clientes', 'clients'], [serviceLabel, 'appointments'], ['Lançamentos', 'transactions']];
-  return (
-    <div className="rounded-xl border border-line text-sm">
-      <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 border-b border-line px-3 py-2 font-semibold">
-        <span />
-        <span className="text-right">Agora</span>
-        <span className="text-right">No arquivo</span>
-      </div>
-      {rows.map(([label, k]) => (
-        <div key={k} className="grid grid-cols-[1fr_auto_auto] gap-x-4 border-b border-line px-3 py-2 last:border-0">
-          <span className="text-muted">{label}</span>
-          <span className="num text-right">{current[k]}</span>
-          <span className="num text-right font-semibold">{file[k]}</span>
-        </div>
-      ))}
-      {(exportedAt || appVersion) && (
-        <p className="px-3 pb-2 text-xs text-muted">
-          {exportedAt ? `Arquivo exportado em ${fmtDateTime(exportedAt)}` : 'Arquivo'}{appVersion ? ` pelo Ofício v${appVersion}` : ''}
-        </p>
-      )}
-      {newerApp && (
-        <p className="mx-3 mb-3 rounded-lg bg-surface-2 p-2 text-xs">
-          Feito por uma versão mais nova que esta (v{__APP_VERSION__}). Os dados foram conferidos; informações que esta versão não usa são mantidas sem alteração.
-        </p>
-      )}
-    </div>
-  );
-}
-
 export function DataPage() {
   const { data, service, profession, persistent } = useApp();
   const cloud = useCloud();
@@ -66,6 +37,7 @@ export function DataPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [copies, setCopies] = useState<BackupEntry[] | null>(null);
   const [copiesOpen, setCopiesOpen] = useState(false);
+  const [restore, setRestore] = useState<{ text: string; preview: BackupPreview } | null>(null);
   const hasDemo = service.hasDemoData();
   const t = profession.terms;
 
@@ -76,29 +48,10 @@ export function DataPage() {
   }, [cloud.sync, data]);
 
   async function importData(file: File) {
-    let text: string;
-    let preview;
     try {
-      text = await file.text();
-      preview = service.previewBackup(text); // valida o arquivo antes de pedir confirmação
-    } catch (err) {
-      onError(err);
-      return;
-    }
-    const ok = await confirm({
-      title: 'Importar e restaurar backup?',
-      message: cloud.linked
-        ? 'Todos os dados atuais serão substituídos pelos do arquivo — neste aparelho, na nuvem e nos outros aparelhos conectados. Registros criados depois desse backup serão excluídos. Uma cópia de segurança dos dados atuais é guardada neste aparelho antes.'
-        : 'Todos os dados atuais deste aparelho serão substituídos pelos dados do arquivo. Uma cópia de segurança dos dados atuais é guardada antes.',
-      details: <CountsTable file={preview.file} current={preview.current} serviceLabel={t.services} exportedAt={preview.exportedAt} appVersion={preview.appVersion} newerApp={preview.newerApp} />,
-      confirmLabel: 'Importar',
-      danger: true,
-    });
-    if (!ok) return;
-    try {
-      await service.importBackup(text);
-      const d = service.data;
-      toast({ title: 'Backup importado com sucesso', description: `${d.clients.length} clientes, ${d.appointments.length} ${t.services.toLowerCase()} e ${d.transactions.length} lançamentos restaurados.` });
+      const text = await file.text();
+      // Valida o arquivo inteiro (soma e estrutura) antes de mostrar qualquer opção de restaurar.
+      setRestore({ text, preview: service.previewBackup(text) });
     } catch (err) {
       onError(err);
     }
@@ -213,6 +166,7 @@ export function DataPage() {
           <p className="rounded-xl bg-surface-2 p-3 text-sm text-muted">Nenhuma cópia automática ainda. Ela é criada antes de importar um backup ou conectar a conta Google.</p>
         )}
       </Sheet>
+      {restore && <RestoreSheet text={restore.text} preview={restore.preview} onClose={() => setRestore(null)} />}
     </SettingsSubpage>
   );
 }

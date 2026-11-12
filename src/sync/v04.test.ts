@@ -1,4 +1,5 @@
 import type { ProfileImage, SealAward } from '../domain/types';
+import { signed } from '../test/backupFile';
 import { AppService } from '../state/service';
 import { createIndexedDbAdapter } from '../storage/indexeddb';
 import { createMemoryAdapter } from '../storage/memory';
@@ -314,7 +315,7 @@ describe('armazenamento local e backup (0.4)', () => {
     expect(back.profileImages[0]?.hash).toBe('hb');
     delete parsed.data.sealAwards;
     delete parsed.data.profileImages;
-    const old = parseBackup(JSON.stringify(parsed));
+    const old = parseBackup(signed(parsed));
     expect(old.sealAwards).toEqual([]);
     expect(old.profileImages).toEqual([]);
     expect(old.clients).toEqual(back.clients);

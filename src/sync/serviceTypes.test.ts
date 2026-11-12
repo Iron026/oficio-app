@@ -1,4 +1,5 @@
 import { moveServiceType, serviceChoices, serviceNameKey, sortServiceTypes, isValidServiceType, MAX_SERVICE_TYPES } from '../domain/serviceTypes';
+import { signed } from '../test/backupFile';
 import type { ServiceType } from '../domain/types';
 import { totalXp } from '../gamification/engine';
 import { AppService, ValidationError } from '../state/service';
@@ -140,9 +141,9 @@ describe('tipos de serviço — armazenamento, backup e nuvem', () => {
     expect(parseBackup(json).serviceTypes.map((t) => t.name)).toEqual(['Hora de trabalho']);
     const parsed = JSON.parse(json);
     delete parsed.data.serviceTypes;
-    expect(parseBackup(JSON.stringify(parsed)).serviceTypes).toEqual([]);
+    expect(parseBackup(signed(parsed)).serviceTypes).toEqual([]);
     parsed.data.serviceTypes = [st('a', 'Ok'), st('a', 'Repetido'), { id: 'b', name: '' }, { ...st('c', 'Extra'), url: 'x' }];
-    expect(parseBackup(JSON.stringify(parsed)).serviceTypes.map((t) => t.name)).toEqual(['Ok']);
+    expect(parseBackup(signed(parsed)).serviceTypes.map((t) => t.name)).toEqual(['Ok']);
   });
 
   it('sem as regras novas (padrão do APK): ficam só no aparelho, sem pendência nem envio', async () => {

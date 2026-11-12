@@ -1,7 +1,6 @@
 import { buildDemoData } from '../domain/demo';
 import { getProfession } from '../domain/professions';
 import type { AppData, Appointment, Client, Profile, ProfileImage, SealAward, ServiceType, Settings, Transaction, UnlockedAchievement, XpEvent } from '../domain/types';
-import { compareVersions } from '../domain/compat';
 import { paymentSummary, type PaymentMark, type PaymentMethod } from '../domain/payments';
 import { refundGroups, reviewLog } from '../domain/refundReview';
 import { addDaysKey } from '../domain/agenda';
@@ -23,7 +22,9 @@ import {
   hasErrors, validateAppointment, validateClient, validateProfile, validateServiceType, validateTransaction,
   type AppointmentInput, type ClientInput, type Errors, type ServiceTypeInput, type TransactionInput,
 } from '../lib/validation';
-import { parseBackup, serializeBackup } from '../storage/backup';
+import { inspectBackup, serializeBackup, type BackupIntegrity } from '../storage/backup';
+import { backupCompatibility, backupCounts, backupLoss, type BackupCompatibility, type BackupCounts, type BackupLoss } from '../domain/backupPreview';
+import { duplicateXpIds } from '../sync/merge';
 import type { StorageAdapter } from '../storage/types';
 
 export class ValidationError<T = unknown> extends Error {
@@ -87,14 +88,18 @@ type PrefsListener = (prefs: DevicePrefs) => void;
  * Serviço de aplicação: concentra regras de negócio, persistência e gamificação.
  * A interface (React) apenas lê `data` e chama métodos.
  */
-export interface BackupCounts { clients: number; appointments: number; transactions: number }
+export type { BackupCounts } from '../domain/backupPreview';
 export interface BackupPreview {
   exportedAt: string | null;
   appVersion: string | null;
   /** O arquivo foi exportado por uma versão mais nova do app (a interface avisa antes de restaurar). */
   newerApp: boolean;
+  compatibility: BackupCompatibility;
+  /** Soma de verificação conferida, ou arquivo antigo sem soma (aceito depois da validação estrutural). */
+  integrity: BackupIntegrity;
   file: BackupCounts;
   current: BackupCounts;
+  loss: BackupLoss;
 }
 
 /** Chave (só neste aparelho) da data do último backup exportado. */
@@ -1041,26 +1046,22 @@ export class AppService {
 
   /** Lê um arquivo de backup sem alterar nada: resumo do arquivo e dos dados atuais (para a confirmação). */
   previewBackup(text: string): BackupPreview {
-    const parsed = parseBackup(text);
-    let exportedAt: string | null = null;
-    let appVersion: string | null = null;
-    try {
-      const raw = JSON.parse(text) as { exportedAt?: unknown; appVersion?: unknown };
-      if (typeof raw.exportedAt === 'string' && !Number.isNaN(Date.parse(raw.exportedAt))) exportedAt = raw.exportedAt;
-      // Só informativo; arquivos anteriores à beta.3 não têm.
-      if (typeof raw.appVersion === 'string' && /^\d+\.\d+\.\d+[\w.-]*$/.test(raw.appVersion) && raw.appVersion.length <= 32) appVersion = raw.appVersion;
-    } catch {
-      /* parseBackup já validou o JSON */
-    }
-    const count = (d: AppData) => ({ clients: d.clients.length, appointments: d.appointments.length, transactions: d.transactions.length });
-    const newerApp = appVersion !== null && (compareVersions(appVersion, __APP_VERSION__) ?? 0) > 0;
-    return { exportedAt, appVersion, newerApp, file: count(parsed), current: count(this._data) };
+    const { data: parsed, integrity, exportedAt, appVersion } = inspectBackup(text);
+    const compatibility = backupCompatibility(appVersion, __APP_VERSION__);
+    return {
+      exportedAt, appVersion, newerApp: compatibility === 'mais-nova', compatibility, integrity,
+      file: backupCounts(parsed), current: backupCounts(this._data), loss: backupLoss(this._data, parsed, exportedAt),
+    };
   }
 
   importBackup(text: string): Promise<void> {
     return this.run(async () => {
-      const parsed = parseBackup(text);
+      // Valida tudo (soma, estrutura) antes de qualquer gravação: arquivo inválido não altera nada.
+      const parsed = inspectBackup(text).data;
       this._undo = null; // restaurar substitui tudo: nada anterior pode ser desfeito
+      // XP: no máximo um evento por chave (mesma regra da sincronização), nunca XP em dobro.
+      const dupXp = new Set(duplicateXpIds(parsed.xpEvents as unknown as { id: string; key: string; createdAt: string }[]));
+      if (dupXp.size) parsed.xpEvents = parsed.xpEvents.filter((e) => !dupXp.has(e.id));
       // Selos são permanentes: um backup mais antigo nunca reduz o estágio já alcançado.
       const byId = new Map(parsed.sealAwards.map((a) => [a.id, a]));
       for (const cur of this._data.sealAwards) {
