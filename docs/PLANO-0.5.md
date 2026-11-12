@@ -111,3 +111,36 @@ estornos fora das despesas operacionais.
 4. Versão, documentação, varredura visual e Android: 0.4.0-beta.7 → 0.5.0-beta.3 (com cliente, agendamento,
    pagamento e estorno) → beta.4; recibo salvo pela janela do sistema; avisos reais com o app aberto, em segundo
    plano e com o processo encerrado.
+
+## 0.5.0-beta.5 (a partir de `91122a9`, beta.4 aprovada)
+
+Decisões das betas aprovadas prevalecem sobre a proposta: duração nunca presumida (a “duração padrão” da proposta
+2.11 não entra), avisos sem detalhes por padrão, estornos fora das despesas.
+
+### Auditoria
+
+| Área | Situação encontrada | Consequência na beta.5 |
+| --- | --- | --- |
+| `settings.dashboard` | Reservado desde a 0.4.0-beta.4 (`unknown`), preservado por `updateSettings`, nunca usado | Formato `{ v: 1, order, hidden, orderAt, hiddenAt }`; ids e campos desconhecidos são preservados |
+| Sincronização das preferências | `mergeMeta` faz mesclagem em 3 vias **por campo** de `settings`; em conflito vence a nuvem | Sem ajuste, mudar a ordem num aparelho e ocultar um cartão no outro perderia uma das mudanças em silêncio → mesclagem própria do Painel (ocultar/mostrar por cartão; ordem pela mudança mais recente) |
+| Regras do Firestore | `users/{uid}.data` só exige ser um mapa | `settings.dashboard` sincroniza **sem mudar as regras** |
+| Painel | Saldo + receitas/estornos/despesas num cartão, nível, atalhos, meta da semana, aviso de atrasados, próximos, missões, dica. Sem “A receber”, sem meta mensal, sem aviso de estornos em revisão | Cartões configuráveis reaproveitam os blocos; “A receber” e “Meta do mês” entram como opcionais ocultos (o Painel padrão continua igual ao aprovado). Atrasados, estornos em revisão e conflitos de sincronização viram avisos fixos, fora da personalização |
+| Backup | Formato 1, `appVersion`, validação estrutural e de campos financeiros, resumo de 3 contagens, cópia de segurança, gravação numa transação do IndexedDB | Soma SHA-256, pré-visualização completa, validação mais rígida (ids repetidos, tipos), confirmação explícita |
+| Restauração com conta | `beforeReplaceAll` marca exclusões e envios **antes** da gravação local; se a gravação falhar, a nuvem poderia receber exclusões de registros que continuam no aparelho | Marcação desfeita se a gravação falhar (teste reproduz antes da correção); pré-visualização mostra o que sai, inclusive pagamentos e estornos |
+| Onboarding | 2 passos (profissão, perfil); `completeOnboarding` cria só o perfil | Etapa opcional depois do perfil, oferecida uma vez (marca local), e as mesmas sugestões em Ajustes |
+| Tipos de serviço | Bloqueio de nome repetido (sem acento/maiúscula), limite 100, ids aleatórios | Sugestões aceitas recebem id determinístico (`sugestao-<profissão>-<nome>`): repetir a configuração ou fazê-la em dois aparelhos não duplica |
+| Início da semana | Fixo na segunda em 10 pontos, inclusive na chave das missões semanais (XP) | **Não** vira opção: mudar a semana mudaria as chaves de XP das missões |
+| Agenda | Visão inicial sempre “Lista” (estado da tela) | Preferência do aparelho “visão inicial da Agenda” (local, como o tema) |
+
+### Riscos de incompatibilidade
+
+- Aparelho na beta.4 recebe `settings.dashboard` pela nuvem: só preserva (campo opcional), não mostra.
+- Backup novo (com `checksum`) lido pela beta.4: campo desconhecido no topo do arquivo é ignorado; continua importável.
+- Backup antigo sem soma: aceito depois da validação estrutural, identificado como “sem verificação”.
+- Ids determinísticos de tipos de serviço: mesmo formato de id (texto ≤ 128), aceitos pelas regras atuais.
+
+### Entregas (commits separados)
+
+A. Painel personalizável (domínio, mesclagem, tela, testes). B. Backup: soma, validação, pré-visualização,
+restauração segura, testes de arquivos. C. Configuração inicial por profissão. D. Versão 0.5.0-beta.5, documentação,
+varredura visual (320/360/412), revisão independente, Android (atualização por cima da beta.4) e entrega.
