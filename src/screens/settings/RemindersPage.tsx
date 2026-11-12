@@ -99,7 +99,7 @@ export function RemindersPage({ native = isNative() }: { native?: boolean }) {
         </div>
       </Group>
       <Card className="!py-1">
-        <Switch checked={r.showClient} onChange={(v) => void save({ showClient: v })} label="Mostrar o nome do cliente" description="Desligado: o aviso mostra só o serviço e o horário. Na tela bloqueada, o conteúdo fica oculto." />
+        <Switch checked={r.showDetails} onChange={(v) => void save({ showDetails: v })} label="Mostrar detalhes no aviso" description="Desligado: o aviso diz só o horário (“Atendimento em 30 minutos · 14:00”). Ligado: mostra também a descrição do atendimento e o nome do cliente — inclusive na tela bloqueada, conforme os ajustes do Android." />
       </Card>
       {active && last && last.permission === 'granted' && (
         <p className="flex items-center gap-2 text-sm text-muted" aria-live="polite" data-reminders-count={last.total}>

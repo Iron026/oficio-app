@@ -48,7 +48,9 @@ export function nativeReminderPlatform(): ReminderPlatform {
       if (!list.length) return;
       const { ln } = await plugin();
       if (!channel) {
-        // Visibilidade privada: na tela bloqueada o Android mostra só que há um aviso do Ofício.
+        // O Android ignora a visibilidade de canal pedida por apps (só o sistema a muda); o plugin marca cada aviso
+        // como privado, o que só oculta o conteúdo se a pessoa configurou a tela bloqueada assim. Por isso o texto
+        // padrão do aviso já não tem detalhes (domain/reminders.ts).
         await ln.createChannel({ id: CHANNEL_ID, name: 'Lembretes de atendimentos', description: 'Avisos antes dos atendimentos agendados', importance: 4, visibility: 0 });
         channel = true;
       }

@@ -35,7 +35,7 @@ describe('beta.4: tela de Lembretes', () => {
     const { m } = await native('prompt', 'granted');
     expect(master()).not.toBeChecked();
     expect(within(screen.getByRole('group', { name: /antecedência/i })).getAllByRole('button').every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
-    expect(screen.getByRole('switch', { name: /nome do cliente/i })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: /mostrar detalhes/i })).not.toBeChecked();
     expect(screen.getByText(/pode atrasar os avisos/i)).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 10));
     expect(m.state.requests).toBe(0);
@@ -46,7 +46,7 @@ describe('beta.4: tela de Lembretes', () => {
     await user.click(master());
     await waitFor(() => expect(master()).toBeChecked());
     expect(m.state.requests).toBe(1);
-    expect(s.devicePrefs.reminders).toEqual({ enabled: true, offsets: [30], showClient: false });
+    expect(s.devicePrefs.reminders).toEqual({ enabled: true, offsets: [30], showDetails: false });
     const group = screen.getByRole('group', { name: /antecedência/i });
     await user.click(within(group).getByRole('button', { name: '1 dia antes' }));
     await user.click(within(group).getByRole('button', { name: '15 minutos antes' }));

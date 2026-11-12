@@ -24,7 +24,7 @@ Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0
   anterior, evolução de 6/12 meses, caixa × pendente × previsto, ticket médio explicado, categorias, serviços e
   clientes recorrentes), **recibos em PDF** só de pagamentos registrados (número estável, situação de estorno,
   “não é nota fiscal”) e **lembretes** locais no Android (opcionais, desligados por padrão, 15 min/30 min/1 h/1 dia,
-  não exatos, sem nome do cliente por padrão). Teste Android: 0.4.0-beta.7 → 0.5.0-beta.3 → beta.4, com avisos
+  não exatos, só o horário no aviso por padrão — sem descrição, cliente ou valores). Teste Android: 0.4.0-beta.7 → 0.5.0-beta.3 → beta.4, com avisos
   reais com o app aberto, em segundo plano e fechado.
 
 ## 0.4 (em desenvolvimento — branch `feat/v0.4-design`)

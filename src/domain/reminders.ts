@@ -8,8 +8,9 @@
  * - Horário de parede: o aviso dispara no horário local do aparelho (data + hora do atendimento).
  * - Id numérico estável por (atendimento, antecedência): ocorrências de séries têm ids próprios, então cada uma
  *   gera seus avisos uma única vez; reagendar muda só o horário do mesmo id.
- * - Privacidade: por padrão, sem nome do cliente e sem valores; o canal do Android esconde o conteúdo na tela
- *   bloqueada.
+ * - Privacidade: por padrão o aviso diz só "Atendimento em 15 minutos · 10:00" — sem a descrição do atendimento,
+ *   sem o nome do cliente e sem valores, porque a tela bloqueada pode mostrar o conteúdo (o Android só oculta
+ *   avisos privados se a pessoa configurou isso). Detalhes só se a pessoa ligar "Mostrar detalhes no aviso".
  */
 import type { Appointment, Client } from './types';
 
@@ -28,15 +29,15 @@ export const REMINDER_LATE_GRACE_MS = 2 * 3_600_000;
 export interface ReminderPrefs {
   enabled: boolean;
   offsets: ReminderOffset[];
-  /** Mostrar o nome do cliente no aviso (desligado por padrão). */
-  showClient: boolean;
+  /** Mostrar a descrição do atendimento e o nome do cliente no aviso (desligado por padrão). */
+  showDetails: boolean;
 }
-export const DEFAULT_REMINDERS: ReminderPrefs = { enabled: false, offsets: [], showClient: false };
+export const DEFAULT_REMINDERS: ReminderPrefs = { enabled: false, offsets: [], showDetails: false };
 
 export function readReminderPrefs(v: unknown): ReminderPrefs {
   const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
   const offsets = Array.isArray(o.offsets) ? REMINDER_OFFSETS.filter((x) => (o.offsets as unknown[]).includes(x)) : [];
-  return { enabled: o.enabled === true, offsets, showClient: o.showClient === true };
+  return { enabled: o.enabled === true, offsets, showDetails: o.showDetails === true };
 }
 
 export const OFFSET_LABEL: Record<ReminderOffset, string> = { 15: '15 minutos antes', 30: '30 minutos antes', 60: '1 hora antes', 1440: '1 dia antes' };
@@ -70,6 +71,9 @@ export function localStart(a: Pick<Appointment, 'date' | 'time'>): Date | null {
   return new Date(y, m - 1, d, h, mi, 0, 0);
 }
 
+/** Texto do aviso sem detalhes (padrão). */
+export const GENERIC_BODY = 'Toque para ver os detalhes no Ofício.';
+
 const when = (offset: ReminderOffset) => (offset === 1440 ? 'amanhã' : offset === 60 ? 'em 1 hora' : `em ${offset} minutos`);
 
 export function planReminders(
@@ -94,11 +98,11 @@ export function planReminders(
       const id = reminderId(a.id, offset);
       if (seen.has(id)) continue;
       seen.add(id);
-      const client = prefs.showClient && a.clientId ? names.get(a.clientId) : undefined;
+      const client = prefs.showDetails && a.clientId ? names.get(a.clientId) : undefined;
       out.push({
         id, at, apptId: a.id, offset,
         title: `${serviceTerm} ${when(offset)} · ${a.time}`,
-        body: `${a.title}${client ? ` · ${client}` : ''}`,
+        body: prefs.showDetails ? `${a.title}${client ? ` · ${client}` : ''}` : GENERIC_BODY,
       });
     }
   }

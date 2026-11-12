@@ -21,7 +21,7 @@ async function app(storage = createMemoryAdapter()) {
 }
 const reconcile = (s: AppService, platform: ReturnType<typeof memoryReminderPlatform>['platform']) =>
   reconcileReminders(platform, { appointments: s.data.appointments, clients: s.data.clients, prefs: s.devicePrefs.reminders, now: clock, serviceTerm: 'Atendimento' });
-const enable = (s: AppService, offsets: (15 | 30 | 60 | 1440)[] = [30]) => s.updateDevicePrefs({ reminders: { enabled: true, offsets, showClient: false } });
+const enable = (s: AppService, offsets: (15 | 30 | 60 | 1440)[] = [30]) => s.updateDevicePrefs({ reminders: { enabled: true, offsets, showDetails: false } });
 
 afterEach(() => setReminderPlatform(null));
 
@@ -163,9 +163,9 @@ describe('preferências locais', () => {
   it('ficam no aparelho (sobrevivem a reabrir) e não entram no backup nem nos dados sincronizados', async () => {
     const storage = createMemoryAdapter();
     const s = await app(storage);
-    await s.updateDevicePrefs({ reminders: { enabled: true, offsets: [15, 1440], showClient: true } });
+    await s.updateDevicePrefs({ reminders: { enabled: true, offsets: [15, 1440], showDetails: true } });
     const again = await app(storage);
-    expect(again.devicePrefs.reminders).toEqual({ enabled: true, offsets: [15, 1440], showClient: true });
+    expect(again.devicePrefs.reminders).toEqual({ enabled: true, offsets: [15, 1440], showDetails: true });
     expect(again.exportBackup()).not.toMatch(/reminders|lembretes/i);
     expect(JSON.stringify(again.data)).not.toMatch(/reminders/);
   });
@@ -176,7 +176,7 @@ describe('preferências locais', () => {
     const backup = s.exportBackup();
     await enable(s, [60]);
     await s.importBackup(backup);
-    expect(s.devicePrefs.reminders).toEqual({ enabled: true, offsets: [60], showClient: false });
+    expect(s.devicePrefs.reminders).toEqual({ enabled: true, offsets: [60], showDetails: false });
   });
 });
 

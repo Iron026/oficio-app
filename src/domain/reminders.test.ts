@@ -4,24 +4,24 @@
  */
 import type { Appointment } from './types';
 import {
-  DEFAULT_REMINDERS, REMINDER_DAYS, REMINDER_MAX, diffReminders, lateReminders, localStart, planReminders, readReminderPrefs, reminderId,
+  DEFAULT_REMINDERS, GENERIC_BODY, REMINDER_DAYS, REMINDER_MAX, diffReminders, lateReminders, localStart, planReminders, readReminderPrefs, reminderId,
   type ReminderPrefs,
 } from './reminders';
 
 const now = new Date(2026, 10, 12, 9, 0); // 12/11/2026 09:00 (local)
-const on = (offsets: ReminderPrefs['offsets'], showClient = false): ReminderPrefs => ({ enabled: true, offsets, showClient });
+const on = (offsets: ReminderPrefs['offsets'], showDetails = false): ReminderPrefs => ({ enabled: true, offsets, showDetails });
 let seq = 0;
 const appt = (p: Partial<Appointment>): Appointment =>
   ({ id: `a${++seq}`, title: 'Coloração', clientId: 'c1', date: '2026-11-13', time: '10:00', price: 30_000, notes: '', status: 'agendado', createdAt: '', updatedAt: '', ...p }) as Appointment;
 const clients = [{ id: 'c1', name: 'Carla Souza' }];
 
 describe('preferências', () => {
-  it('padrão desligado, sem antecedências e sem nome do cliente', () => {
-    expect(DEFAULT_REMINDERS).toEqual({ enabled: false, offsets: [], showClient: false });
+  it('padrão desligado, sem antecedências e sem detalhes', () => {
+    expect(DEFAULT_REMINDERS).toEqual({ enabled: false, offsets: [], showDetails: false });
     expect(readReminderPrefs(undefined)).toEqual(DEFAULT_REMINDERS);
   });
   it('lê só valores válidos, na ordem canônica', () => {
-    expect(readReminderPrefs({ enabled: true, offsets: [1440, 7, 15, '30', 60], showClient: 'sim' })).toEqual({ enabled: true, offsets: [15, 60, 1440], showClient: false });
+    expect(readReminderPrefs({ enabled: true, offsets: [1440, 7, 15, '30', 60], showDetails: 'sim' })).toEqual({ enabled: true, offsets: [15, 60, 1440], showDetails: false });
   });
 });
 
@@ -43,13 +43,15 @@ describe('planReminders', () => {
     expect(new Set(plan.map((p) => p.id)).size).toBe(4);
   });
 
-  it('privacidade: sem nome do cliente e sem valores por padrão; nome só se a pessoa ligar', () => {
-    const a = appt({ price: 123_456 });
+  it('privacidade: por padrão só o horário — sem descrição, cliente nem valores; detalhes só se a pessoa ligar', () => {
+    const a = appt({ title: 'Depilação íntima', price: 123_456 });
     const [hidden] = planReminders([a], clients, on([30]), now);
-    expect(`${hidden!.title} ${hidden!.body}`).not.toMatch(/Carla|R\$|1\.234|1234/);
-    expect(hidden!.body).toBe('Coloração');
+    expect(`${hidden!.title} ${hidden!.body}`).not.toMatch(/Depila|Carla|R\$|1\.234|1234/);
+    expect(hidden!.title).toBe('Atendimento em 30 minutos · 10:00');
+    expect(hidden!.body).toBe(GENERIC_BODY);
     const [shown] = planReminders([a], clients, on([30], true), now);
-    expect(shown!.body).toBe('Coloração · Carla Souza');
+    expect(shown!.body).toBe('Depilação íntima · Carla Souza');
+    expect(shown!.body).not.toMatch(/R\$|1\.234/); // valores nunca
   });
 
   it('só agendados, sem demonstração, com horário', () => {

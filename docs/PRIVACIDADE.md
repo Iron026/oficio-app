@@ -61,8 +61,10 @@ Ao tocar em **Continuar com Google** e confirmar a conexão:
   arquivo vai para onde você escolher salvar ou para o aplicativo com que você compartilhar.
 - **Lembretes de atendimentos** (app Android) são notificações locais, agendadas pelo próprio aparelho, sem
   servidor. Ficam desligados até você ligar; a permissão de notificações só é pedida nesse momento. Por padrão o
-  aviso mostra só o serviço e o horário, sem o nome do cliente e sem valores, e o conteúdo fica oculto na tela
-  bloqueada. A configuração vale só para o aparelho e não vai para o backup nem para a nuvem.
+  aviso diz só o horário (“Atendimento em 30 minutos · 14:00”) — sem a descrição do atendimento, sem o nome do
+  cliente e sem valores —, porque a tela bloqueada do Android pode mostrar o conteúdo dos avisos. Os detalhes só
+  aparecem se você ligar “Mostrar detalhes no aviso”. A configuração vale só para o aparelho e não vai para o backup
+  nem para a nuvem.
 
 ## 5. O que não fazemos
 - Não vendemos dados.

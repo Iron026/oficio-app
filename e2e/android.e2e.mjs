@@ -788,6 +788,7 @@ try {
   });
 
   // ---- beta.4: lembretes reais (notificações locais não exatas) ----
+  const delivered = []; // horários dos avisos entregues
   const openReminders = async () => {
     await tap(page.getByRole('button', { name: /^ajustes$/i }));
     await tap(page.getByRole('button', { name: /^lembretes/i }));
@@ -812,12 +813,19 @@ try {
     await openReminders();
     return at;
   };
-  const waitNotification = async (title, state) => {
+  /** Espera o aviso do atendimento (identificado pelo horário "· HH:MM" no título) e confere a privacidade. */
+  const waitNotification = async (title, at, state) => {
     const t0 = Date.now();
-    const text = await eventually(() => { const n = appNotifications(); return n.includes(title) ? n : null; }, `aviso de "${title}" não chegou (${state})`, 9 * 60_000);
-    const block = text.split(/\n(?=\s*NotificationRecord\()/).find((b) => b.includes(title)) ?? '';
-    assert(!/Cliente Persistente/.test(block), 'o aviso mostra o nome do cliente (deveria estar desligado por padrão)');
+    const mark = `15 minutos · ${at.time}`;
+    const text = await eventually(() => { const n = appNotifications(); return n.includes(mark) ? n : null; }, `aviso de "${title}" (${mark}) não chegou (${state})`, 9 * 60_000);
+    const block = text.split(/\n(?=\s*NotificationRecord\()/).find((b) => b.includes(mark)) ?? '';
+    // Padrão: só o horário. Nada da descrição, do cliente ou do valor (a tela bloqueada pode mostrar o conteúdo).
+    assert(!block.includes(title), 'o aviso mostra a descrição do atendimento (deveria estar desligado por padrão)');
+    assert(!/Cliente Persistente/.test(block), 'o aviso mostra o nome do cliente');
     assert(!/123,45|R\$/.test(block), 'o aviso mostra valores');
+    assert(/Toque para ver os detalhes no Ofício/.test(block), 'texto padrão do aviso ausente');
+    assert(/vis=PRIVATE/.test(block), 'aviso não marcado como privado');
+    delivered.push(mark);
     console.log(`\n  aviso "${title}" (${state}) chegou após ${Math.round((Date.now() - t0) / 1000)} s`);
     return block;
   };
@@ -854,7 +862,7 @@ try {
   });
 
   await step('Lembretes: aviso real com o app aberto', async () => {
-    await scheduleSoon('Lembrete aberto');
+    const atA = await scheduleSoon('Lembrete aberto');
     await expectPending(1, 'o app não agendou o aviso do novo atendimento');
     // Rodar a reconciliação de novo (voltar do segundo plano) não duplica.
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
@@ -863,13 +871,14 @@ try {
     await wait(3000);
     assert((await reminderCount()) === 1, 'a contagem mudou ao voltar ao app (duplicou?)');
     await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
-    const block = await waitNotification('Lembrete aberto', 'app aberto');
+    const block = await waitNotification('Lembrete aberto', atA, 'app aberto');
     assert(resumedPackage() === PKG, 'o app saiu do primeiro plano durante a espera');
     assert(/Atendimento em 15 minutos/.test(block), `título inesperado: ${block.slice(0, 400)}`);
+    // O Android não deixa o app mudar a visibilidade do canal (fica -1000, padrão do sistema); a proteção vem do
+    // texto sem detalhes e do aviso marcado como privado (conferidos em waitNotification).
     const dump = adb('shell', 'dumpsys', 'notification', '--noredact');
     const ch = dump.slice(Math.max(0, dump.indexOf("mId='lembretes'")), dump.indexOf("mId='lembretes'") + 1500);
-    console.log(`\n  canal: ${(ch.match(/mLockscreenVisibility=-?\d+/) ?? ['?'])[0]} ${(ch.match(/mImportance=\d+/) ?? ['?'])[0]}`);
-    assert(/mLockscreenVisibility=0\b/.test(ch), 'canal de lembretes não está como privado na tela bloqueada');
+    console.log(`\n  canal: ${(ch.match(/mImportance=\d+/) ?? ['?'])[0]} ${(ch.match(/mLockscreenVisibility=-?\d+/) ?? ['?'])[0]}`);
     adb('shell', 'cmd', 'statusbar', 'expand-notifications');
     await wait(1500);
     shot('10-aviso-app-aberto');
@@ -878,12 +887,12 @@ try {
   });
 
   await step('Lembretes: aviso real com o app em segundo plano', async () => {
-    await scheduleSoon('Lembrete fundo');
+    const atB = await scheduleSoon('Lembrete fundo');
     await expectPending(1, 'o app não agendou o aviso do novo atendimento');
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
     await wait(1500);
     assert(resumedPackage() !== PKG, 'o app continuou em primeiro plano');
-    await waitNotification('Lembrete fundo', 'segundo plano');
+    await waitNotification('Lembrete fundo', atB, 'segundo plano');
     adb('shell', 'cmd', 'statusbar', 'expand-notifications');
     await wait(1500);
     shot('11-aviso-segundo-plano');
@@ -892,7 +901,7 @@ try {
 
   await step('Lembretes: aviso real com o app fechado (processo encerrado)', async () => {
     page = await launch({ newProcess: false });
-    await scheduleSoon('Lembrete fechado');
+    const atC = await scheduleSoon('Lembrete fechado');
     await expectPending(1, 'o app não agendou o aviso do novo atendimento');
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
     await wait(1500);
@@ -902,7 +911,7 @@ try {
     let pid = adb('shell', `pidof ${PKG}; true`).trim();
     if (pid) { try { adb('shell', 'run-as', PKG, 'kill', '-9', ...pid.split(/\s+/)); } catch { /* sem run-as */ } await wait(1000); pid = adb('shell', `pidof ${PKG}; true`).trim(); }
     assert(!pid, `o processo do app continua vivo (${pid})`);
-    await waitNotification('Lembrete fechado', 'app fechado');
+    await waitNotification('Lembrete fechado', atC, 'app fechado');
     adb('shell', 'cmd', 'statusbar', 'expand-notifications');
     await wait(1500);
     shot('12-aviso-app-fechado');
@@ -914,9 +923,10 @@ try {
     await openReminders();
     await expectPending(0, 'depois dos três avisos, nada deveria continuar pendente');
     const notes = appNotifications();
-    for (const title of ['Lembrete aberto', 'Lembrete fundo', 'Lembrete fechado']) {
-      const count = notes.split(/\n(?=\s*NotificationRecord\()/).filter((b) => b.includes(title)).length;
-      assert(count === 1, `aviso de "${title}" aparece ${count} vez(es)`);
+    assert(delivered.length === 3, `esperados 3 avisos entregues, ${delivered.length}`);
+    for (const mark of delivered) {
+      const count = notes.split(/\n(?=\s*NotificationRecord\()/).filter((b) => b.includes(mark)).length;
+      assert(count === 1, `aviso "${mark}" aparece ${count} vez(es)`);
     }
     const sw = page.getByRole('switch', { name: /lembretes de atendimentos/i });
     await tap(sw);
