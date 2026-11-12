@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, CircleDollarSign, Undo2 } from 'lucide-react';
+import { Check, CircleDollarSign, FileText, Undo2 } from 'lucide-react';
 import { PAYMENT_METHODS, PAYMENT_STATE_LABEL, paymentSummary, type PaymentEntry, type PaymentMethod, type PaymentSummary } from '../../domain/payments';
 import type { RefundIssue } from '../../domain/refundReview';
 import type { Appointment, Transaction } from '../../domain/types';
@@ -10,7 +10,8 @@ import { centsToInput, formatMoney, parseMoney } from '../../lib/money';
 import { useApp, useErrorHandler, useFeedback, useUndoAction } from '../../state/AppContext';
 import type { CompletePayment } from '../../state/service';
 import { StatusBadge, type StatusTone } from '../../ui/Badge';
-import { Button } from '../../ui/Button';
+import { Button, IconButton } from '../../ui/Button';
+import { ReceiptSheet } from './ReceiptSheet';
 import { cx } from '../../ui/cx';
 import { TextField } from '../../ui/Field';
 import { Money } from '../../ui/Money';
@@ -40,6 +41,7 @@ const KIND_LABEL: Record<PaymentEntry['kind'], string> = { pagamento: 'Pagamento
 /** Resumo financeiro do atendimento: contratado, recebido, estornado, pendente e histórico. */
 export function PaymentPanel({ a, onPay, onRefund }: { a: Appointment; onPay: () => void; onRefund: (e: PaymentEntry) => void }) {
   const { data } = useApp();
+  const [receipt, setReceipt] = useState<string | null>(null);
   const s = paymentSummary(a, data.transactions);
   if (a.price === 0 && s.entries.length === 0) return null;
   const pendingLabel = a.status === 'agendado' ? 'Falta receber' : s.state === 'nao-registrado' ? 'Pagamento' : 'Pendente';
@@ -75,6 +77,9 @@ export function PaymentPanel({ a, onPay, onRefund }: { a: Appointment; onPay: ()
                 </span>
               </span>
               <Money cents={e.tx.amount} kind={e.kind === 'estorno' ? 'expense' : 'income'} className="font-semibold" />
+              {e.kind !== 'estorno' && (
+                <IconButton label={`Recibo do pagamento de ${formatDateShort(e.tx.date)}`} onClick={() => setReceipt(e.tx.id)} className="shrink-0"><FileText size={18} /></IconButton>
+              )}
               {e.kind !== 'estorno' && e.refundable > 0 && (
                 <Button variant="ghost" size="sm" className="min-h-11" icon={<Undo2 size={14} />} onClick={() => onRefund(e)} aria-label={`Estornar ${formatMoney(e.refundable)} de ${formatDateShort(e.tx.date)}`}>Estornar</Button>
               )}
@@ -87,6 +92,7 @@ export function PaymentPanel({ a, onPay, onRefund }: { a: Appointment; onPay: ()
           {a.status === 'agendado' ? 'Registrar pagamento antecipado' : 'Registrar pagamento'}
         </Button>
       )}
+      <ReceiptSheet txId={receipt} onClose={() => setReceipt(null)} />
     </section>
   );
 }

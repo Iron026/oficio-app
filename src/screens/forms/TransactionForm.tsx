@@ -12,6 +12,9 @@ import { ChoiceChips } from '../../ui/ChoiceChips';
 import { Segmented } from '../../ui/Misc';
 import { Sheet } from '../../ui/Sheet';
 import { useToast } from '../../ui/Toast';
+import { FileText } from 'lucide-react';
+import { receiptFor } from '../../domain/receipt';
+import { ReceiptSheet } from '../payments/ReceiptSheet';
 
 interface Props { open: boolean; onClose: () => void; transaction?: Transaction; defaultType?: TransactionType }
 
@@ -25,6 +28,7 @@ export function TransactionFormSheet({ open, onClose, transaction, defaultType =
 
 function TransactionForm({ transaction, defaultType, onDone }: { transaction?: Transaction; defaultType: TransactionType; onDone: () => void }) {
   const { service, profession, data } = useApp();
+  const [receipt, setReceipt] = useState<string | null>(null);
   const feedback = useFeedback();
   const onError = useErrorHandler();
   const confirm = useConfirm();
@@ -83,6 +87,7 @@ function TransactionForm({ transaction, defaultType, onDone }: { transaction?: T
   }
 
   return (
+    <>
     <form onSubmit={submit} noValidate className="space-y-4">
       <Segmented
         label="Tipo de lançamento"
@@ -101,7 +106,13 @@ function TransactionForm({ transaction, defaultType, onDone }: { transaction?: T
       <TextField label="Descrição" optional value={v.description} onChange={set('description')} error={errors.description} maxLength={80} placeholder={v.category ? `Se vazio, aparece como “${v.category}”` : v.type === 'receita' ? 'Ex.: Pagamento do serviço' : 'Ex.: Compra de material'} />
       <TextField label="Data" type="date" value={v.date} onChange={set('date')} error={errors.date} />
       <Button type="submit" block size="lg" disabled={saving}>{transaction ? 'Salvar alterações' : 'Registrar'}</Button>
+      {transaction && receiptFor(data, transaction.id) && (
+        <Button type="button" variant="secondary" block icon={<FileText size={18} />} onClick={() => setReceipt(transaction.id)}>Emitir recibo</Button>
+      )}
       {transaction && <Button variant="ghost" block className="text-red-600 dark:text-red-400" onClick={remove}>Excluir lançamento</Button>}
     </form>
+    {/* Fora do <form>: eventos atravessam portais e o recibo não pode enviar o formulário. */}
+    <ReceiptSheet txId={receipt} onClose={() => setReceipt(null)} />
+    </>
   );
 }

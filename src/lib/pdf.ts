@@ -46,6 +46,26 @@ export function fitText(text: string, maxWidth: number, size: number, font: Font
   return lo === 0 ? '…' : chars.slice(0, lo).join('').trimEnd() + '…';
 }
 
+/**
+ * Quebra o texto em linhas que cabem na largura (por palavras; palavras longas demais são cortadas com
+ * "…" — nunca passam da margem).
+ */
+export function wrapText(text: string, maxWidth: number, size: number, font: Font = 'regular'): string[] {
+  const words = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const candidate = line ? `${line} ${w}` : w;
+    if (textWidth(candidate, size, font) <= maxWidth) line = candidate;
+    else {
+      if (line) lines.push(line);
+      line = textWidth(w, size, font) <= maxWidth ? w : fitText(w, maxWidth, size, font);
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+
 const num = (n: number) => (Math.round(n * 100) / 100).toString();
 const color = ([r, g, b]: RGB) => `${num(r / 255)} ${num(g / 255)} ${num(b / 255)}`;
 const pdfString = (codes: number[]) =>
