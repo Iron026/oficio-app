@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 /** Regressão: o backup usa o Storage Access Framework, sem acesso amplo ao armazenamento. */
 describe('AndroidManifest: permissões mínimas', () => {
   const manifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
-  const permissions = [...manifest.matchAll(/uses-permission[^>]*android:name="([^"]+)"/g)].map((m) => m[1]);
+  const declared = [...manifest.matchAll(/<uses-permission([^>]*)>/g)].map((m) => m[1]!);
+  // Entradas com tools:node="remove" tiram do manifesto final permissões que plugins declaram.
+  const permissions = declared.filter((d) => !/tools:node="remove"/.test(d)).map((d) => /android:name="([^"]+)"/.exec(d)![1]);
+  const removed = declared.filter((d) => /tools:node="remove"/.test(d)).map((d) => /android:name="([^"]+)"/.exec(d)![1]);
 
   it('não solicita acesso irrestrito ao armazenamento', () => {
     for (const p of ['READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE', 'MANAGE_EXTERNAL_STORAGE', 'READ_MEDIA_IMAGES']) {
@@ -13,6 +16,19 @@ describe('AndroidManifest: permissões mínimas', () => {
 
   it('declara somente as permissões necessárias', () => {
     expect(permissions).toEqual(['android.permission.INTERNET']);
+  });
+
+  it('beta.4: lembretes não exatos — remove SCHEDULE_EXACT_ALARM (e não pede USE_EXACT_ALARM)', () => {
+    expect(removed).toEqual(['android.permission.SCHEDULE_EXACT_ALARM']);
+    expect(permissions).not.toContain('android.permission.USE_EXACT_ALARM');
+    expect(manifest).toMatch(/xmlns:tools="http:\/\/schemas\.android\.com\/tools"/);
+  });
+
+  it('beta.4: notificações com ícone pequeno monocromático próprio', () => {
+    const icon = readFileSync('android/app/src/main/res/drawable/ic_stat_oficio.xml', 'utf8');
+    expect(icon).toMatch(/<vector/);
+    expect([...icon.matchAll(/android:(?:fill|stroke)Color="([^"]+)"/g)].map((m) => m[1])).toEqual(['#FFFFFF', '#FFFFFF']);
+    expect(readFileSync('capacitor.config.ts', 'utf8')).toMatch(/smallIcon: 'ic_stat_oficio'/);
   });
 
   it('registra o plugin de salvar backup na atividade principal', () => {

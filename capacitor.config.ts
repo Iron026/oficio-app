@@ -49,6 +49,11 @@ const config: CapacitorConfig = {
       showSpinner: false,
       androidScaleType: 'CENTER_CROP',
     },
+    LocalNotifications: {
+      // Lembretes (beta.4): ícone monocromático da logo na barra de status, na cor da marca.
+      smallIcon: 'ic_stat_oficio',
+      iconColor: '#0f7b71',
+    },
     Keyboard: {
       resizeOnFullScreen: true,
     },

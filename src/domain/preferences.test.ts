@@ -10,7 +10,8 @@ describe('preferências do aparelho', () => {
 
   it('depois de salvas, o valor do aparelho vale (a conta não muda mais o tema)', () => {
     expect(readDevicePrefs({ version: 1, theme: 'light', density: 'compacta', hideValues: true, motion: 'reduzir' }, 'dark'))
-      .toEqual({ version: 1, theme: 'light', density: 'compacta', hideValues: true, motion: 'reduzir', haptics: false });
+      .toEqual({ version: 1, theme: 'light', density: 'compacta', hideValues: true, motion: 'reduzir', haptics: false,
+        reminders: { enabled: false, offsets: [], showClient: false } }); // beta.4: lembretes desligados ao atualizar
   });
 
   it('valores inválidos viram o padrão', () => {

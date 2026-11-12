@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { startReminderSync } from './platform/reminderSync';
 import { HideValuesContext } from './ui/privacy';
 import { useApp, useAppearanceEffect, usePrefs, useThemeEffect, AppProvider } from './state/AppContext';
 import { decideBack } from './platform/backStack';
-import { hideSplash, minimizeApp, onAndroidBack, setupKeyboard } from './platform/native';
+import { hideSplash, isNative, minimizeApp, onAndroidBack, setupKeyboard } from './platform/native';
 import { navigate, useLocation, type Route } from './state/router';
 import { AppService } from './state/service';
 import { createStorage, type StorageAdapter } from './storage';
@@ -43,6 +44,7 @@ export function App({ storageFactory, cloudFactory }: AppProps) {
     let cancelled = false;
     let sync: SyncEngine | null = null;
     let stopAuth: (() => void) | undefined;
+    let reminders: { stop(): void } | undefined;
     (async () => {
       const { storage, persistent } = await (storageFactory ?? createStorage)();
       const tracked = new TrackedStorage(storage);
@@ -55,6 +57,8 @@ export function App({ storageFactory, cloudFactory }: AppProps) {
       // beta.3: completa as séries recorrentes até 90 dias à frente (sem XP; idempotente).
       await service.extendSeries().catch(() => undefined);
       setBoot({ service, persistent, sync: engine });
+      // beta.4: lembretes do aparelho acompanham a agenda (só no app Android; nunca pede permissão sozinho).
+      if (isNative()) reminders = startReminderSync(service);
       void setupKeyboard();
       // Conta Google e nuvem carregam depois, sem atrasar a abertura (e o app funciona sem elas).
       void (cloudFactory ?? createCloud)().then(async (cloud) => {
@@ -77,6 +81,7 @@ export function App({ storageFactory, cloudFactory }: AppProps) {
       // Ao desmontar, nenhum temporizador ou ouvinte do app pode continuar ativo.
       cancelled = true;
       stopAuth?.();
+      reminders?.stop();
       sync?.dispose();
     };
   }, [storageFactory, cloudFactory]);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, Cloud, Database, HardDrive, Info, Palette, ShieldCheck, UserRound } from 'lucide-react';
+import { Bell, Camera, Cloud, Database, HardDrive, Info, Palette, ShieldCheck, UserRound } from 'lucide-react';
 import { accentOf } from '../domain/preferences';
 import { platformName } from '../platform/native';
 import { useApp, usePrefs } from '../state/AppContext';
@@ -19,6 +19,7 @@ import { DataPage, relativeDay } from './settings/DataPage';
 import { APP_VERSION, settingsPage, type SettingsPageId } from './settings/pages';
 import { PrivacyPage } from './settings/PrivacyPage';
 import { ProfilePage } from './settings/ProfilePage';
+import { RemindersPage } from './settings/RemindersPage';
 import { CategoryRow, openSettings, useRestoreScroll } from './settings/shared';
 
 export { APP_VERSION, PRIVACY_POLICY_URL } from './settings/pages';
@@ -28,6 +29,7 @@ const PAGES: Record<SettingsPageId, () => React.ReactNode> = {
   'aparencia/paleta': () => <PalettePage />,
   perfil: () => <ProfilePage />,
   privacidade: () => <PrivacyPage />,
+  lembretes: () => <RemindersPage />,
   conta: () => <AccountPage />,
   dados: () => <DataPage />,
   sobre: () => <AboutPage />,
@@ -83,6 +85,7 @@ function SettingsIndex() {
         <CategoryRow icon={<Palette size={20} />} title="Aparência e personalização" subtitle="Tema, paleta de cores e densidade" summary={`${themeLabel(prefs.theme)} · ${getPalette(accentOf(data.settings)).name}`} onClick={() => go('aparencia')} />
         <CategoryRow icon={<UserRound size={20} />} title="Perfil e negócio" subtitle="Nome, profissão, imagem, selo e metas" summary={profession.name} onClick={() => go('perfil')} />
         <CategoryRow icon={<ShieldCheck size={20} />} title="Privacidade e acessibilidade" subtitle="Ocultar valores, animações e privacidade" summary={`${prefs.hideValues ? 'Valores ocultos' : 'Valores visíveis'}${prefs.motion === 'reduzir' ? ' · Animações reduzidas' : ''}`} onClick={() => go('privacidade')} />
+        <CategoryRow icon={<Bell size={20} />} title="Lembretes" subtitle="Avisos antes dos atendimentos" summary={prefs.reminders.enabled ? `Ligados · ${prefs.reminders.offsets.length} ${prefs.reminders.offsets.length === 1 ? 'antecedência' : 'antecedências'}` : 'Desligados'} onClick={() => go('lembretes')} />
         <CategoryRow icon={<Cloud size={20} />} title="Conta e sincronização" subtitle="Conta Google e nuvem" summary={accountSummary} onClick={() => go('conta')} />
         <CategoryRow icon={<HardDrive size={20} />} title="Backup e dados" subtitle="Exportar, importar e cópias de segurança" summary={last ? `Último backup: ${relativeDay(last)}` : 'Nenhum backup exportado ainda'} onClick={() => go('dados')} />
         <CategoryRow icon={<Info size={20} />} title="Sobre o Ofício" subtitle="Versão, plano e informações" summary={`v${APP_VERSION}`} onClick={() => go('sobre')} />
