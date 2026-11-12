@@ -10,7 +10,7 @@ import { centsToInput, formatMoney, parseMoney } from '../../lib/money';
 import { useApp, useErrorHandler, useFeedback, useUndoAction } from '../../state/AppContext';
 import type { CompletePayment } from '../../state/service';
 import { StatusBadge, type StatusTone } from '../../ui/Badge';
-import { Button, IconButton } from '../../ui/Button';
+import { Button } from '../../ui/Button';
 import { ReceiptSheet } from './ReceiptSheet';
 import { cx } from '../../ui/cx';
 import { TextField } from '../../ui/Field';
@@ -67,7 +67,7 @@ export function PaymentPanel({ a, onPay, onRefund }: { a: Appointment; onPay: ()
       {s.entries.length > 0 && (
         <ol className="divide-y divide-line rounded-xl border border-line" aria-label="Histórico financeiro">
           {s.entries.map((e) => (
-            <li key={e.tx.id} className="flex items-center gap-2 px-3 py-2 text-sm" data-payment-entry={e.kind}>
+            <li key={e.tx.id} className="flex flex-wrap items-center gap-x-2 px-3 py-2 text-sm" data-payment-entry={e.kind}>
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold">
                   {KIND_LABEL[e.kind]}{e.early && e.kind !== 'estorno' ? ' antecipado' : ''}
@@ -76,12 +76,15 @@ export function PaymentPanel({ a, onPay, onRefund }: { a: Appointment; onPay: ()
                   {formatDateShort(e.tx.date)}{e.method ? ` · ${e.method}` : ''}{e.refunded > 0 ? ` · ${e.refundable === 0 ? 'estornado' : 'estornado em parte'}` : ''}
                 </span>
               </span>
-              <Money cents={e.tx.amount} kind={e.kind === 'estorno' ? 'expense' : 'income'} className="font-semibold" />
+              <Money cents={e.tx.amount} kind={e.kind === 'estorno' ? 'expense' : 'income'} className="shrink-0 whitespace-nowrap font-semibold" />
               {e.kind !== 'estorno' && (
-                <IconButton label={`Recibo do pagamento de ${formatDateShort(e.tx.date)}`} onClick={() => setReceipt(e.tx.id)} className="shrink-0"><FileText size={18} /></IconButton>
-              )}
-              {e.kind !== 'estorno' && e.refundable > 0 && (
-                <Button variant="ghost" size="sm" className="min-h-11" icon={<Undo2 size={14} />} onClick={() => onRefund(e)} aria-label={`Estornar ${formatMoney(e.refundable)} de ${formatDateShort(e.tx.date)}`}>Estornar</Button>
+                // Ações numa linha própria: em telas estreitas a data e o valor não ficam espremidos.
+                <span className="-mr-2 flex w-full justify-end gap-1">
+                  <Button variant="ghost" size="sm" className="min-h-11" icon={<FileText size={14} />} onClick={() => setReceipt(e.tx.id)} aria-label={`Recibo do pagamento de ${formatDateShort(e.tx.date)}`}>Recibo</Button>
+                  {e.refundable > 0 && (
+                    <Button variant="ghost" size="sm" className="min-h-11" icon={<Undo2 size={14} />} onClick={() => onRefund(e)} aria-label={`Estornar ${formatMoney(e.refundable)} de ${formatDateShort(e.tx.date)}`}>Estornar</Button>
+                  )}
+                </span>
               )}
             </li>
           ))}

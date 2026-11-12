@@ -43,6 +43,14 @@ async function start({ hide = false, conflict = false } = {}) {
 }
 
 describe('beta.4: relatórios', () => {
+  it('o link "Finanças" no topo volta para Finanças (no navegador não há botão Voltar do sistema)', async () => {
+    const { user } = await start();
+    expect(window.location.hash).toBe('#/financas/relatorios');
+    await user.click(screen.getAllByRole('link', { name: /^finanças$/i }).find((l) => l.hasAttribute('data-report-back'))!);
+    await screen.findByRole('button', { name: /^relatórios$/i });
+    expect(window.location.hash).toBe('#/financas');
+  });
+
   it('abre por Finanças (5 áreas na navegação); caixa, fora do caixa e ticket médio com a fórmula', async () => {
     const { user } = await start();
     expect(window.location.hash).toBe('#/financas/relatorios');

@@ -320,6 +320,10 @@ try {
         await fresh.page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
         await capture(fresh.page, vp, theme, `vazio-${s.id}`);
       }
+      // beta.4: relatórios sem lançamentos (estado vazio).
+      await fresh.page.goto(BASE + '#/financas/relatorios');
+      await fresh.page.locator('[data-report-empty]').waitFor();
+      await capture(fresh.page, vp, theme, 'vazio-relatorios');
       await fresh.ctx.close();
 
       const { ctx, page } = await newPage(vp, theme);
@@ -355,7 +359,14 @@ try {
       await page.getByRole('radio', { name: /concluíd/i }).click();
       await page.getByRole('button', { name: /pacote noiva/i }).first().click();
       await page.getByRole('region', { name: 'Pagamento' }).waitFor();
-      await capture(page, vp, theme, 'agenda-pagamento', { skipChecks: true });
+      await capture(page, vp, theme, 'agenda-pagamento');
+      // beta.4: recibo do pagamento (só leitura; nada é lançado).
+      await page.getByRole('button', { name: /^recibo do pagamento/i }).first().click();
+      const recibo = page.getByRole('dialog', { name: 'Recibo' });
+      await recibo.waitFor();
+      await capture(page, vp, theme, 'recibo');
+      await page.keyboard.press('Escape');
+      await recibo.waitFor({ state: 'detached' });
       await page.keyboard.press('Escape');
       await page.getByRole('dialog').waitFor({ state: 'detached' });
       // beta.3: formulário com "Repetir", histórico do cliente e busca global.
@@ -382,8 +393,16 @@ try {
       await capture(page, vp, theme, 'busca-vazia');
       await page.keyboard.press('Escape');
       await busca.waitFor({ state: 'detached' });
+      // beta.4: relatórios (caixa do mês, fora do caixa, evolução e tabelas).
+      await page.goto(BASE + '#/financas/relatorios');
+      await page.locator('[data-reports]').waitFor();
+      await capture(page, vp, theme, 'relatorios');
+      if (vp.id === 'celular-360') {
+        await page.locator('[data-reports] details summary').first().click();
+        await capture(page, vp, theme, 'relatorios-inteira', { full: true, skipChecks: true });
+      }
       // Central de Ajustes: páginas internas (rodada 5).
-      for (const sub of ['aparencia', 'aparencia/paleta', 'perfil', 'privacidade', 'conta', 'dados', 'sobre']) {
+      for (const sub of ['aparencia', 'aparencia/paleta', 'perfil', 'lembretes', 'privacidade', 'conta', 'dados', 'sobre']) {
         await page.goto(BASE + '#/ajustes/' + sub);
         await page.getByRole('link', { name: /^(ajustes|aparência)$/i }).waitFor();
         await capture(page, vp, theme, `ajustes-${sub.replace('/', '-')}`);
@@ -717,6 +736,10 @@ try {
           await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
           await capture(page, vp, theme, `paleta-${id}-${s.id}`);
         }
+        // beta.4: gráfico dos relatórios em cada paleta (contraste das barras e da linha).
+        await page.goto(BASE + '#/financas/relatorios');
+        await page.locator('[data-reports]').waitFor();
+        await capture(page, vp, theme, `paleta-${id}-relatorios`);
         // Formulário com erros de validação (campos, mensagens, botão desabilitado ao salvar).
         await page.goto(BASE + '#/financas');
         await page.getByRole('button', { name: /^receita$/i }).first().click();

@@ -192,13 +192,15 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
           <div className="rounded-xl bg-surface-2 p-3"><dt className="text-muted">Horário</dt><dd className="font-semibold">{a.time ? <>{timeRange(a)}<span className="block text-xs font-normal text-muted">{durationOf(a) ? formatDuration(durationOf(a)!) : 'Duração não informada'}</span></> : 'Sem horário'}</dd></div>
           <div className="col-span-2 rounded-xl bg-surface-2 p-3"><dt className="text-muted">Valor combinado</dt><dd className="font-semibold">{a.price ? <Money cents={a.price} /> : '—'}</dd></div>
           <div className="col-span-2 flex items-center gap-2 rounded-xl bg-surface-2 p-3">
-            <User size={16} className="text-muted" aria-hidden="true" />
-            <dd className="min-w-0 flex-1 font-semibold [overflow-wrap:anywhere]">{client?.name ?? 'Sem cliente vinculado'}</dd>
-            {wa && (
-              <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-green-700 px-3 text-sm font-semibold text-white">
-                <MessageCircle size={14} aria-hidden="true" /> WhatsApp
-              </a>
-            )}
+            <dt className="shrink-0 text-muted"><User size={16} aria-hidden="true" /><span className="sr-only">Cliente</span></dt>
+            <dd className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="min-w-0 flex-1 font-semibold [overflow-wrap:anywhere]">{client?.name ?? 'Sem cliente vinculado'}</span>
+              {wa && (
+                <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl bg-green-700 px-3 text-sm font-semibold text-white">
+                  <MessageCircle size={14} aria-hidden="true" /> WhatsApp
+                </a>
+              )}
+            </dd>
           </div>
           {rule && (
             <div className="col-span-2 rounded-xl bg-surface-2 p-3" data-series-rule>

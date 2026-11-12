@@ -121,7 +121,10 @@ export function Reports() {
   return (
     <div className="space-y-4" data-reports={month}>
       <HeroSlot overlap>
-        <div className="flex items-center justify-between gap-2 pt-1">
+        <a href="#/financas" className="press-soft -ml-2 inline-flex min-h-11 items-center gap-0.5 rounded-lg px-2 text-sm font-semibold text-white/90 hover:bg-white/15" data-report-back>
+          <ChevronLeft size={18} aria-hidden="true" /> Finanças
+        </a>
+        <div className="flex items-center justify-between gap-2">
           <IconButton label="Mês anterior" onClick={() => shift(-1)} className="!text-white hover:!bg-white/15"><ChevronLeft size={22} /></IconButton>
           <h2 className="text-center font-display text-lg font-bold first-letter:uppercase" aria-live="polite">{monthLabel(month)}</h2>
           <IconButton label="Próximo mês" onClick={() => shift(1)} disabled={isCurrent} className="!text-white hover:!bg-white/15 disabled:opacity-30"><ChevronRight size={22} /></IconButton>
