@@ -230,3 +230,44 @@ describe('avisos não exatos atrasados', () => {
     expect(m.state.pending.size).toBe(0);
   });
 });
+
+describe('reagendamento completo ao iniciar o app (beta.5)', () => {
+  it('a primeira reconciliação depois de abrir o app agenda de novo todos os avisos (mesmos ids, sem duplicar)', async () => {
+    const s = await app();
+    await s.saveAppointment(input());
+    await s.saveAppointment(input({ title: 'Pé', time: '11:00' }));
+    await enable(s, [30]);
+    const m = memoryReminderPlatform('granted');
+    await reconcile(s, m.platform);
+    // O sistema perdeu um alarme, mas a lista do plugin continua dizendo que ele está agendado.
+    const lost = [...m.state.pending.keys()][0]!;
+    const calls = m.state.scheduleCalls;
+    setReminderPlatform(m.platform);
+    const ctl = startReminderSync(s, { debounceMs: 0, now });
+    try {
+      const r = await ctl.runNow();
+      expect(r).toMatchObject({ total: 2, scheduled: 2 });
+      expect(m.state.scheduleCalls).toBe(calls + 1);
+      expect(m.state.pending.size).toBe(2);
+      expect(m.state.pending.has(lost)).toBe(true);
+      // Depois da primeira, volta ao modo econômico: nada muda, nada é reagendado.
+      expect(await ctl.runNow()).toMatchObject({ scheduled: 0, cancelled: 0 });
+    } finally {
+      ctl.stop();
+    }
+  });
+
+  it('forçado não cancela aviso atrasado que ainda vale nem agenda aviso passado', async () => {
+    let t = new Date(2026, 10, 12, 9, 0);
+    const s = await AppService.load(createMemoryAdapter(), () => t);
+    await s.completeOnboarding({ name: 'Ana', businessName: '', professionId: 'beleza' });
+    const a = (await s.saveAppointment(input({ date: '2026-11-12', time: '10:00' }))).appointment;
+    await enable(s, [15]);
+    const m = memoryReminderPlatform('granted');
+    const run = (force = false) => reconcileReminders(m.platform, { appointments: s.data.appointments, clients: s.data.clients, prefs: s.devicePrefs.reminders, now: t, serviceTerm: 'Atendimento' }, { force });
+    await run();
+    t = new Date(2026, 10, 12, 9, 50);
+    expect(await run(true)).toMatchObject({ scheduled: 0, cancelled: 0 });
+    expect(m.state.pending.has(reminderId(a.id, 15))).toBe(true);
+  });
+});

@@ -33,6 +33,8 @@ export function startReminderSync(service: AppService, opts: { debounceMs?: numb
   let running: Promise<ReconcileResult | null> | null = null;
   let again = false;
   let stopped = false;
+  // A primeira reconciliação depois de o app iniciar reagenda tudo (ver reconcileReminders, `force`).
+  let fresh = true;
 
   const run = async (): Promise<ReconcileResult | null> => {
     if (stopped) return null;
@@ -43,7 +45,8 @@ export function startReminderSync(service: AppService, opts: { debounceMs?: numb
         last = await reconcileReminders(reminderPlatform(), {
           appointments: d.appointments, clients: d.clients, prefs: service.devicePrefs.reminders, now: now(),
           serviceTerm: getProfession(d.profile?.professionId).terms.service,
-        });
+        }, { force: fresh });
+        if (last.permission !== 'indisponivel') fresh = false;
         listeners.forEach((l) => l());
         return last;
       } catch {

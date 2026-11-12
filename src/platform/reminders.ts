@@ -75,6 +75,7 @@ export interface ReconcileResult { scheduled: number; cancelled: number; total: 
 export async function reconcileReminders(
   platform: ReminderPlatform,
   input: { appointments: readonly Appointment[]; clients: readonly Pick<Client, 'id' | 'name'>[]; prefs: ReminderPrefs; now: Date; serviceTerm?: string },
+  opts: { force?: boolean } = {},
 ): Promise<ReconcileResult> {
   if (!platform.available()) return { scheduled: 0, cancelled: 0, total: 0, permission: 'indisponivel' };
   const permission = await platform.checkPermission();
@@ -82,7 +83,15 @@ export async function reconcileReminders(
   const planned = granted ? planReminders(input.appointments, input.clients, input.prefs, input.now, input.serviceTerm) : [];
   const late = granted ? lateReminders(input.appointments, input.clients, input.prefs, input.now, input.serviceTerm) : [];
   const pending = await platform.pending();
-  const { cancel, schedule } = diffReminders(pending, planned, late);
+  let { cancel, schedule } = diffReminders(pending, planned, late);
+  if (opts.force) {
+    // beta.5: reagenda tudo (mesmos ids, sem duplicar). A lista do plugin pode dizer "agendado" para um alarme que o
+    // sistema perdeu (atualização do app, limpeza do sistema); reagendar também encurta a janela do aviso não exato.
+    // Avisos atrasados que ainda valem e continuam pendentes não são tocados.
+    const keepLate = new Set(late.map((l) => l.id).filter((id) => pending.some((p) => p.id === id) && !cancel.includes(id)));
+    cancel = pending.map((p) => p.id).filter((id) => !keepLate.has(id));
+    schedule = [...planned];
+  }
   await platform.cancel(cancel);
   await platform.schedule(schedule);
   return { scheduled: schedule.length, cancelled: cancel.length, total: planned.length, permission };
