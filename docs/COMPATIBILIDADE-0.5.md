@@ -104,6 +104,17 @@ sincronização. Por isso o gerador da 0.5 não pode “preencher buracos”: el
 | XP | Só a criação da série dá XP de agendamento; ocorrências geradas não contam na missão semanal |
 | Aparelho na beta.2 | Vê as ocorrências como agendamentos comuns e preserva `series`; não gera nada. Uma ocorrência excluída lá não volta (o `through` continua gravado nas outras) |
 
+## O que a 0.5.0-beta.4 mudou
+
+| Situação | Na 0.5.0-beta.4 |
+| --- | --- |
+| Dados gravados | **Nenhum campo novo** em clientes, serviços ou lançamentos. Relatórios e recibos são calculados na hora a partir dos lançamentos; emitir recibo não grava nada nem dá XP |
+| Número do recibo | Derivado do id e da data do lançamento (`REC-<aaaammdd>-<4>`): o mesmo em todos os aparelhos e em cada reemissão |
+| Lembretes | Configuração em `DevicePrefs.reminders` (`kv`, por aparelho): fora do backup, da nuvem e da sincronização. Desligados por padrão, inclusive ao atualizar da beta.3. Os avisos agendados ficam só no Android |
+| Android | Plugin `@capacitor/local-notifications`; permissão `POST_NOTIFICATIONS` (pedida só ao ligar). `SCHEDULE_EXACT_ALARM` removida do manifesto final. `applicationId` e assinatura inalterados |
+| Aparelho na beta.3 | Não vê relatórios, recibos nem lembretes; os dados continuam idênticos |
+| Regras do Firestore | Sem mudança |
+
 ## Riscos que continuam
 
 - **Aparelho ainda na beta.3 ou anterior.** Ele não tem estas proteções. Antes de usar a 0.5, todos os

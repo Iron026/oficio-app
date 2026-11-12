@@ -81,3 +81,33 @@ estornos fora das despesas operacionais.
    edição e cancelamento, XP, interface.
 3. Histórico do cliente. 4. Busca global. 5. Versão 0.5.0-beta.3, documentação, varredura visual (360/412) e
    Android com atualização por cima da beta.2.
+
+## 0.5.0-beta.4 (a partir de `cea9f06`, beta.3 aprovada)
+
+### Auditoria
+
+| Área | Situação | Consequência |
+| --- | --- | --- |
+| Totais | `domain/finance.ts` `totals()` já separa receitas, estornos e despesas; Finanças, Painel e extrato usam a mesma função | Relatórios derivam de `totals()` por mês: nenhum número próprio, nenhuma divergência |
+| Pendente e previsto | `domain/payments.ts` calcula contratado × recebido × estornado por serviço | “A receber” (concluídos) e “previsto” (agendados) fora do caixa |
+| Estornos em revisão | `domain/refundReview.ts` | Relatório avisa “totais ainda não reconciliados” e leva à revisão |
+| PDF | `lib/pdf.ts` (Helvetica, WinAnsi) + `platform/files.ts` (Salvar como / compartilhar) | Recibo reaproveita os dois; só `wrapText` novo |
+| Preferências | `DevicePrefs` em `kv`, por aparelho, fora do backup e da nuvem | Lembretes guardam a configuração ali |
+| Notificações | Nenhum plugin | `@capacitor/local-notifications` 8.3.1 (compatível com Capacitor 8), sem alarme exato |
+
+### Entregas (commits separados)
+
+1. Relatórios (`domain/reports.ts`, `screens/Reports.tsx`, rota `#/financas/relatorios`). Fórmulas: receita bruta =
+   Σ recebimentos; líquida = recebimentos − estornos; saldo = recebimentos − estornos − despesas operacionais;
+   ticket médio = recebimentos líquidos do mês ÷ atendimentos concluídos no mês (numerador, denominador e período
+   na tela). Parciais e antecipados contam na data em que entraram.
+2. Recibos (`domain/receipt.ts`, `lib/receiptPdf.ts`, `ReceiptSheet`): só receitas registradas; número
+   `REC-<aaaammdd>-<4>` derivado do id do lançamento; parcial mostra só o recebido; estorno relacionado mostra a
+   situação atual; não grava nada, não dá XP.
+3. Lembretes (`domain/reminders.ts`, `platform/reminders.ts`, `platform/reminderSync.ts`, Ajustes › Lembretes):
+   planejamento puro + reconciliação idempotente com ids estáveis por (atendimento, antecedência); 30 dias, até 120
+   avisos; ao abrir, ao voltar ao app, ao mudar a agenda/preferências e depois de sincronizar; permissão só ao
+   ligar; manifesto remove `SCHEDULE_EXACT_ALARM`.
+4. Versão, documentação, varredura visual e Android: 0.4.0-beta.7 → 0.5.0-beta.3 (com cliente, agendamento,
+   pagamento e estorno) → beta.4; recibo salvo pela janela do sistema; avisos reais com o app aberto, em segundo
+   plano e com o processo encerrado.

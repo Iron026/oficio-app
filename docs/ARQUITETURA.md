@@ -60,6 +60,12 @@ a sincronização deixa a ocorrência gerada e intocada ceder à exclusão de ou
 estornos acima do pago ou sem pagamento ficam para revisão (nunca removidos automaticamente).
 `domain/clientHistory.ts` e `domain/search.ts`: derivados, em memória, sem gravar nada e sem rede.
 
+**0.5.0-beta.4.** `domain/reports.ts` (relatórios mensais e histórico de 6/12 meses sobre `totals()`, os mesmos
+números de Finanças e do extrato), `domain/receipt.ts` + `lib/receiptPdf.ts` (recibo derivado de uma receita
+registrada; número estável) e lembretes: `domain/reminders.ts` (planejamento puro), `platform/reminders.ts`
+(plugin de notificações locais, não exato; reconciliação idempotente) e `platform/reminderSync.ts` (controlador
+que reconcilia ao abrir, ao voltar ao app e a cada mudança de dados ou preferências; só no app nativo).
+
 ## Conta e sincronização (v0.3)
 
 Ver [SINCRONIZACAO.md](SINCRONIZACAO.md). Resumo: `TrackedStorage` registra alterações locais; `SyncEngine` envia/recebe pelo `RemoteStore` (Firestore) com controle de revisão e mesclagem em 3 vias; `AccountController` orquestra login e associação. Sem Firebase configurado, o app é 100% local.

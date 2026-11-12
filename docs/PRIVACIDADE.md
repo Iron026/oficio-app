@@ -42,7 +42,7 @@ Ao tocar em **Continuar com Google** e confirmar a conexão:
 - **Dados de demonstração** (fictícios) não são enviados.
 - **Foto de perfil, selos e tipos de serviço (versão 0.4):** a foto escolhida no Ofício é recortada e
   reduzida no próprio aparelho (até 64 KB, sem localização ou outros metadados da câmera). Até a versão
-  0.5.0-beta.3 a foto, os selos e os tipos de serviço personalizados ficam **só no aparelho e no arquivo
+  0.5.0-beta.4 a foto, os selos e os tipos de serviço personalizados ficam **só no aparelho e no arquivo
   de backup** — não são enviados para a nuvem, mesmo com conta conectada. Se isso mudar numa versão futura, esta política será atualizada antes.
   A foto da conta Google não é usada como foto de perfil do Ofício.
 
@@ -55,6 +55,14 @@ Ao tocar em **Continuar com Google** e confirmar a conexão:
 - Antes de conectar uma conta ou importar um backup, o aplicativo guarda automaticamente até
   **5 cópias de segurança locais** dos dados anteriores, somente no aparelho. Elas são apagadas
   com “Apagar todos os dados”.
+
+## 4a. Recibos e lembretes (versão 0.5)
+- **Recibos em PDF** são gerados no próprio aparelho, a partir dos pagamentos registrados. Nada é enviado; o
+  arquivo vai para onde você escolher salvar ou para o aplicativo com que você compartilhar.
+- **Lembretes de atendimentos** (app Android) são notificações locais, agendadas pelo próprio aparelho, sem
+  servidor. Ficam desligados até você ligar; a permissão de notificações só é pedida nesse momento. Por padrão o
+  aviso mostra só o serviço e o horário, sem o nome do cliente e sem valores, e o conteúdo fica oculto na tela
+  bloqueada. A configuração vale só para o aparelho e não vai para o backup nem para a nuvem.
 
 ## 5. O que não fazemos
 - Não vendemos dados.

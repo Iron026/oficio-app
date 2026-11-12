@@ -20,6 +20,12 @@ Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0
   com término, horizonte de 90 dias, ids determinísticos, “só esta / esta e as próximas / toda a série”, sem
   duplicar nem recriar entre aparelhos e sem XP repetido; **histórico do cliente** derivado dos lançamentos;
   **busca global** offline na lupa do cabeçalho. Teste Android: 0.4.0-beta.7 → 0.5.0-beta.2 → beta.3.
+- 0.5.0-beta.4 (a partir de `cea9f06`, beta.3 aprovada no S26): **relatórios** em Finanças (mês, comparação com o
+  anterior, evolução de 6/12 meses, caixa × pendente × previsto, ticket médio explicado, categorias, serviços e
+  clientes recorrentes), **recibos em PDF** só de pagamentos registrados (número estável, situação de estorno,
+  “não é nota fiscal”) e **lembretes** locais no Android (opcionais, desligados por padrão, 15 min/30 min/1 h/1 dia,
+  não exatos, sem nome do cliente por padrão). Teste Android: 0.4.0-beta.7 → 0.5.0-beta.3 → beta.4, com avisos
+  reais com o app aberto, em segundo plano e fechado.
 
 ## 0.4 (em desenvolvimento — branch `feat/v0.4-design`)
 Design, estética e experiência. Etapas: 0 rede de segurança visual · 1 fundamentos do design

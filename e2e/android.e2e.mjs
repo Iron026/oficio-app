@@ -13,7 +13,7 @@ const OUT = 'e2e-results';
 const apk = process.argv[2];
 /** APK da versão anterior (0.4.0-beta.7) para o teste de atualização por cima; opcional. */
 const previousApk = process.argv[3] || '';
-/** APK da versão intermediária aprovada (hoje a 0.5.0-beta.2, a que está no S26): cadeia 0.4 → ela → atual; opcional. */
+/** APK da versão intermediária aprovada (hoje a 0.5.0-beta.3, a que está no S26): cadeia 0.4 → ela → atual; opcional. */
 const midApk = process.argv[4] || '';
 if (!apk) throw new Error('Informe o caminho do APK.');
 mkdirSync(OUT, { recursive: true });
@@ -239,6 +239,52 @@ const findStatementFiles = (ext) => {
 
 const namesIn = (rows) => rows.map((r) => r.name ?? r.title ?? r.description);
 
+/** Arquivos no armazenamento compartilhado cujo nome casa com o padrão (curinga do `find`). */
+const findShared = (glob) => {
+  try {
+    return adb('shell', `find /sdcard/ -name '${glob}' -not -path '*/Android/*' 2>/dev/null; true`).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+/** Confere um PDF gravado no aparelho (cabeçalho, fim e tamanho). */
+const assertPdf = (file, min = 1500) => {
+  const head = adb('shell', `head -c 8 '${file}'`);
+  const tail = adb('shell', `tail -c 6 '${file}'`);
+  const size = Number(adb('shell', `wc -c < '${file}'`).trim());
+  assert(head.startsWith('%PDF-1.4'), `cabeçalho do PDF inválido: ${JSON.stringify(head)}`);
+  assert(tail.includes('%%EOF'), 'PDF sem marcador de fim');
+  assert(size > min, `PDF pequeno demais (${size} bytes)`);
+  return size;
+};
+/** Toca em "Salvar" na janela "Salvar como" do Android e espera o app voltar. */
+const saveInSystemDialog = async () => {
+  await eventually(() => /documentsui/.test(resumedPackage()), 'janela "Salvar como" do Android não abriu');
+  const save = await eventually(() => findUiNode((n) => /^(save|salvar)$/i.test(n.text) && n.enabled), 'botão Salvar da janela do sistema não encontrado', 15_000);
+  adb('shell', 'input', 'tap', String(save.x), String(save.y));
+  await eventually(() => resumedPackage() === PKG, 'o app não voltou após salvar');
+};
+
+/** beta.4 — permissões do pacote instalado (lembretes). */
+const packageDump = () => adb('shell', 'dumpsys', 'package', PKG);
+const notificationsGranted = () => /android\.permission\.POST_NOTIFICATIONS: granted=true/.test(packageDump());
+const permissionDialogOpen = () => /permissioncontroller/.test(resumedPackage());
+/** Notificações postadas pelo app (texto completo, sem ocultar conteúdo). */
+const appNotifications = () => {
+  const dump = adb('shell', 'dumpsys', 'notification', '--noredact');
+  return dump.split(/\n(?=\s*NotificationRecord\()/).filter((b) => b.includes(`pkg=${PKG}`)).join('\n');
+};
+/** Data e hora locais do aparelho daqui a `seconds` segundos, arredondadas para o próximo minuto cheio. */
+const deviceLocalIn = (seconds) => {
+  const epoch = Number(adb('shell', 'date', '+%s').trim());
+  const z = adb('shell', 'date', '+%z').trim(); // ex.: -0300
+  const offset = (z.startsWith('-') ? -1 : 1) * (Number(z.slice(1, 3)) * 3600 + Number(z.slice(3, 5)) * 60);
+  const at = Math.ceil((epoch + seconds) / 60) * 60;
+  const d = new Date((at + offset) * 1000);
+  const p2 = (n) => String(n).padStart(2, '0');
+  return { epoch, at, date: `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`, time: `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}` };
+};
+
 const [device] = await android.devices({ omitDriverInstall: true });
 assert(device, 'Nenhum dispositivo Android encontrado.');
 console.log(`Dispositivo: ${device.model()} · Android SDK ${adb('shell', 'getprop', 'ro.build.version.sdk').trim()}`);
@@ -339,11 +385,26 @@ try {
     assert(/Pago/.test((await item.textContent()) ?? ''), 'atendimento pago na 0.4 não aparece como "Pago" na 0.5');
     await wait(800);
     shot('00-atualizado-da-0.4');
-    console.log(`\n  dados preservados${midApk ? ' (0.4 → 0.5.0-beta.2)' : ''}: ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
+    console.log(`\n  dados preservados${midApk ? ' (0.4 → 0.5.0-beta.3)' : ''}: ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
   });
 
-  if (previousApk && midApk) await step('Atualização por cima da 0.5.0-beta.2 (com estorno parcial) sem perder dados', async () => {
-    // Na beta.2 (interface dela): estorno parcial de R$ 20,00 da receita automática da 0.4.
+  if (previousApk && midApk) await step('Atualização por cima da 0.5.0-beta.3 (cliente, agendamento, pagamento e estorno) sem perder dados', async () => {
+    // Na beta.3 (interface dela): um agendamento futuro com cliente e o estorno parcial de R$ 20,00 da receita da 0.4.
+    const t = new Date(Date.now() + 86_400_000);
+    const amanha = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
+    await tap(page.getByRole('button', { name: /^agendar$/i }));
+    const novo = page.getByRole('dialog');
+    await novo.getByLabel(/descrição/i).fill('Escova da beta.3');
+    await novo.getByLabel(/^cliente/i).selectOption({ label: 'Cliente da 0.4' });
+    await novo.getByLabel(/^data/i).fill(amanha);
+    await novo.getByLabel(/^horário/i).fill('10:00');
+    await novo.getByLabel(/valor/i).fill('90,00');
+    await tap(novo.getByRole('button', { name: /^agendar$/i }));
+    await novo.waitFor({ state: 'detached' });
+    await eventually(async () => (await readStore(page, 'appointments')).some((a) => a.title === 'Escova da beta.3'), 'a beta.3 não gravou o agendamento');
+    await tap(page.getByRole('navigation').getByRole('link', { name: /agenda/i }));
+    await tap(page.getByRole('radio', { name: /concluíd/i }));
     const sheetOf = () => page.getByRole('dialog', { name: 'Corte da 0.4' });
     await tap(page.getByRole('button', { name: /corte da 0\.4/i }));
     await tap(sheetOf().getByRole('button', { name: /^estornar r\$/i }));
@@ -351,7 +412,7 @@ try {
     await rf.getByLabel(/valor a estornar/i).fill('20,00');
     await tap(rf.getByRole('button', { name: /registrar estorno/i }));
     await rf.waitFor({ state: 'detached' });
-    await eventually(async () => (await readStore(page, 'transactions')).length === 2, 'a beta.2 não registrou o estorno');
+    await eventually(async () => (await readStore(page, 'transactions')).length === 2, 'a beta.3 não registrou o estorno');
     const snap = async () => Object.fromEntries(await Promise.all(['clients', 'appointments', 'transactions', 'xpEvents'].map(async (k) => [k, await readStore(page, k)])));
     const before = await snap();
     adb('install', '-r', apk);
@@ -359,19 +420,23 @@ try {
     await page.getByText(/atendimentos na semana/i).waitFor();
     const after = await snap();
     for (const k of Object.keys(before)) {
-      assert(JSON.stringify(after[k]) === JSON.stringify(before[k]), `${k} mudou ao atualizar da beta.2 (antes ${before[k].length}, depois ${after[k].length})`);
+      assert(JSON.stringify(after[k]) === JSON.stringify(before[k]), `${k} mudou ao atualizar da beta.3 (antes ${before[k].length}, depois ${after[k].length})`);
     }
-    // Finanças: o estorno da beta.2 continua como movimentação própria (fora de Despesas); saldo 80 − 20.
+    // beta.4: atualizar não pede permissão de notificações nem liga lembretes.
+    assert(!permissionDialogOpen(), 'a atualização abriu o pedido de permissão de notificações');
+    assert(!notificationsGranted(), 'notificações concedidas sem a pessoa pedir');
+    assert(!/SCHEDULE_EXACT_ALARM|USE_EXACT_ALARM/.test(packageDump()), 'o app declara permissão de alarme exato');
+    // Finanças: o estorno da beta.3 continua como movimentação própria (fora de Despesas); saldo 80 − 20.
     await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
     const refunds = page.locator('[data-refunds-total]');
     await refunds.waitFor();
-    assert(/20,00/.test((await refunds.textContent()) ?? ''), 'estorno da beta.2 não aparece na linha "Estornos"');
+    assert(/20,00/.test((await refunds.textContent()) ?? ''), 'estorno da beta.3 não aparece na linha "Estornos"');
     const body = (await page.locator('main').textContent()) ?? '';
     assert(/Despesas\s*R\$\s*0,00/.test(body.replace(/\u00a0/g, ' ')), `estorno contado como despesa: ${body.slice(0, 300)}`);
     assert(/\+?\s*(mais\s*)?R\$\s*60,00/.test(body.replace(/\u00a0/g, ' ')), 'saldo do mês diferente de R$ 60,00');
     assert(await page.locator('[data-link-label]').filter({ hasText: 'Estorno de pagamento' }).count() === 1, 'rótulo "Estorno de pagamento" ausente');
     await wait(800);
-    shot('00b-atualizado-da-beta2-financas');
+    shot('00b-atualizado-da-beta3-financas');
     // beta.3: a busca do cabeçalho encontra o atendimento da 0.4 sem internet (só dados do aparelho).
     await tap(page.getByRole('button', { name: 'Buscar' }));
     const busca = page.getByRole('dialog', { name: 'Buscar' });
@@ -384,7 +449,44 @@ try {
     shot('00c-busca');
     await page.keyboard.press('Escape');
     await busca.waitFor({ state: 'detached' });
-    console.log(`\n  dados preservados (beta.2 → atual): ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
+
+    // beta.4 — Relatórios com os dados reais da beta.3: mesmos números de Finanças (80 − 20 = 60).
+    await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
+    await tap(page.getByRole('button', { name: /^relatórios/i }));
+    await page.waitForFunction(() => location.hash === '#/financas/relatorios');
+    const caixa = ((await page.locator('[data-reports] dl').first().textContent()) ?? '').replace(/\u00a0/g, ' ');
+    console.log(`\n  relatório (caixa do mês): ${caixa}`);
+    assert(/Receita bruta \(recebimentos\)\D*80,00/.test(caixa), 'receita bruta do relatório diferente de R$ 80,00');
+    assert(/Estornos\D*20,00/.test(caixa), 'estornos do relatório diferentes de R$ 20,00');
+    assert(/Saldo\D*60,00/.test(caixa), 'saldo do relatório diferente de R$ 60,00 (diverge de Finanças)');
+    await wait(800);
+    shot('00d-relatorios');
+    back();
+    await page.waitForFunction(() => location.hash === '#/financas');
+
+    // beta.4 — Recibo do pagamento da 0.4 (estornado em parte), salvo pela janela "Salvar como".
+    await tap(page.getByRole('navigation').getByRole('link', { name: /agenda/i }));
+    await tap(page.getByRole('radio', { name: /concluíd/i }));
+    await tap(page.getByRole('button', { name: /corte da 0\.4/i }));
+    await tap(page.getByRole('dialog', { name: 'Corte da 0.4' }).getByRole('button', { name: /^recibo do pagamento/i }));
+    const recibo = page.getByRole('dialog', { name: 'Recibo' });
+    await recibo.waitFor();
+    const rt = (await recibo.textContent()) ?? '';
+    assert(/REC-\d{8}-[0-9A-Z]{4}/.test(rt), 'recibo sem número');
+    assert(/estornado em parte/i.test(rt), 'recibo não mostra o estorno parcial');
+    assert(/Não é nota fiscal/.test(rt), 'recibo sem o aviso de que não é nota fiscal');
+    await wait(800);
+    shot('00e-recibo');
+    await tap(recibo.getByRole('button', { name: /salvar no aparelho/i }));
+    await saveInSystemDialog();
+    await recibo.waitFor({ state: 'detached' });
+    const recibos = await eventually(() => { const f = findShared('recibo-REC-*.pdf'); return f.length ? f : null; }, 'PDF do recibo não encontrado no armazenamento');
+    console.log(`\n  recibo salvo: ${recibos.join(', ')} (${assertPdf(recibos[0])} bytes)`);
+    const afterReceipt = await snap();
+    for (const k of Object.keys(before)) {
+      assert(JSON.stringify(afterReceipt[k]) === JSON.stringify(before[k]), `emitir o recibo alterou ${k}`);
+    }
+    console.log(`\n  dados preservados (beta.3 → atual): ${after.clients.length} cliente(s), ${after.appointments.length} atendimento(s), ${after.transactions.length} lançamento(s), ${after.xpEvents.length} evento(s) de XP`);
   });
 
   await step('Instalar APK', async () => {
@@ -395,6 +497,10 @@ try {
   await step('Abrir app e mostrar boas-vindas', async () => {
     page = await launch();
     await page.getByRole('button', { name: /começar/i }).waitFor();
+    // beta.4: a primeira abertura não pede permissão de notificações.
+    await wait(1500);
+    assert(!permissionDialogOpen(), 'a primeira abertura pediu permissão de notificações');
+    assert(!notificationsGranted(), 'notificações concedidas sem a pessoa pedir');
     await wait(800);
     shot('01-boas-vindas');
   });
@@ -679,6 +785,143 @@ try {
     await tap(page.getByRole('navigation').getByRole('link', { name: /clientes/i }));
     await page.getByText('Cliente Importado').waitFor();
     await page.getByText('Cliente Persistente').waitFor();
+  });
+
+  // ---- beta.4: lembretes reais (notificações locais não exatas) ----
+  const openReminders = async () => {
+    await tap(page.getByRole('button', { name: /^ajustes$/i }));
+    await tap(page.getByRole('button', { name: /^lembretes/i }));
+    await page.waitForFunction(() => location.hash === '#/ajustes/lembretes');
+  };
+  const reminderCount = async () => Number(await page.locator('[data-reminders-count]').getAttribute('data-reminders-count', { timeout: 2000 }));
+  /** Neste fluxo, logo depois de agendar há exatamente 1 aviso pendente (os anteriores já dispararam). */
+  const expectPending = (n, msg) => eventually(async () => (await reminderCount()) === n, msg, 20_000);
+  /** Agenda um atendimento (com cliente) cujo aviso de 15 min dispara em 1–2 min, e espera o app agendar o aviso. */
+  const scheduleSoon = async (title) => {
+    const at = deviceLocalIn(16 * 60);
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
+    await tap(page.getByRole('button', { name: /^agendar$/i }));
+    const form = page.getByRole('dialog');
+    await form.getByLabel(/descrição/i).fill(title);
+    await form.getByLabel(/^cliente/i).selectOption({ label: 'Cliente Persistente' });
+    await form.getByLabel(/^data/i).fill(at.date);
+    await form.getByLabel(/^horário/i).fill(at.time);
+    await form.getByLabel(/valor/i).fill('123,45');
+    await tap(form.getByRole('button', { name: /^agendar$/i }));
+    await form.waitFor({ state: 'detached' });
+    await openReminders();
+    return at;
+  };
+  const waitNotification = async (title, state) => {
+    const t0 = Date.now();
+    const text = await eventually(() => { const n = appNotifications(); return n.includes(title) ? n : null; }, `aviso de "${title}" não chegou (${state})`, 9 * 60_000);
+    const block = text.split(/\n(?=\s*NotificationRecord\()/).find((b) => b.includes(title)) ?? '';
+    assert(!/Cliente Persistente/.test(block), 'o aviso mostra o nome do cliente (deveria estar desligado por padrão)');
+    assert(!/123,45|R\$/.test(block), 'o aviso mostra valores');
+    console.log(`\n  aviso "${title}" (${state}) chegou após ${Math.round((Date.now() - t0) / 1000)} s`);
+    return block;
+  };
+
+  await step('Lembretes: permissão só ao ligar, sem alarme exato', async () => {
+    // Tela ligada durante as esperas (o aviso não exato pode levar alguns minutos).
+    adb('shell', 'svc', 'power', 'stayon', 'true');
+    adb('shell', 'settings', 'put', 'system', 'screen_off_timeout', '1800000');
+    const dump = packageDump();
+    assert(!/SCHEDULE_EXACT_ALARM|USE_EXACT_ALARM/.test(dump), 'o app declara permissão de alarme exato');
+    assert(/android\.permission\.POST_NOTIFICATIONS/.test(dump), 'o app não declara POST_NOTIFICATIONS');
+    assert(!notificationsGranted(), 'notificações concedidas antes de ligar os lembretes');
+    await openReminders();
+    const sw = page.getByRole('switch', { name: /lembretes de atendimentos/i });
+    assert((await sw.getAttribute('aria-checked')) === 'false', 'lembretes ligados por padrão');
+    assert(!permissionDialogOpen(), 'a tela de Lembretes pediu permissão sem a pessoa ligar');
+    shot('09-lembretes-desligados');
+    await tap(sw);
+    await eventually(() => permissionDialogOpen(), 'o pedido de permissão do Android não abriu ao ligar');
+    await wait(1000);
+    shot('09b-pedido-permissao');
+    const allow = await eventually(() => findUiNode((n) => /permission_allow_button/.test(n.id) || (/^(allow|permitir)$/i.test(n.text) && n.enabled)), 'botão Permitir não encontrado', 15_000);
+    adb('shell', 'input', 'tap', String(allow.x), String(allow.y));
+    await eventually(() => resumedPackage() === PKG, 'o app não voltou após permitir');
+    await eventually(async () => (await sw.getAttribute('aria-checked')) === 'true', 'lembretes não ligaram após permitir');
+    assert(notificationsGranted(), 'permissão não registrada pelo Android');
+    // Só 15 minutos antes (desmarca os 30 minutos padrão).
+    await tap(page.getByRole('button', { name: '15 minutos antes' }));
+    await tap(page.getByRole('button', { name: '30 minutos antes' }));
+    await eventually(async () => (await page.getByRole('button', { name: '15 minutos antes' }).getAttribute('aria-pressed')) === 'true'
+      && (await page.getByRole('button', { name: '30 minutos antes' }).getAttribute('aria-pressed')) === 'false', 'antecedências não salvas');
+    await wait(800);
+    shot('09c-lembretes-ligados');
+  });
+
+  await step('Lembretes: aviso real com o app aberto', async () => {
+    await scheduleSoon('Lembrete aberto');
+    await expectPending(1, 'o app não agendou o aviso do novo atendimento');
+    // Rodar a reconciliação de novo (voltar do segundo plano) não duplica.
+    adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
+    await wait(1500);
+    page = await launch({ newProcess: false });
+    await wait(3000);
+    assert((await reminderCount()) === 1, 'a contagem mudou ao voltar ao app (duplicou?)');
+    await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
+    const block = await waitNotification('Lembrete aberto', 'app aberto');
+    assert(resumedPackage() === PKG, 'o app saiu do primeiro plano durante a espera');
+    assert(/Atendimento em 15 minutos/.test(block), `título inesperado: ${block.slice(0, 400)}`);
+    const dump = adb('shell', 'dumpsys', 'notification', '--noredact');
+    const ch = dump.slice(Math.max(0, dump.indexOf("mId='lembretes'")), dump.indexOf("mId='lembretes'") + 1500);
+    console.log(`\n  canal: ${(ch.match(/mLockscreenVisibility=-?\d+/) ?? ['?'])[0]} ${(ch.match(/mImportance=\d+/) ?? ['?'])[0]}`);
+    assert(/mLockscreenVisibility=0\b/.test(ch), 'canal de lembretes não está como privado na tela bloqueada');
+    adb('shell', 'cmd', 'statusbar', 'expand-notifications');
+    await wait(1500);
+    shot('10-aviso-app-aberto');
+    adb('shell', 'cmd', 'statusbar', 'collapse');
+    await wait(800);
+  });
+
+  await step('Lembretes: aviso real com o app em segundo plano', async () => {
+    await scheduleSoon('Lembrete fundo');
+    await expectPending(1, 'o app não agendou o aviso do novo atendimento');
+    adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
+    await wait(1500);
+    assert(resumedPackage() !== PKG, 'o app continuou em primeiro plano');
+    await waitNotification('Lembrete fundo', 'segundo plano');
+    adb('shell', 'cmd', 'statusbar', 'expand-notifications');
+    await wait(1500);
+    shot('11-aviso-segundo-plano');
+    adb('shell', 'cmd', 'statusbar', 'collapse');
+  });
+
+  await step('Lembretes: aviso real com o app fechado (processo encerrado)', async () => {
+    page = await launch({ newProcess: false });
+    await scheduleSoon('Lembrete fechado');
+    await expectPending(1, 'o app não agendou o aviso do novo atendimento');
+    adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
+    await wait(1500);
+    // Encerra o processo como o Android faz ao liberar memória (sem "forçar parada", que cancela alarmes).
+    adb('shell', 'am', 'kill', PKG);
+    await wait(1500);
+    let pid = adb('shell', `pidof ${PKG}; true`).trim();
+    if (pid) { try { adb('shell', 'run-as', PKG, 'kill', '-9', ...pid.split(/\s+/)); } catch { /* sem run-as */ } await wait(1000); pid = adb('shell', `pidof ${PKG}; true`).trim(); }
+    assert(!pid, `o processo do app continua vivo (${pid})`);
+    await waitNotification('Lembrete fechado', 'app fechado');
+    adb('shell', 'cmd', 'statusbar', 'expand-notifications');
+    await wait(1500);
+    shot('12-aviso-app-fechado');
+    adb('shell', 'cmd', 'statusbar', 'collapse');
+  });
+
+  await step('Lembretes: reabrir não duplica; desligar cancela o que falta', async () => {
+    page = await launch();
+    await openReminders();
+    await expectPending(0, 'depois dos três avisos, nada deveria continuar pendente');
+    const notes = appNotifications();
+    for (const title of ['Lembrete aberto', 'Lembrete fundo', 'Lembrete fechado']) {
+      const count = notes.split(/\n(?=\s*NotificationRecord\()/).filter((b) => b.includes(title)).length;
+      assert(count === 1, `aviso de "${title}" aparece ${count} vez(es)`);
+    }
+    const sw = page.getByRole('switch', { name: /lembretes de atendimentos/i });
+    await tap(sw);
+    await eventually(async () => (await sw.getAttribute('aria-checked')) === 'false', 'lembretes não desligaram');
+    assert(!permissionDialogOpen(), 'desligar abriu pedido de permissão');
   });
 } finally {
   writeFileSync(`${OUT}/resultado.json`, JSON.stringify(results, null, 2));
