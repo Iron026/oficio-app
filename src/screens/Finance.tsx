@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, FileDown, Receipt, Undo2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, CalendarClock, ChevronLeft, ChevronRight, CircleMinus, CirclePlus, FileDown, Receipt, Undo2 } from 'lucide-react';
 import { byCategory, futureServiceDateFor, movementKind, sortByDateDesc, totals, transactionsInMonth, transactionLabel, type MovementKind } from '../domain/finance';
 import type { Transaction, TransactionType } from '../domain/types';
 import { addMonths, formatDateShort, monthKey, monthLabel, parseDateKey, relativeDayLabel } from '../lib/dates';
 import { useApp } from '../state/AppContext';
+import { navigate, useLocation } from '../state/router';
+import { Reports } from './Reports';
 import { Button, IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
 import { Card, DemoBadge, EmptyState, ProgressBar, Segmented } from '../ui/Misc';
@@ -19,6 +21,12 @@ import { RefundReviewCard } from './payments/RefundReview';
 type Filter = 'todos' | MovementKind;
 
 export function Finance() {
+  // beta.4: Relatórios ficam dentro de Finanças (#/financas/relatorios), sem nova área na navegação.
+  const { sub } = useLocation();
+  return sub === 'relatorios' ? <Reports /> : <FinanceMain />;
+}
+
+function FinanceMain() {
   const { data, profession } = useApp();
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [filter, setFilter] = useState<Filter>('todos');
@@ -113,9 +121,10 @@ export function Finance() {
         <Button variant="secondary" icon={<CirclePlus size={20} className="text-income" />} onClick={() => setCreating('receita')}>Receita</Button>
         <Button variant="secondary" icon={<CircleMinus size={20} className="text-expense" />} onClick={() => setCreating('despesa')}>Despesa</Button>
       </div>
-      <Button variant="tonal" block className="mt-3" icon={<FileDown size={20} />} onClick={() => setExporting(true)}>
-        Exportar extrato do mês
-      </Button>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Button variant="tonal" icon={<BarChart3 size={20} />} onClick={() => navigate('financas', 'relatorios')}>Relatórios</Button>
+        <Button variant="tonal" icon={<FileDown size={20} />} onClick={() => setExporting(true)}>Exportar extrato</Button>
+      </div>
 
       <div className="mt-5">
         <Segmented label="Filtrar lançamentos" value={shown} onChange={setFilter} options={[{ value: 'todos', label: 'Todos' }, { value: 'receita', label: 'Receitas' }, { value: 'despesa', label: 'Despesas' }, ...(hasRefunds ? [{ value: 'estorno' as const, label: 'Estornos' }] : [])]} />

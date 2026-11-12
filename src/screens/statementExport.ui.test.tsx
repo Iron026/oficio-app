@@ -28,7 +28,7 @@ describe('Finanças > Exportar extrato', () => {
       window.location.hash = '#/financas';
       render(<App storageFactory={async () => ({ storage: await createIndexedDbAdapter(dbName), persistent: true })} />);
       const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /exportar extrato do mês/i }));
+      await user.click(await screen.findByRole('button', { name: /^exportar extrato/i }));
       const sheet = await screen.findByRole('dialog', { name: /exportar extrato/i });
       expect(within(sheet).getByText(/1 lançamento/)).toBeInTheDocument();
       await user.click(within(sheet).getByRole('radio', { name: /planilha/i }));
@@ -40,7 +40,7 @@ describe('Finanças > Exportar extrato', () => {
       const csv = await blobs[0]!.text();
       expect(csv).toContain('Receita;Atendimento;"Corte; escova";120,00');
 
-      await user.click(await screen.findByRole('button', { name: /exportar extrato do mês/i }));
+      await user.click(await screen.findByRole('button', { name: /^exportar extrato/i }));
       const again = await screen.findByRole('dialog', { name: /exportar extrato/i });
       await user.click(within(again).getByRole('radio', { name: /pdf/i }));
       await user.click(within(again).getByRole('button', { name: /baixar pdf/i }));

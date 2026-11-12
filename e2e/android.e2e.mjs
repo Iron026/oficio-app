@@ -612,7 +612,7 @@ try {
 
   await step('Extrato do mês em PDF: "Salvar como" grava um PDF válido', async () => {
     await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
-    await tap(page.getByRole('button', { name: /exportar extrato do mês/i }));
+    await tap(page.getByRole('button', { name: /^exportar extrato/i }));
     const sheet = page.getByRole('dialog', { name: /exportar extrato/i });
     await tap(sheet.getByRole('radio', { name: /pdf/i }));
     shot('05b-extrato-opcoes');

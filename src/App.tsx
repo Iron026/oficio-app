@@ -115,7 +115,7 @@ function Root() {
   const prefs = usePrefs();
   useThemeEffect(prefs.theme);
   useAppearanceEffect(data.settings, prefs);
-  useAndroidBack(route, !data.profile);
+  useAndroidBack(route, !data.profile, sub);
   if (!data.profile) return <Onboarding />;
   const screens: Record<Route, React.ReactNode> = {
     painel: <Dashboard />, agenda: <Agenda />, clientes: <Clients />, financas: <Finance />, evolucao: <Evolution />, ajustes: <Settings />,
@@ -125,8 +125,8 @@ function Root() {
       <CelebrationProvider>
         <Shell
           route={route}
-          pageKey={route === 'ajustes' && sub ? `${route}/${sub}` : route}
-          title={route === 'ajustes' ? settingsTitle(sub) : TITLES[route]}
+          pageKey={(route === 'ajustes' || route === 'financas') && sub ? `${route}/${sub}` : route}
+          title={route === 'ajustes' ? settingsTitle(sub) : route === 'financas' && sub === 'relatorios' ? 'Relatórios' : TITLES[route]}
           action={route === 'painel' || route === 'financas' ? <HideValuesToggle /> : undefined}
         >
           {screens[route]}
@@ -137,15 +137,17 @@ function Root() {
 }
 
 /** Botão Voltar do Android: fecha painéis, volta ao Painel e, por fim, minimiza o app. */
-function useAndroidBack(route: Route, onboarding: boolean) {
-  const state = useRef({ route, onboarding });
+function useAndroidBack(route: Route, onboarding: boolean, sub = '') {
+  const state = useRef({ route, onboarding, sub });
   useEffect(() => {
-    state.current = { route, onboarding };
+    state.current = { route, onboarding, sub };
   });
   useEffect(() => {
     let remove: (() => void) | undefined;
     let disposed = false;
     void onAndroidBack(() => {
+      // beta.4: de Relatórios, o Voltar leva a Finanças.
+      if (state.current.route === 'financas' && state.current.sub) return navigate('financas');
       const action = decideBack(state.current.route, state.current.onboarding);
       if (action === 'home') navigate('painel');
       else if (action === 'exit') void minimizeApp();
