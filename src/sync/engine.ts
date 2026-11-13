@@ -551,33 +551,44 @@ export class SyncEngine implements ChangeTracker {
     // Grava no máximo ~1 vez por segundo e sempre no último lote. Se o app fechar entre gravações, os lotes já
     // aceitos pela nuvem são reenviados e reconhecidos como iguais (ver interruption.test.ts), sem conflito.
     let savedAt = performance.now();
-    for (let i = 0; i < items.length; i += CHUNK) {
-      const chunk = items.slice(i, i + CHUNK);
-      const last = i + CHUNK >= items.length;
-      const results = await this.remote.push(uid, chunk, this.state.deviceId);
-      await this.service.exclusive(async () => {
-        results.forEach((res, j) => {
-          const it = chunk[j]!;
-          const key = recordKey(it.collection, it.id);
-          const r = this.state.records[key];
-          if (!r) return; // estado substituído durante o envio (restauração desfeita)
-          if (res.ok) {
-            r.baseRev = res.rev;
-            r.base = it.data;
-            // Só limpa a pendência se não houve nova edição durante o envio.
-            if (r.seq === seqs.get(key)) {
-              r.dirty = false;
-              r.deleted = undefined;
+    let unsaved = false;
+    try {
+      for (let i = 0; i < items.length; i += CHUNK) {
+        const chunk = items.slice(i, i + CHUNK);
+        const last = i + CHUNK >= items.length;
+        const results = await this.remote.push(uid, chunk, this.state.deviceId);
+        await this.service.exclusive(async () => {
+          results.forEach((res, j) => {
+            const it = chunk[j]!;
+            const key = recordKey(it.collection, it.id);
+            const r = this.state.records[key];
+            if (!r) return; // estado substituído durante o envio (restauração desfeita)
+            if (res.ok) {
+              r.baseRev = res.rev;
+              r.base = it.data;
+              r.deletedHere = it.data === null || undefined;
+              // Só limpa a pendência se não houve nova edição durante o envio.
+              if (r.seq === seqs.get(key)) {
+                r.dirty = false;
+                r.deleted = undefined;
+              }
+            } else {
+              rejected.push(res.current);
             }
-          } else {
-            rejected.push(res.current);
+          });
+          unsaved = true;
+          if (last || performance.now() - savedAt >= SAVE_EVERY_MS) {
+            await this.save();
+            savedAt = performance.now();
+            unsaved = false;
           }
         });
-        if (last || performance.now() - savedAt >= SAVE_EVERY_MS) {
-          await this.save();
-          savedAt = performance.now();
-        }
-      });
+      }
+    } catch (err) {
+      // Queda no meio do envio: grava o progresso dos lotes já aceitos (revisão da auditoria pré-RC), para o disco
+      // não ficar atrás da memória. A falha original é a que importa; erro ao gravar aqui não a encobre.
+      if (unsaved) await this.service.exclusive(() => this.save()).catch(() => undefined);
+      throw err;
     }
     if (this.state.meta.dirty) {
       const seq = this.state.meta.seq;
@@ -629,7 +640,8 @@ export class SyncEngine implements ChangeTracker {
         // Auditoria pré-RC: registro financeiro que este aparelho já sabia excluído (exclusão confirmada na nuvem)
         // voltou porque outro aparelho o alterou offline. Restaura (nada se perde) e sinaliza, como no caso em que a
         // alteração chega antes da exclusão ser enviada (`excluido_aqui`).
-        if (m && m.baseRev > 0 && m.base === null && r.data && financial) {
+        // Só quando a exclusão foi feita aqui: uma lápide apenas recebida de outro aparelho não gera aviso.
+        if (m?.deletedHere && m.base === null && r.data && financial) {
           addConflict({ key, collection: r.collection, id: r.id, kind: 'excluido_aqui', fields: [], local: null, remote: r.data });
         }
         if (r.data) map.set(r.id, clone(r.data));

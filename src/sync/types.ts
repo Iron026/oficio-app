@@ -74,6 +74,7 @@ export interface RecordSyncState {
   base: Entity | null; // conteúdo dessa revisão (para mesclagem em 3 vias)
   dirty: boolean; // há alteração local não enviada
   deleted?: boolean; // excluído localmente (enviar lápide)
+  deletedHere?: boolean; // a exclusão confirmada na nuvem foi feita neste aparelho (não só recebida de outro)
   seq: number; // incrementa a cada alteração local (evita perder edições durante o envio)
 }
 

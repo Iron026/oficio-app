@@ -184,3 +184,23 @@ describe('auditoria pré-RC: operações concorrentes offline — totais coerent
     }
   });
 });
+
+describe('auditoria pré-RC (revisão independente): aviso "excluído aqui" só no aparelho que excluiu', () => {
+  it('B só recebeu a exclusão feita em A; A restaura um backup que traz o lançamento de volta: B não vê conflito falso', async () => {
+    const { a, b } = await pair();
+    const exp = (await a.service.saveTransaction({ type: 'despesa', amount: '20,00', description: 'Tinta', category: 'Produtos', date: '2026-11-05' })).transaction;
+    await all(a, b);
+    const backup = a.service.exportBackup(); // com a despesa
+    tick();
+    await a.service.deleteTransaction(exp.id);
+    await all(a, b);
+    expect(b.service.data.transactions.some((t) => t.id === exp.id)).toBe(false);
+    tick();
+    await a.service.importBackup(backup); // a despesa volta pela restauração em A
+    await all(a, b);
+    for (const d of [a, b]) expect(d.service.data.transactions.some((t) => t.id === exp.id)).toBe(true);
+    expect(b.sync.conflicts).toEqual([]); // B nunca excluiu nada
+    expect(a.sync.conflicts).toEqual([]); // a restauração foi decisão explícita de A
+  });
+});
+

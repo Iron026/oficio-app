@@ -100,6 +100,9 @@ describe('campos de texto que sempre existiram (antes: aceitos e derrubavam as t
     ['atendimento sem observações', (r: any) => { delete r.data.appointments[0].notes; }, /appointments.*observações/],
     ['conclusão em número', (r: any) => { r.data.appointments[0].completedAt = 5; }, /appointments.*conclusão/],
     ['metas do perfil em texto', (r: any) => { r.data.profile.weeklyGoalServices = 'cinco'; }, /Perfil/],
+    // Revisão independente: metas sempre gravadas desde a v0.1; sem elas a meta vira NaN ("undefined por semana").
+    ['meta semanal ausente', (r: any) => { delete r.data.profile.weeklyGoalServices; }, /Perfil/],
+    ['meta mensal ausente', (r: any) => { delete r.data.profile.monthlyGoalRevenue; }, /Perfil/],
   ])('%s: recusado', async (_n, fn, msg) => {
     await expectRejected(edit(fn), msg);
   });

@@ -102,6 +102,24 @@ describe('auditoria pré-RC: sincronização interrompida', () => {
     expect(again.service.data.clients).toHaveLength(350);
   });
 
+  it('queda no meio de um envio grande grava o progresso dos lotes aceitos (memória e disco não divergem)', async () => {
+    const remote = new LossyRemote();
+    const storage = createMemoryAdapter();
+    const a = await device(remote, storage);
+    await a.service.completeOnboarding({ name: 'Ana', businessName: '', professionId: 'beleza' });
+    await a.sync.setUser('u');
+    await a.sync.link('u', 'mesclar');
+    for (let i = 0; i < 350; i++) await a.service.saveClient({ name: `Cliente ${i}`, phone: '', email: '', address: '', notes: '' });
+    remote.failOnChunk = 4; // lotes 1–3 (300) aceitos; o 4º cai
+    const before = a.sync.pendingCount;
+    await a.sync.sync().catch(() => undefined);
+    const inMemory = a.sync.pendingCount;
+    expect(inMemory).toBe(before - 300);
+    // O que ficou gravado é o mesmo que está em memória.
+    const reopened = await device(remote, storage);
+    expect(reopened.sync.pendingCount).toBe(inMemory);
+  });
+
   it('app fechado com pendências offline: ao abrir de novo, envia uma única vez', async () => {
     const remote = new LossyRemote();
     const storage = createMemoryAdapter();

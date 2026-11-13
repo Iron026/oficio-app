@@ -159,6 +159,27 @@ Causas e correções, todas com o mesmo resultado anterior:
   cobrindo meia-noite, atendimentos sem horário ou sem duração e durações longas.
 - **P6** — o conjunto de ids dos atendimentos é memorizado em Finanças.
 
+## Revisão independente
+
+Revisão do diff `431ef22..HEAD` por um revisor separado, que leu o código sem executá-lo. Cada achado foi
+reproduzido com um teste antes de ser corrigido.
+
+| # | Achado | Verificação | Resultado |
+|---|--------|-------------|-----------|
+| R1 | Backup sem as metas do perfil era aceito, embora a política dissesse "recusado". A meta virava NaN ("undefined por semana") | As metas são gravadas desde a v0.1 (`c183f02`). 2 casos novos em `backupAudit.test.ts` falhavam | Corrigido: metas obrigatórias e numéricas |
+| R2 | Aviso "Excluído neste aparelho" aparecia também no aparelho que só recebeu a exclusão de outro | Cenário novo em `financialAudit.test.ts`: B mostrava conflito falso | Corrigido: o estado guarda `deletedHere` só quando a exclusão deste aparelho é confirmada na nuvem |
+| R3 | Queda no meio de um envio grande deixava o disco atrás da memória (progresso dos lotes aceitos só em memória) | Teste novo em `interruption.test.ts`: 360 pendências no disco contra 60 em memória | Corrigido: o progresso é gravado também no caminho de falha |
+| R4 | Foto de backup antigo recusada pela validação mais estrita? | `isValidProfileImage` é a mesma desde a v0.4, e o app recusa salvar foto que não passe nela | Sem problema |
+
+O revisor também conferiu, sem achados:
+- compatibilidade dos backups antigos;
+- equivalência de `byDay`;
+- caches por identidade (nenhuma lista do estado é alterada no lugar);
+- `touchMany` e `putMany`;
+- limpeza do cache restrita a `cache/compartilhar`;
+- limite de erro por tela;
+- cadeia Android.
+
 ## Verificado sem problema
 
 - **Isolamento de contas:**
@@ -206,7 +227,7 @@ Antes de cada commit, `npm run check` (typecheck, lint, testes e build). Situaç
 
 | Verificação | Resultado |
 |---|---|
-| Testes unitários e de interface | 1.290, 99 arquivos |
+| Testes unitários e de interface | 1.294, 99 arquivos |
 | Firestore Emulator | 30/30 |
 | Visual e acessibilidade em modo estrito | Ver CI |
 | Android | Cadeia de atualização 0.4.0-beta.7 → 0.5.0-beta.5 aprovada (run 43274062889, mesma assinatura) → versão auditada, com notificações reais |

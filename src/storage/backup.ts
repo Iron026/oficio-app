@@ -227,7 +227,8 @@ export function inspectBackup(text: string): BackupInspection {
   const d = raw.data;
   if (!isObj(d)) throw new BackupError('estrutura', 'Backup sem dados.');
   const profile = d.profile;
-  const goal = (v: unknown) => v === undefined || (typeof v === 'number' && Number.isFinite(v) && v >= 0);
+  // Metas sempre gravadas desde a v0.1; ausentes viravam NaN na Evolução e no perfil (revisão da auditoria pré-RC).
+  const goal = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
   if (profile !== null && (!isObj(profile) || typeof profile.name !== 'string' || !isProfessionId(profile.professionId) || !optStr(profile.businessName)
     || !goal(profile.weeklyGoalServices) || !goal(profile.monthlyGoalRevenue))) {
     throw new BackupError('estrutura', 'Perfil inválido no backup.');
