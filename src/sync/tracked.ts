@@ -5,6 +5,8 @@ import type { SyncCollection } from './types';
 /** Recebe avisos de alterações locais (implementado pelo SyncEngine). */
 export interface ChangeTracker {
   touch(collection: SyncCollection, id: string, deleted: boolean): Promise<void>;
+  /** Várias alterações de uma vez (gravação em lote): o mesmo que `touch` para cada id, gravando o estado uma vez só. */
+  touchMany(collection: SyncCollection, ids: readonly string[], deleted: boolean): Promise<void>;
   touchMeta(): Promise<void>;
   beforeReplaceAll(data: AppData): Promise<{ commit: () => void; rollback: () => Promise<void> }>;
   afterClearAll(): Promise<void>;
@@ -68,8 +70,7 @@ export class TrackedStorage implements StorageAdapter {
       },
       putMany: async (items) => {
         await store.putMany(items);
-        const t = this.active;
-        if (t) for (const i of items) await t.touch(name, i.id, false);
+        await this.active?.touchMany(name, items.map((i) => i.id), false);
       },
       remove: async (id) => {
         await store.remove(id);

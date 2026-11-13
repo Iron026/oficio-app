@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowDown, MoonStar, Repeat, User } from 'lucide-react';
 import { seriesOf } from '../../domain/recurrence';
 import { byDay, conflictMap, dayLayout, formatDuration, durationOf, monthGrid, timeRange, weekKeys, type DayItem } from '../../domain/agenda';
-import { paymentSummary } from '../../domain/payments';
+import { paymentSummaryIn } from '../../domain/payments';
 import type { Appointment } from '../../domain/types';
 import { todayKey } from '../../lib/dates';
 import { useApp } from '../../state/AppContext';
@@ -95,7 +95,7 @@ export function DayView({ dateKey, items }: { dateKey: string; items: Appointmen
 function DayBlock({ it, conflict, onOpen }: { it: DayItem<Appointment>; conflict: number; onOpen: () => void }) {
   const { data } = useApp();
   const client = data.clients.find((c) => c.id === it.a.clientId);
-  const pay = paymentSummary(it.a, data.transactions);
+  const pay = paymentSummaryIn(it.a, data.transactions);
   const top = (it.from / 60) * HOUR;
   const height = Math.max(((it.to - it.from) / 60) * HOUR - 2, 40);
   const gutter = 48;
@@ -139,7 +139,7 @@ function DayBlock({ it, conflict, onOpen }: { it: DayItem<Appointment>; conflict
 function AgendaRow({ a, conflict, onOpen, dayKey }: { a: Appointment; conflict: number; onOpen: () => void; dayKey?: string }) {
   const { data } = useApp();
   const client = data.clients.find((c) => c.id === a.clientId);
-  const pay = paymentSummary(a, data.transactions);
+  const pay = paymentSummaryIn(a, data.transactions);
   const crosses = dayKey && a.date !== dayKey;
   return (
     <button type="button" onClick={onOpen} data-agenda-row={a.id}

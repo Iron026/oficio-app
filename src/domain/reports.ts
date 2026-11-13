@@ -16,7 +16,7 @@
 import { addMonths, isInMonth, monthKey, parseDateKey } from '../lib/dates';
 import { byCategory, growthPercent, totals, transactionsInMonth, type Totals } from './finance';
 import { completedInMonth } from './insights';
-import { paymentSummary, receivables } from './payments';
+import { byAppointment, paymentSummary, receivables } from './payments';
 import { refundIssues } from './refundReview';
 import type { AppData } from './types';
 
@@ -69,10 +69,11 @@ export function monthReport(data: Data, mKey: string): MonthReport {
   const prevDone = completedInMonth(data.appointments, prevKey);
 
   // Ticket médio.
+  const linked = byAppointment(data.transactions);
   let numerator = 0;
   let denominator = 0;
   for (const a of done) {
-    const s = paymentSummary(a, data.transactions);
+    const s = paymentSummary(a, linked.get(a.id) ?? []);
     if (s.net > 0) { numerator += s.net; denominator++; }
   }
 
@@ -103,7 +104,7 @@ export function monthReport(data: Data, mKey: string): MonthReport {
   for (const a of data.appointments) {
     if (a.status !== 'agendado' || !isInMonth(a.date, mKey)) continue;
     forecastCount++;
-    forecastAmount += Math.max(0, a.price - Math.max(0, paymentSummary(a, data.transactions).net));
+    forecastAmount += Math.max(0, a.price - Math.max(0, paymentSummary(a, linked.get(a.id) ?? []).net));
   }
 
   const issues = refundIssues(data.transactions);

@@ -168,15 +168,22 @@ export function dayLayout<T extends Ap>(appointments: readonly T[], key: string)
 
 /** Atendimentos por dia numa faixa de datas (inclui quem atravessa a meia-noite nos dois dias). */
 export function byDay<T extends Ap>(appointments: readonly T[], keys: readonly string[]): Map<string, T[]> {
+  // Auditoria pré-RC: uma passada pelos atendimentos (antes, uma por dia da grade — 42 na visão Mês).
   const out = new Map<string, T[]>(keys.map((k) => [k, []]));
-  for (const k of keys) {
-    const d0 = dayNumber(k) * DAY;
-    for (const a of appointments) {
-      const iv = intervalOf(a);
-      if (iv?.known ? iv.start < d0 + DAY && iv.end > d0 : a.date === k) out.get(k)!.push(a);
-    }
-    out.get(k)!.sort((x, y) => (intervalOf(x)?.start ?? Infinity) - (intervalOf(y)?.start ?? Infinity));
+  const keyOfDay = new Map(keys.map((k) => [dayNumber(k), k]));
+  const startOf = new Map<T, number>();
+  for (const a of appointments) {
+    const iv = intervalOf(a);
+    startOf.set(a, iv?.start ?? Infinity);
+    if (iv?.known) {
+      // Todos os dias que o intervalo [início, fim) toca.
+      for (let d = Math.floor(iv.start / DAY); d * DAY < iv.end; d++) {
+        const k = keyOfDay.get(d);
+        if (k !== undefined) out.get(k)!.push(a);
+      }
+    } else out.get(a.date)?.push(a);
   }
+  for (const list of out.values()) list.sort((x, y) => startOf.get(x)! - startOf.get(y)!);
   return out;
 }
 

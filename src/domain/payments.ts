@@ -137,12 +137,39 @@ export const PAYMENT_STATE_LABEL: Record<PaymentState, string> = {
 };
 
 /** Total a receber (serviços concluídos com controle ativo). Previsto (agendados) fica separado. */
+/**
+ * Lançamentos agrupados pelo atendimento (auditoria pré-RC): para calcular muitos resumos sem percorrer todos os
+ * lançamentos a cada atendimento. `paymentSummary(a, byAppointment(tx).get(a.id) ?? [])` dá o mesmo resultado.
+ */
+export function byAppointment<T extends Tx>(transactions: readonly T[]): Map<string, T[]> {
+  const out = new Map<string, T[]>();
+  for (const t of transactions) {
+    if (!t.appointmentId) continue;
+    const list = out.get(t.appointmentId);
+    if (list) list.push(t); else out.set(t.appointmentId, [t]);
+  }
+  return out;
+}
+
+const linkedCache = new WeakMap<readonly Tx[], Map<string, Tx[]>>();
+/**
+ * `paymentSummary` para telas que mostram muitos atendimentos (auditoria pré-RC): o índice por atendimento é
+ * calculado uma vez por lista de lançamentos (memorizado pela identidade; as listas do estado nunca são alteradas
+ * no lugar) em vez de percorrer todos os lançamentos a cada cartão. Mesmo resultado de `paymentSummary`.
+ */
+export function paymentSummaryIn(a: Ap, transactions: readonly Tx[]): PaymentSummary {
+  let index = linkedCache.get(transactions);
+  if (!index) linkedCache.set(transactions, (index = byAppointment(transactions)));
+  return paymentSummary(a, index.get(a.id) ?? []);
+}
+
 export function receivables(appointments: readonly Ap[], transactions: readonly Tx[]): { pending: number; count: number } {
   let pending = 0;
   let count = 0;
+  const linked = byAppointment(transactions);
   for (const a of appointments) {
     if (a.status !== 'concluido') continue;
-    const s = paymentSummary(a, transactions);
+    const s = paymentSummary(a, linked.get(a.id) ?? []);
     if (s.pending > 0) { pending += s.pending; count++; }
   }
   return { pending, count };

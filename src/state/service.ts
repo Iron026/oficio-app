@@ -793,7 +793,7 @@ export class AppService {
     }
     const created = pendingOccurrences(this._data.appointments, todayKey(this.now()));
     if (!created.length) return [];
-    for (const a of created) await this.storage.appointments.put(a);
+    await this.storage.appointments.putMany(created);
     this.set({ ...this._data, appointments: [...this._data.appointments, ...created] });
     return created;
   }

@@ -48,6 +48,8 @@ function FinanceMain() {
   const isCurrent = month === monthKey(new Date());
   // 0.5: pendências ficam separadas do caixa (nunca somadas ao saldo).
   const due = useMemo(() => receivables(data.appointments, data.transactions), [data.appointments, data.transactions]);
+  // Auditoria pré-RC: cada linha conferia o vínculo percorrendo todos os atendimentos.
+  const apptIds = useMemo(() => new Set(data.appointments.map((a) => a.id)), [data.appointments]);
 
   const grouped = new Map<string, Transaction[]>();
   for (const t of list) grouped.set(t.date, [...(grouped.get(t.date) ?? []), t]);
@@ -148,7 +150,7 @@ function FinanceMain() {
                         <span className="line-clamp-2 font-medium leading-snug [overflow-wrap:anywhere]">{transactionLabel(t)}</span>
                         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-muted">
                           <span className="sr-only">{kind === 'receita' ? 'Receita,' : kind === 'estorno' ? 'Estorno,' : 'Despesa,'}</span>
-                          <LinkLabel t={t} service={profession.terms.service} feminine={profession.terms.serviceArticle === 'a'} defaultCategory={profession.incomeCategories[0]} exists={!!t.appointmentId && data.appointments.some((a) => a.id === t.appointmentId)} />
+                          <LinkLabel t={t} service={profession.terms.service} feminine={profession.terms.serviceArticle === 'a'} defaultCategory={profession.incomeCategories[0]} exists={!!t.appointmentId && apptIds.has(t.appointmentId)} />
                           {t.isDemo && <DemoBadge />}
                           <FutureServiceBadge date={futureServiceDateFor(t, data.appointments)} />
                         </span>

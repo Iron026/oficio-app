@@ -108,10 +108,24 @@ export function seriesGroups<T extends Appointment>(appointments: readonly T[]):
   const out = new Map<string, T[]>();
   for (const a of appointments) {
     const s = seriesOf(a);
-    if (s) out.set(s.id, [...(out.get(s.id) ?? []), a]);
+    if (!s) continue;
+    const list = out.get(s.id);
+    if (list) list.push(a); else out.set(s.id, [a]); // auditoria pré-RC: copiar a lista a cada item era quadrático
   }
   for (const list of out.values()) list.sort((x, y) => (x.date === y.date ? (x.id < y.id ? -1 : 1) : x.date < y.date ? -1 : 1));
   return out;
+}
+
+const groupsCache = new WeakMap<readonly Appointment[], Map<string, Appointment[]>>();
+/**
+ * `seriesGroups` memorizado pela identidade da lista (auditoria pré-RC): cada cartão da Agenda reagrupava todos os
+ * atendimentos. As listas do estado nunca são alteradas no lugar (cada mudança gera uma lista nova). Não altere o
+ * resultado: é compartilhado entre chamadas.
+ */
+export function seriesGroupsOf(appointments: readonly Appointment[]): ReadonlyMap<string, readonly Appointment[]> {
+  let g = groupsCache.get(appointments);
+  if (!g) groupsCache.set(appointments, (g = seriesGroups(appointments)));
+  return g;
 }
 
 /** Regra efetiva da série: a de maior `v` (empate: id); `through` é o maior gravado em qualquer ocorrência. */

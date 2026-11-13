@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, CircleDollarSign, FileText, Undo2 } from 'lucide-react';
-import { PAYMENT_METHODS, PAYMENT_STATE_LABEL, paymentSummary, type PaymentEntry, type PaymentMethod, type PaymentSummary } from '../../domain/payments';
+import { PAYMENT_METHODS, PAYMENT_STATE_LABEL, paymentSummaryIn, type PaymentEntry, type PaymentMethod, type PaymentSummary } from '../../domain/payments';
 import type { RefundIssue } from '../../domain/refundReview';
 import type { Appointment, Transaction } from '../../domain/types';
 import { RefundReviewCard } from './RefundReview';
@@ -42,7 +42,7 @@ const KIND_LABEL: Record<PaymentEntry['kind'], string> = { pagamento: 'Pagamento
 export function PaymentPanel({ a, onPay, onRefund }: { a: Appointment; onPay: () => void; onRefund: (e: PaymentEntry) => void }) {
   const { data } = useApp();
   const [receipt, setReceipt] = useState<string | null>(null);
-  const s = paymentSummary(a, data.transactions);
+  const s = paymentSummaryIn(a, data.transactions);
   if (a.price === 0 && s.entries.length === 0) return null;
   const pendingLabel = a.status === 'agendado' ? 'Falta receber' : s.state === 'nao-registrado' ? 'Pagamento' : 'Pendente';
   return (
@@ -131,7 +131,7 @@ function CompleteForm({ a, onDone }: { a: Appointment; onDone: () => void }) {
   const t = profession.terms;
   const feedback = useFeedback();
   const onError = useErrorHandler();
-  const s = paymentSummary(a, data.transactions);
+  const s = paymentSummaryIn(a, data.transactions);
   const [opId] = useState(() => newId());
   const [mode, setMode] = useState<CompletePayment['mode'] | null>(a.price === 0 && s.net === 0 ? 'nenhum' : null);
   const [amount, setAmount] = useState('');
@@ -212,7 +212,7 @@ function PaymentForm({ a, onDone }: { a: Appointment; onDone: () => void }) {
   const toast = useToast();
   const undoAction = useUndoAction();
   const onError = useErrorHandler();
-  const s = paymentSummary(a, data.transactions);
+  const s = paymentSummaryIn(a, data.transactions);
   const [opId] = useState(() => newId());
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(() => todayKey());

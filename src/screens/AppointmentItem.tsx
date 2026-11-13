@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Ban, Check, MessageCircle, Pencil, Repeat, RotateCcw, Trash2, User } from 'lucide-react';
 import { durationOf, formatDuration, timeRange } from '../domain/agenda';
-import { paymentSummary, type PaymentEntry } from '../domain/payments';
+import { paymentSummary, paymentSummaryIn, type PaymentEntry } from '../domain/payments';
 import type { Appointment } from '../domain/types';
 import { formatDateShort, isFutureDateKey, relativeDayLabel, todayKey } from '../lib/dates';
 import { formatMoney } from '../lib/money';
@@ -15,7 +15,7 @@ import { Money } from '../ui/Money';
 import { Sheet } from '../ui/Sheet';
 import { useToast } from '../ui/Toast';
 import { AppointmentFormSheet } from './forms/AppointmentForm';
-import { describeRule, effectiveRule, seriesGroups, seriesOf } from '../domain/recurrence';
+import { describeRule, effectiveRule, seriesGroupsOf, seriesOf } from '../domain/recurrence';
 import type { EditScope } from '../state/service';
 import { ScopeSheet } from './agenda/Recurrence';
 import { CompleteSheet, PaymentBadge, PaymentPanel, PaymentSheet, RefundSheet } from './payments/PaymentSheets';
@@ -49,7 +49,7 @@ export function missingIncome(a: Appointment, transactions: Parameters<typeof pa
 /** Item de agendamento clicável, com painel de ações. */
 export function AppointmentItem({ a, showDate }: { a: Appointment; showDate?: boolean }) {
   const { data } = useApp();
-  const pay = paymentSummary(a, data.transactions);
+  const pay = paymentSummaryIn(a, data.transactions);
   const [open, setOpen] = useState(false);
   const client = data.clients.find((c) => c.id === a.clientId);
   const cancelled = a.status === 'cancelado';
@@ -114,13 +114,13 @@ export function AppointmentActions({ a, open, onClose }: { a: Appointment; open:
   const [sheet, setSheet] = useState<null | 'editar' | 'concluir' | 'pagar'>(null);
   // beta.3: ocorrência de série pergunta o alcance antes de editar ou cancelar.
   const series = seriesOf(a);
-  const rule = series ? effectiveRule(seriesGroups(data.appointments).get(series.id) ?? [a]) : null;
+  const rule = series ? effectiveRule(seriesGroupsOf(data.appointments).get(series.id) ?? [a]) : null;
   const [scopeFor, setScopeFor] = useState<null | 'editar' | 'cancelar'>(null);
   const [editScope, setEditScope] = useState<EditScope>('esta');
   const [refund, setRefund] = useState<PaymentEntry | null>(null);
   const client = data.clients.find((c) => c.id === a.clientId);
   const wa = client ? whatsappLink(client.phone) : null;
-  const pay = paymentSummary(a, data.transactions);
+  const pay = paymentSummaryIn(a, data.transactions);
   // 0.5: dinheiro recebido nunca some ao reabrir, cancelar ou excluir; a confirmação diz isso.
   const keepsMoney = pay.net > 0 ? ` Os valores recebidos (${formatMoney(pay.net)}) continuam em Finanças e no histórico.` : '';
 

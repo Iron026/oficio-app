@@ -30,6 +30,8 @@ import {
 } from './types';
 
 const STATE_KEY = 'sync:state';
+/** Intervalo mínimo entre gravações do estado durante um envio em vários lotes (ver pushPending). */
+const SAVE_EVERY_MS = 1_000;
 const BACKUP_PREFIX = 'backup:';
 const MAX_BACKUPS = 5;
 /** Margem de segurança na leitura incremental (gravações concorrentes). */
@@ -253,12 +255,22 @@ export class SyncEngine implements ChangeTracker {
   // ------------------------------------------------------------- rastreamento
 
   async touch(collection: SyncCollection, id: string, deleted: boolean) {
-    if (!this.state.linkedUid || !this.syncs(collection)) return;
-    const key = recordKey(collection, id);
-    const r = (this.state.records[key] ??= { baseRev: 0, base: null, dirty: false, seq: 0 });
-    r.dirty = true;
-    r.deleted = deleted;
-    r.seq++;
+    return this.touchMany(collection, [id], deleted);
+  }
+
+  /**
+   * Auditoria pré-RC: o estado da sincronização guarda a base de todos os registros; gravá-lo uma vez por item de
+   * um lote (ex.: ocorrências geradas ao abrir o app) deixava o custo quadrático. Marca todos e grava uma vez.
+   */
+  async touchMany(collection: SyncCollection, ids: readonly string[], deleted: boolean) {
+    if (!ids.length || !this.state.linkedUid || !this.syncs(collection)) return;
+    for (const id of ids) {
+      const key = recordKey(collection, id);
+      const r = (this.state.records[key] ??= { baseRev: 0, base: null, dirty: false, seq: 0 });
+      r.dirty = true;
+      r.deleted = deleted;
+      r.seq++;
+    }
     await this.save();
     this.markPending();
     this.schedule();
@@ -405,7 +417,7 @@ export class SyncEngine implements ChangeTracker {
         const data = remoteToData(pulled.records, pulled.meta, this.service.data.settings);
         for (const r of pulled.records) next.records[recordKey(r.collection, r.id)] = { baseRev: r.rev, base: r.data, dirty: false, seq: 0 };
         next.meta = { baseRev: pulled.meta?.rev ?? 0, base: pulled.meta?.data ?? null, dirty: !pulled.meta && !!data.profile, seq: 0 };
-        next.cursor = Math.max(0, ...pulled.records.map((r) => r.updatedAt));
+        next.cursor = pulled.records.reduce((m, r) => Math.max(m, r.updatedAt), 0); // sem espalhar: estoura a pilha com ~150 mil registros
         this.state = next;
         await this.storage.untracked(() => this.service.applySyncedData(data));
       } else {
@@ -503,9 +515,15 @@ export class SyncEngine implements ChangeTracker {
     this.retryDelay = Math.min(this.retryDelay * 2, 5 * 60_000);
   }
 
-  private localEntity(collection: SyncCollection, id: string): Entity | null {
-    const found = (this.service.data[collection] as unknown as Entity[]).find((e) => e.id === id);
-    return found ? clone(found) : null;
+  /** Índice por id de cada coleção (auditoria pré-RC: o envio fazia uma busca linear por registro). */
+  private localIndex(): (collection: SyncCollection, id: string) => Entity | null {
+    const maps = new Map<SyncCollection, Map<string, Entity>>();
+    return (collection, id) => {
+      let m = maps.get(collection);
+      if (!m) maps.set(collection, (m = new Map((this.service.data[collection] as unknown as Entity[]).map((e) => [e.id, e]))));
+      const found = m.get(id);
+      return found ? clone(found) : null;
+    };
   }
 
   private async pushPending(uid: string) {
@@ -513,11 +531,12 @@ export class SyncEngine implements ChangeTracker {
     if (this.replacing) return;
     const items: PushItem[] = [];
     const seqs = new Map<string, number>();
+    const localEntity = this.localIndex();
     for (const [key, r] of Object.entries(this.state.records)) {
       if (!r.dirty) continue;
       const k = parseRecordKey(key);
       if (!k) continue;
-      const data = r.deleted ? null : this.localEntity(k.collection, k.id);
+      const data = r.deleted ? null : localEntity(k.collection, k.id);
       // Dados de demonstração (fictícios) nunca vão para a nuvem.
       if (data?.isDemo) {
         if (r.baseRev === 0) delete this.state.records[key];
@@ -528,8 +547,13 @@ export class SyncEngine implements ChangeTracker {
       seqs.set(key, r.seq);
     }
     const rejected: RemoteRecord[] = [];
+    // Auditoria pré-RC: gravar o estado inteiro após cada lote deixava o envio grande quadrático (95% do tempo).
+    // Grava no máximo ~1 vez por segundo e sempre no último lote. Se o app fechar entre gravações, os lotes já
+    // aceitos pela nuvem são reenviados e reconhecidos como iguais (ver interruption.test.ts), sem conflito.
+    let savedAt = performance.now();
     for (let i = 0; i < items.length; i += CHUNK) {
       const chunk = items.slice(i, i + CHUNK);
+      const last = i + CHUNK >= items.length;
       const results = await this.remote.push(uid, chunk, this.state.deviceId);
       await this.service.exclusive(async () => {
         results.forEach((res, j) => {
@@ -549,7 +573,10 @@ export class SyncEngine implements ChangeTracker {
             rejected.push(res.current);
           }
         });
-        await this.save();
+        if (last || performance.now() - savedAt >= SAVE_EVERY_MS) {
+          await this.save();
+          savedAt = performance.now();
+        }
       });
     }
     if (this.state.meta.dirty) {
