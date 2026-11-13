@@ -223,11 +223,58 @@ O revisor também conferiu, sem achados:
 
 ## Testes executados
 
-Antes de cada commit, `npm run check` (typecheck, lint, testes e build). Situação atual:
+Commit final da auditoria: `a0f6486`. Antes de cada commit rodou `npm run check` (typecheck, lint, testes e
+build).
 
 | Verificação | Resultado |
 |---|---|
-| Testes unitários e de interface | 1.294, 99 arquivos |
-| Firestore Emulator | 30/30 |
-| Visual e acessibilidade em modo estrito | Ver CI |
-| Android | Cadeia de atualização 0.4.0-beta.7 → 0.5.0-beta.5 aprovada (run 43274062889, mesma assinatura) → versão auditada, com notificações reais |
+| Testes unitários e de interface | 1.294 aprovados (99 arquivos) |
+| Firestore Emulator (regras e sincronização) | Aprovado. Regras de produção sem alteração |
+| Visual e acessibilidade em modo estrito | Aprovado, sem violação axe WCAG 2.1 AA |
+| Android, emulador API 35, run 43458051692 | 26/26 etapas |
+
+A suíte visual cobriu 320, 360 e 412 px, tablet e computador, temas claro e escuro e as 8 paletas. O resultado
+veio do CI 43458051598; a execução local foi interrompida por tempo.
+
+Cadeia de atualização no Android:
+
+| Etapa | Dados preservados |
+|---|---|
+| 0.4.0-beta.7 → 0.5.0-beta.5 aprovada | 1 cliente, 1 atendimento, 1 lançamento |
+| 0.5.0-beta.5 → versão auditada | 1 cliente, 3 atendimentos, 2 lançamentos |
+
+A versão intermediária é a beta.5 aprovada no S26 (artefato do run 43274062889, mesma assinatura). Também passaram:
+- lembrete agendado na beta.5 entregue depois da atualização;
+- estorno fora de Despesas, saldo de R$ 60,00 e relatório batendo;
+- recibo em PDF;
+- backup, extrato e restauração;
+- lembretes reais com o app aberto, em segundo plano e fechado.
+
+APK de depuração da versão auditada: artefato `oficio-apk-debug` do run 43458051692. A versão continua
+`0.5.0-beta.5`; nenhuma RC foi criada.
+
+## Veredito: APTO COM RESSALVAS para a 0.5.0-rc.1
+
+**Fundamentos:**
+- Todos os problemas confirmados foram corrigidos com teste que falhava antes, regressão completa e revisão
+  independente. Isso inclui as perdas silenciosas no backup, as telas em branco, o aviso financeiro e a
+  persistência da sincronização.
+- Totais financeiros coerentes entre telas e aparelhos nos cenários concorrentes testados.
+- Atualização sem perda de dados desde a 0.4.0-beta.7, passando pela beta.5 aprovada.
+- Isolamento de contas e regras do Firestore verificados no emulador.
+
+**Ressalvas** (nenhuma bloqueia; todas documentadas acima):
+1. Desempenho em uso muito longo:
+   - o estado da sincronização é gravado inteiro a cada alteração;
+   - a lista da Agenda não é paginada.
+
+   Aceitável para os volumes de 1 a 5 anos medidos. Recomendado para a 0.6.
+2. Alertas do `npm audit` em dependência de servidor do Firebase, que não entra no app. Atualizar quando o
+   Firebase corrigir.
+3. Medições feitas em jsdom. Recomenda-se conferir no S26, antes de publicar a RC, um backup grande (a restauração
+   é recusada se o arquivo tiver problema, sem alterar nada) e a abertura de Agenda e Finanças.
+4. Arquivos de backup antes aceitos com dados malformados agora são recusados por inteiro, com mensagem. É a
+   política pedida, mas muda o comportamento para quem tiver um arquivo corrompido ou editado à mão.
+
+A criação da RC depende de autorização: nada foi para a `main`, nenhuma release foi publicada e a versão não foi
+alterada.
