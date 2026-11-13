@@ -62,13 +62,28 @@ export function saveTextFile(filename: string, content: string, deps: { native?:
   return saveFile(filename, content, 'application/json', deps);
 }
 
+/**
+ * Pasta (no cache do app) dos arquivos entregues ao menu de compartilhar. Auditoria pré-RC: antes, backups completos
+ * e PDFs ficavam no cache para sempre, inclusive depois de "Apagar todos os dados". Não dá para apagar logo depois
+ * de compartilhar (o app escolhido pode ler o arquivo mais tarde); a pasta é limpa antes do próximo
+ * compartilhamento, ao abrir o app e ao apagar os dados.
+ */
+const SHARE_DIR = 'compartilhar';
+
+export async function clearSharedFiles(): Promise<void> {
+  const { Filesystem, Directory } = await import('@capacitor/filesystem');
+  await Filesystem.rmdir({ path: SHARE_DIR, directory: Directory.Cache, recursive: true }).catch(() => undefined); // pode não existir
+}
+
 /** Android: abre o menu de compartilhar (Drive, WhatsApp, e-mail...) com o arquivo. */
 export async function shareFile(filename: string, data: FileData, title: string): Promise<void> {
   const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
   const { Share } = await import('@capacitor/share');
+  await clearSharedFiles();
+  const path = `${SHARE_DIR}/${filename}`;
   const res = typeof data === 'string'
-    ? await Filesystem.writeFile({ path: filename, data, directory: Directory.Cache, encoding: Encoding.UTF8 })
-    : await Filesystem.writeFile({ path: filename, data: bytesToBase64(data), directory: Directory.Cache });
+    ? await Filesystem.writeFile({ path, data, directory: Directory.Cache, encoding: Encoding.UTF8, recursive: true })
+    : await Filesystem.writeFile({ path, data: bytesToBase64(data), directory: Directory.Cache, recursive: true });
   await Share.share({ title, files: [res.uri], dialogTitle: title });
 }
 

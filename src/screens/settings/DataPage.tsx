@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, FlaskConical, History, Trash2, Upload } from 'lucide-react';
 import { isNative } from '../../platform/native';
+import { clearSharedFiles } from '../../platform/files';
 import { useApp, useErrorHandler } from '../../state/AppContext';
 import { useCloud } from '../../state/CloudContext';
 import { navigate } from '../../state/router';
@@ -82,6 +83,8 @@ export function DataPage() {
     if (!ok) return;
     try {
       await service.resetAll();
+      // Auditoria pré-RC: também os arquivos deixados no cache pelo menu de compartilhar (backups, PDFs).
+      if (isNative()) await clearSharedFiles().catch(() => undefined);
       navigate('painel');
     } catch (err) {
       onError(err);

@@ -4,6 +4,7 @@ import { HideValuesContext } from './ui/privacy';
 import { useApp, useAppearanceEffect, usePrefs, useThemeEffect, AppProvider } from './state/AppContext';
 import { decideBack } from './platform/backStack';
 import { hideSplash, isNative, minimizeApp, onAndroidBack, setupKeyboard } from './platform/native';
+import { clearSharedFiles } from './platform/files';
 import { navigate, useLocation, type Route } from './state/router';
 import { AppService } from './state/service';
 import { createStorage, type StorageAdapter } from './storage';
@@ -15,6 +16,7 @@ import { TrackedStorage } from './sync/tracked';
 import { ConfirmProvider } from './ui/Confirm';
 import { ToastProvider } from './ui/Toast';
 import { CelebrationProvider } from './ui/Celebration';
+import { ScreenBoundary } from './ui/ScreenBoundary';
 import { Agenda } from './screens/Agenda';
 import { Clients } from './screens/Clients';
 import { Dashboard } from './screens/Dashboard';
@@ -59,6 +61,8 @@ export function App({ storageFactory, cloudFactory }: AppProps) {
       setBoot({ service, persistent, sync: engine });
       // beta.4: lembretes do aparelho acompanham a agenda (só no app Android; nunca pede permissão sozinho).
       if (isNative()) reminders = startReminderSync(service);
+        // Auditoria pré-RC: arquivos de compartilhamentos anteriores (backup completo, PDFs) não ficam no cache.
+        if (isNative()) void clearSharedFiles().catch(() => undefined);
       void setupKeyboard();
       // Conta Google e nuvem carregam depois, sem atrasar a abertura (e o app funciona sem elas).
       void (cloudFactory ?? createCloud)().then(async (cloud) => {
@@ -125,16 +129,17 @@ function Root() {
   const screens: Record<Route, React.ReactNode> = {
     painel: <Dashboard />, agenda: <Agenda />, clientes: <Clients />, financas: <Finance />, evolucao: <Evolution />, ajustes: <Settings />,
   };
+  const pageKey = (route === 'ajustes' || route === 'financas') && sub ? `${route}/${sub}` : route;
   return (
     <HideValuesContext.Provider value={prefs.hideValues}>
       <CelebrationProvider>
         <Shell
           route={route}
-          pageKey={(route === 'ajustes' || route === 'financas') && sub ? `${route}/${sub}` : route}
+          pageKey={pageKey}
           title={route === 'ajustes' ? settingsTitle(sub) : route === 'financas' && sub === 'relatorios' ? 'Relatórios' : TITLES[route]}
           action={route === 'painel' || route === 'financas' ? <HideValuesToggle /> : undefined}
         >
-          {screens[route]}
+          <ScreenBoundary key={pageKey}>{screens[route]}</ScreenBoundary>
         </Shell>
       </CelebrationProvider>
     </HideValuesContext.Provider>
