@@ -6,11 +6,16 @@
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import { App } from '../App';
+import type { Cloud } from '../cloud';
+import { UnavailableAuth } from '../cloud/auth';
 import { todayKey } from '../lib/dates';
 import { AppService } from '../state/service';
 import { createIndexedDbAdapter } from '../storage/indexeddb';
 import { createMemoryAdapter } from '../storage/memory';
 import { signed } from '../test/backupFile';
+
+// Sem nuvem: no CI do Android o build tem as variáveis do Firebase, e o Auth real não roda no jsdom.
+const noCloud = async (): Promise<Cloud> => ({ auth: new UnavailableAuth(), remote: null, projectId: null });
 
 beforeAll(() => {
   window.matchMedia ??= (() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
@@ -52,7 +57,7 @@ describe('auditoria pré-RC: dados restaurados abrem todas as telas', () => {
       const errors: string[] = [];
       const spy = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => { errors.push(String(a[0])); });
       window.location.hash = route;
-      render(<App storageFactory={async () => ({ storage: await createIndexedDbAdapter(dbName), persistent: true })} />);
+      render(<App storageFactory={async () => ({ storage: await createIndexedDbAdapter(dbName), persistent: true })} cloudFactory={noCloud} />);
       await screen.findByRole('navigation', { name: /navegação principal/i });
       await new Promise((r) => setTimeout(r, 30));
       spy.mockRestore();

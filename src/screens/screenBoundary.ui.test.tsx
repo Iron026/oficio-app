@@ -5,6 +5,8 @@
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { App } from '../App';
+import type { Cloud } from '../cloud';
+import { UnavailableAuth } from '../cloud/auth';
 import { AppService } from '../state/service';
 import { createIndexedDbAdapter } from '../storage/indexeddb';
 
@@ -12,6 +14,9 @@ let explode = true;
 vi.mock('./Agenda', () => ({
   Agenda: () => { if (explode) throw new Error('falha simulada ao desenhar'); return <p>Agenda ok</p>; },
 }));
+
+// Sem nuvem: no CI do Android o build tem as variáveis do Firebase, e o Auth real não roda no jsdom.
+const noCloud = async (): Promise<Cloud> => ({ auth: new UnavailableAuth(), remote: null, projectId: null });
 
 beforeAll(() => {
   window.matchMedia ??= (() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
@@ -31,7 +36,7 @@ describe('auditoria pré-RC: falha numa tela', () => {
     const db = await ready();
     window.location.hash = '#/agenda';
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    render(<App storageFactory={async () => ({ storage: await createIndexedDbAdapter(db), persistent: true })} />);
+    render(<App storageFactory={async () => ({ storage: await createIndexedDbAdapter(db), persistent: true })} cloudFactory={noCloud} />);
     expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível abrir esta tela/i);
     const nav = screen.getByRole('navigation', { name: /navegação principal/i });
     fireEvent.click(nav.querySelector('a[href="#/painel"]')!);
