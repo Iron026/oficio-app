@@ -128,6 +128,24 @@ sincronização. Por isso o gerador da 0.5 não pode “preencher buracos”: el
 | Tipos de serviço sugeridos | Id `sugestao-<profissão>-<nome normalizado>` (mesmo formato de id; continuam fora da nuvem até as regras novas) |
 | Preferências do aparelho | `agendaView` (visão inicial da Agenda; padrão Lista) e a marca `setup:offer` (configuração inicial pendente), só no aparelho |
 
+## Política de restauração (auditoria pré-RC da 0.5.0)
+
+Preservar os dados compatíveis; recusar o arquivo **inteiro**, antes de qualquer gravação, quando houver risco de
+perda silenciosa ou de dados que as telas não conseguem mostrar. Nada é corrigido em silêncio.
+
+| Situação no arquivo | Resultado |
+| --- | --- |
+| Selo com estrutura inválida, lista que não é lista, selo repetido | Recusado (antes: descartado em silêncio; repetido podia gravar o estágio menor) |
+| Selo de versão mais nova (id desconhecido, estrutura válida) | Preservado; as telas mostram só os selos conhecidos |
+| Foto inválida ou mais de uma | Recusado (antes: descartada em silêncio) |
+| Tipo de serviço inválido, id repetido, mais de 100 | Recusado (antes: descartado em silêncio); campos extras de versões futuras são preservados |
+| Lançamento sem `category`/`description` (texto desde a v0.1) | Recusado (antes: aceito; Finanças e Relatórios quebravam) |
+| Cliente sem `phone`/`email`/`address`/`notes` em texto; atendimento sem `notes`; `completedAt`/`transactionId` sem texto; metas do perfil sem número | Recusado (antes: aceito; Painel, Agenda e Clientes quebravam) |
+| Estorno sem `of` (ou `of` que não é texto), estorno como receita, pagamento como despesa, `kind` desconhecido ou de outro tipo, `method`/`key`/`review` com tipo errado, `reviews` que não é lista | Recusado (antes: aceito; o estorno sem referência reduzia o saldo sem ir para a revisão) |
+| Estorno de um pagamento que não existe no arquivo | Aceito e marcado para revisão (“sem pagamento”), como desde a beta.3 |
+| Marcador sem `kind` numa receita vinculada | Aceito como pagamento (contrato da 0.4.0-beta.4) |
+| Regra de recorrência incompleta (sem `id`, `freq` conhecida, `start`, `through`), `interval`/`count` < 1, `days` fora de 0–6, `until` inválido | Recusado (antes: aceito; a série deixava de existir em silêncio) |
+
 ## Riscos que continuam
 
 - **Aparelho ainda na beta.3 ou anterior.** Ele não tem estas proteções. Antes de usar a 0.5, todos os

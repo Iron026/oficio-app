@@ -134,7 +134,7 @@ describe('tipos de serviço — armazenamento, backup e nuvem', () => {
     expect((await adapter.loadAll()).serviceTypes).toHaveLength(1);
   });
 
-  it('backup leva os tipos; backup antigo (sem o campo) importa e itens inválidos são descartados', async () => {
+  it('backup leva os tipos; backup antigo (sem o campo) importa; itens inválidos recusam o arquivo (auditoria pré-RC)', async () => {
     const { service } = await setup();
     await service.saveServiceType({ name: 'Hora de trabalho', price: '80,00' });
     const json = service.exportBackup();
@@ -142,8 +142,14 @@ describe('tipos de serviço — armazenamento, backup e nuvem', () => {
     const parsed = JSON.parse(json);
     delete parsed.data.serviceTypes;
     expect(parseBackup(signed(parsed)).serviceTypes).toEqual([]);
-    parsed.data.serviceTypes = [st('a', 'Ok'), st('a', 'Repetido'), { id: 'b', name: '' }, { ...st('c', 'Extra'), url: 'x' }];
-    expect(parseBackup(signed(parsed)).serviceTypes.map((t) => t.name)).toEqual(['Ok']);
+    // Antes: repetidos e inválidos eram descartados em silêncio. Agora o arquivo inteiro é recusado.
+    parsed.data.serviceTypes = [st('a', 'Ok'), st('a', 'Repetido')];
+    expect(() => parseBackup(signed(parsed))).toThrow(/repetidos em "serviceTypes"/);
+    parsed.data.serviceTypes = [st('a', 'Ok'), { id: 'b', name: '' }];
+    expect(() => parseBackup(signed(parsed))).toThrow(/serviceTypes/);
+    // Campo de versão mais nova num tipo válido: preservado.
+    parsed.data.serviceTypes = [st('a', 'Ok'), { ...st('c', 'Extra'), url: 'x' }];
+    expect(parseBackup(signed(parsed)).serviceTypes.map((t) => t.name)).toEqual(['Ok', 'Extra']);
   });
 
   it('sem as regras novas (padrão do APK): ficam só no aparelho, sem pendência nem envio', async () => {

@@ -1,6 +1,7 @@
 import { canonicalJson, sha256Hex } from '../lib/sha256';
-import { isValidProfileImage, isValidSealAward } from '../domain/profileImage';
-import { MAX_SERVICE_TYPES, isDuration, isValidServiceType, uniqueById } from '../domain/serviceTypes';
+import { isValidProfileImage } from '../domain/profileImage';
+import { MAX_SERVICE_TYPES, isDuration, isValidServiceType } from '../domain/serviceTypes';
+import { seriesOf } from '../domain/recurrence';
 import { isProfessionId } from '../domain/professions';
 import { DEFAULT_SETTINGS, type AppData } from '../domain/types';
 
@@ -78,6 +79,79 @@ function checkCollection(d: Record<string, unknown>, key: string, required: stri
 }
 
 /**
+ * Marcador de pagamento/estorno (`transaction.payment`, 0.5). Auditoria pré-RC: um estorno sem referência ao
+ * pagamento reduzia o saldo sem aparecer na revisão de estornos, e marcadores com tipos errados mudavam a leitura
+ * dos totais. Devolve o campo com problema, ou null.
+ */
+function paymentMarkError(t: Record<string, unknown>): string | null {
+  const m = t.payment;
+  if (m === undefined || m === null) return null;
+  if (!isObj(m)) return 'pagamento';
+  if (m.kind === 'pagamento') {
+    if (t.type !== 'receita') return 'pagamento lançado como despesa';
+    if (!optStr(m.method)) return 'pagamento: forma de pagamento';
+  } else if (m.kind === 'estorno') {
+    if (t.type !== 'despesa') return 'estorno lançado como receita';
+    if (typeof m.of !== 'string' || !m.of) return 'estorno sem o pagamento de origem';
+  } else if (m.kind === undefined && t.type === 'receita') {
+    // Contrato da 0.4.0-beta.4 (COMPATIBILIDADE-0.5.md): qualquer marcador numa receita vinculada = pagamento.
+    if (!optStr(m.method)) return 'pagamento: forma de pagamento';
+  } else {
+    return 'pagamento: tipo de marcador desconhecido';
+  }
+  if (!optStr(m.key)) return 'pagamento: chave';
+  if (m.review !== undefined && m.review !== null && !(isObj(m.review) && typeof m.review.ack === 'string' && typeof m.review.at === 'string')) return 'pagamento: revisão';
+  return null;
+}
+
+/**
+ * Regra de recorrência (0.5.0-beta.3) estruturalmente completa. Auditoria pré-RC: uma regra inválida era aceita e a
+ * série deixava de existir em silêncio (o gerador a ignora). Campos extras de versões futuras são aceitos.
+ */
+function isValidSeries(v: unknown): boolean {
+  if (!isObj(v) || seriesOf({ series: v }) === null) return false;
+  const intOrNull = (x: unknown) => x === undefined || x === null || (Number.isInteger(x) && (x as number) >= 1);
+  if (!intOrNull(v.interval) || !intOrNull(v.count)) return false;
+  if (v.days !== undefined && v.days !== null && !(Array.isArray(v.days) && v.days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6))) return false;
+  if (v.until !== undefined && v.until !== null && !(typeof v.until === 'string' && DATE_RE.test(v.until))) return false;
+  return true;
+}
+
+/** Selo estruturalmente válido; id desconhecido (selo de versão mais nova) é preservado. */
+function isSealShape(v: unknown): boolean {
+  return isObj(v) && typeof v.id === 'string' && v.id.length > 0 && v.id.length <= 40
+    && Number.isInteger(v.stage) && (v.stage as number) >= 1 && (v.stage as number) <= 4
+    && Array.isArray(v.reachedAt) && v.reachedAt.length <= 4 && v.reachedAt.every((d) => d === null || typeof d === 'string')
+    && typeof v.createdAt === 'string' && typeof v.updatedAt === 'string';
+}
+
+/** Tipo de serviço: campos conhecidos válidos; campos extras de versões futuras são preservados. */
+function isServiceTypeShape(v: unknown): boolean {
+  if (!isObj(v)) return false;
+  const known: Record<string, unknown> = {};
+  for (const k of ['id', 'name', 'price', 'pinned', 'order', 'duration', 'createdAt', 'updatedAt']) if (k in v) known[k] = v[k];
+  return isValidServiceType(known);
+}
+
+/**
+ * Coleções opcionais da 0.4 (ausentes em backups antigos). Auditoria pré-RC: antes, itens inválidos, repetidos ou
+ * além do limite eram descartados em silêncio; agora o arquivo inteiro é recusado.
+ */
+function checkOptionalCollection(d: Record<string, unknown>, key: string, label: string, valid: (v: unknown) => boolean, max: number) {
+  const list = d[key];
+  if (list === undefined) return;
+  if (!Array.isArray(list)) throw new BackupError('estrutura', `Dados inválidos em "${key}" (${label}): não é uma lista.`);
+  if (list.length > max) throw new BackupError('estrutura', `Dados inválidos em "${key}" (${label}): ${list.length} itens, acima do limite de ${max}. Nada foi restaurado.`);
+  const seen = new Set<string>();
+  list.forEach((item, i) => {
+    if (!valid(item)) throw new BackupError('estrutura', `Dados inválidos em "${key}" (${label}, item ${i + 1}).`);
+    const id = (item as { id: string }).id;
+    if (seen.has(id)) throw new BackupError('estrutura', `Registros repetidos em "${key}" (${label}): o id do item ${i + 1} aparece mais de uma vez.`);
+    seen.add(id);
+  });
+}
+
+/**
  * Integridade dos campos que entram nos totais (valores, datas, tipo e situação). Um arquivo editado à mão ou
  * corrompido é recusado antes de qualquer alteração — nada é restaurado pela metade. Campos da 0.5 são opcionais,
  * mas, se existirem, precisam ter o tipo esperado: um arquivo de versão mais nova não é aceito só por ter o formato 1.
@@ -86,26 +160,37 @@ function checkIntegrity(d: Record<string, unknown>) {
   const bad = (key: string, i: number, field: string) => new BackupError('estrutura', `Dados inválidos em "${key}" (item ${i + 1}: ${field}).`);
   (d.appointments as Record<string, unknown>[]).forEach((a, i) => {
     if (typeof a.title !== 'string') throw bad('appointments', i, 'descrição');
+    // Auditoria pré-RC: campos que todas as versões gravaram como texto; ausentes, derrubavam telas.
+    if (typeof a.notes !== 'string') throw bad('appointments', i, 'observações');
+    if (a.completedAt !== undefined && a.completedAt !== null && typeof a.completedAt !== 'string') throw bad('appointments', i, 'conclusão');
+    if (a.transactionId !== undefined && a.transactionId !== null && typeof a.transactionId !== 'string') throw bad('appointments', i, 'receita vinculada');
     if (typeof a.date !== 'string' || !DATE_RE.test(a.date)) throw bad('appointments', i, 'data');
     if (!['agendado', 'concluido', 'cancelado'].includes(a.status as string)) throw bad('appointments', i, 'situação');
     if (!cents(a.price, 0)) throw bad('appointments', i, 'valor');
     if (!optStr(a.time)) throw bad('appointments', i, 'horário');
     if (!optStr(a.clientId)) throw bad('appointments', i, 'cliente');
     if (a.duration !== undefined && !isDuration(a.duration)) throw bad('appointments', i, 'duração');
-    if (a.series !== undefined && a.series !== null && !isObj(a.series)) throw bad('appointments', i, 'recorrência');
+    if (a.series !== undefined && a.series !== null && !isValidSeries(a.series)) throw bad('appointments', i, 'recorrência');
     if (a.payments !== undefined && typeof a.payments !== 'boolean') throw bad('appointments', i, 'controle de pagamento');
   });
   (d.transactions as Record<string, unknown>[]).forEach((t, i) => {
     if (t.type !== 'receita' && t.type !== 'despesa') throw bad('transactions', i, 'tipo');
     if (!cents(t.amount, 0)) throw bad('transactions', i, 'valor');
     if (typeof t.date !== 'string' || !DATE_RE.test(t.date)) throw bad('transactions', i, 'data');
-    if (t.category !== undefined && typeof t.category !== 'string') throw bad('transactions', i, 'categoria');
-    if (t.description !== undefined && typeof t.description !== 'string') throw bad('transactions', i, 'descrição');
+    // Auditoria pré-RC: categoria e descrição existem desde a v0.1; sem elas, Finanças e Relatórios quebravam.
+    if (typeof t.category !== 'string') throw bad('transactions', i, 'categoria');
+    if (typeof t.description !== 'string') throw bad('transactions', i, 'descrição');
     if (!optStr(t.appointmentId)) throw bad('transactions', i, 'serviço vinculado');
-    if (t.payment !== undefined && t.payment !== null && !isObj(t.payment)) throw bad('transactions', i, 'pagamento');
+    const markErr = paymentMarkError(t);
+    if (markErr) throw bad('transactions', i, markErr);
+    if (t.reviews !== undefined && !(Array.isArray(t.reviews) && t.reviews.every(isObj))) throw bad('transactions', i, 'trilha de revisões');
   });
   (d.clients as Record<string, unknown>[]).forEach((c, i) => {
     if (typeof c.name !== 'string') throw bad('clients', i, 'nome');
+    // Auditoria pré-RC: sem telefone (ou com número), Painel, Agenda e Clientes quebravam.
+    for (const [k, label] of [['phone', 'telefone'], ['email', 'e-mail'], ['address', 'endereço'], ['notes', 'observações']] as const) {
+      if (typeof c[k] !== 'string') throw bad('clients', i, label);
+    }
   });
   (d.xpEvents as Record<string, unknown>[]).forEach((e, i) => {
     if (typeof e.key !== 'string' || typeof e.xp !== 'number' || !Number.isFinite(e.xp)) throw bad('xpEvents', i, 'XP');
@@ -142,7 +227,9 @@ export function inspectBackup(text: string): BackupInspection {
   const d = raw.data;
   if (!isObj(d)) throw new BackupError('estrutura', 'Backup sem dados.');
   const profile = d.profile;
-  if (profile !== null && (!isObj(profile) || typeof profile.name !== 'string' || !isProfessionId(profile.professionId) || !optStr(profile.businessName))) {
+  const goal = (v: unknown) => v === undefined || (typeof v === 'number' && Number.isFinite(v) && v >= 0);
+  if (profile !== null && (!isObj(profile) || typeof profile.name !== 'string' || !isProfessionId(profile.professionId) || !optStr(profile.businessName)
+    || !goal(profile.weeklyGoalServices) || !goal(profile.monthlyGoalRevenue))) {
     throw new BackupError('estrutura', 'Perfil inválido no backup.');
   }
   if (d.settings !== undefined && !isObj(d.settings)) throw new BackupError('estrutura', 'Preferências inválidas no backup.');
@@ -155,6 +242,9 @@ export function inspectBackup(text: string): BackupInspection {
   ];
   for (const [key, req] of checks) checkCollection(d, key, req);
   checkIntegrity(d);
+  checkOptionalCollection(d, 'sealAwards', 'selos', isSealShape, 64);
+  checkOptionalCollection(d, 'profileImages', 'foto de perfil', isValidProfileImage, 1);
+  checkOptionalCollection(d, 'serviceTypes', 'tipos de serviço', isServiceTypeShape, MAX_SERVICE_TYPES);
 
   const exportedAt = typeof raw.exportedAt === 'string' && !Number.isNaN(Date.parse(raw.exportedAt)) ? raw.exportedAt : null;
   // Só informativo; arquivos anteriores à 0.4.0-beta.3 não têm.
@@ -168,11 +258,10 @@ export function inspectBackup(text: string): BackupInspection {
     transactions: d.transactions as AppData['transactions'],
     xpEvents: d.xpEvents as AppData['xpEvents'],
     achievements: d.achievements as AppData['achievements'],
-    // 0.4 (opcionais: backups antigos não têm). Itens inválidos são descartados.
-    sealAwards: Array.isArray(d.sealAwards) ? d.sealAwards.filter(isValidSealAward) : [],
-    profileImages: Array.isArray(d.profileImages) ? d.profileImages.filter(isValidProfileImage).slice(0, 1) : [],
-    // Rodada 3 (opcional): tipos de serviço; inválidos e repetidos são descartados.
-    serviceTypes: Array.isArray(d.serviceTypes) ? uniqueById(d.serviceTypes.filter(isValidServiceType)).slice(0, MAX_SERVICE_TYPES) : [],
+    // 0.4 (opcionais: backups antigos não têm), já conferidos por inteiro acima.
+    sealAwards: (d.sealAwards ?? []) as AppData['sealAwards'],
+    profileImages: (d.profileImages ?? []) as AppData['profileImages'],
+    serviceTypes: (d.serviceTypes ?? []) as AppData['serviceTypes'],
   };
   return { data, integrity, exportedAt, appVersion };
 }

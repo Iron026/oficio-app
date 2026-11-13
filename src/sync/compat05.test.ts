@@ -274,7 +274,7 @@ describe('beta.4: backup com campos da 0.5', () => {
   it('exportar na 0.5 e restaurar na 0.4 mantém os campos novos', async () => {
     const { a, b } = await pair();
     const ap = await appt(a, 'Coloração', '300,00');
-    await write05(a, 'appointments', { ...find(a, ap.id)!, duration: 90, payments: true, series: { id: 's', freq: 'mensal', interval: 1 } });
+    await write05(a, 'appointments', { ...find(a, ap.id)!, duration: 90, payments: true, series: { id: 's', freq: 'mensal', interval: 1, days: null, start: ap.date, through: ap.date, until: null, count: null, v: STAMP } });
     await write05(a, 'transactions', payment('pg-1', ap.id, 10_000, '2026-11-01'));
     const st = await a.service.saveServiceType({ name: 'Corte', price: '' });
     await write05(a, 'serviceTypes', { ...st, duration: 30 } as ServiceType & Record<string, unknown>);

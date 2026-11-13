@@ -321,15 +321,18 @@ describe('armazenamento local e backup (0.4)', () => {
     expect(old.clients).toEqual(back.clients);
   });
 
-  it('dados malformados de selo ou foto no backup são descartados', () => {
+  it('dados malformados de selo ou foto no backup recusam o arquivo (auditoria pré-RC; antes eram descartados)', () => {
     const json = JSON.stringify({ format: 'oficio-backup', version: 1, exportedAt: NOW.toISOString(), data: {
       profile: null, settings: { theme: 'system' }, clients: [], appointments: [], transactions: [], xpEvents: [], achievements: [],
       sealAwards: [{ id: 'inventado', stage: 9 }, award('metas', 1, [null, null, null, null])],
       profileImages: [{ id: 'atual', mime: 'image/svg+xml', data: '<svg/>' }],
     } });
-    const d = parseBackup(json);
-    expect(d.sealAwards.map((s) => s.id)).toEqual(['metas']);
-    expect(d.profileImages).toEqual([]);
+    expect(() => parseBackup(json)).toThrow(/sealAwards/);
+    const onlyPhoto = JSON.parse(json);
+    onlyPhoto.data.sealAwards = [award('metas', 1, [null, null, null, null])];
+    expect(() => parseBackup(JSON.stringify(onlyPhoto))).toThrow(/profileImages/);
+    onlyPhoto.data.profileImages = [];
+    expect(parseBackup(JSON.stringify(onlyPhoto)).sealAwards.map((s) => s.id)).toEqual(['metas']);
   });
 });
 
