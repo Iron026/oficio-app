@@ -599,6 +599,12 @@ export class SyncEngine implements ChangeTracker {
       const financial = FINANCIAL_COLLECTIONS.includes(r.collection);
 
       if (!m || !m.dirty) {
+        // Auditoria pré-RC: registro financeiro que este aparelho já sabia excluído (exclusão confirmada na nuvem)
+        // voltou porque outro aparelho o alterou offline. Restaura (nada se perde) e sinaliza, como no caso em que a
+        // alteração chega antes da exclusão ser enviada (`excluido_aqui`).
+        if (m && m.baseRev > 0 && m.base === null && r.data && financial) {
+          addConflict({ key, collection: r.collection, id: r.id, kind: 'excluido_aqui', fields: [], local: null, remote: r.data });
+        }
         if (r.data) map.set(r.id, clone(r.data));
         else map.delete(r.id);
         this.state.records[key] = { baseRev: r.rev, base: r.data, dirty: false, seq: m?.seq ?? 0 };
