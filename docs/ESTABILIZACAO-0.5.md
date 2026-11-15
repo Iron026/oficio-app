@@ -89,8 +89,11 @@ regressão completa.
   - Por essa proporção, exportações a partir de ~250 KB (alguns meses de uso) já passam do limite.
 - **Testes:**
   - etapa Android que exporta 1,5 MB e confere que o processo continua o mesmo e o arquivo chega inteiro;
-  - etapa com "Não manter atividades": o Android destrói a tela quando a janela abre, e o arquivo de 300 KB ainda
-    é gravado e o temporário apagado;
+  - etapa em que o Android encerra o processo do app com a janela aberta (`am kill`, como acontece com pouca
+    memória) e o recria ao voltar: o arquivo de 300 KB ainda é gravado, em outro processo, e o temporário é apagado.
+    Uma primeira versão usava "Não manter atividades" (`always_finish_activities`), mas no Android 15 do emulador
+    a tela não chegava a ser destruída (sem "App destroyed" no logcat). A etapa foi trocada para não dar falsa
+    garantia;
   - teste estático do plugin, que falhava com o código anterior.
 - **Correção (`BackupFilePlugin.java`):**
   - antes de abrir a janela, o conteúdo vai para um arquivo privado em `cache/exportacao-pendente` (fora do

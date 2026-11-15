@@ -861,36 +861,34 @@ try {
     console.log(`\n  exportação grande: ${size} bytes, mesmo processo (${pidDuring})`);
   });
 
-  // Estabilização da 0.5.0: com "Não manter atividades" o Android destrói a tela do app quando a janela abre e a
-  // recria ao voltar. A gravação precisa acontecer mesmo assim (o conteúdo fica num arquivo temporário privado).
-  await step('Exportação concluída mesmo se o Android recriar a tela com a janela "Salvar como" aberta', async () => {
+  // Estabilização da 0.5.0: com a janela "Salvar como" aberta, o Android pode encerrar o processo do app para
+  // liberar memória (como em aparelhos com pouca RAM) e recriá-lo ao voltar. A gravação precisa acontecer mesmo
+  // assim: o conteúdo fica num arquivo temporário privado e a chamada guarda só o caminho.
+  await step('Exportação concluída mesmo se o Android encerrar o app com a janela "Salvar como" aberta', async () => {
     const n = 300_000;
     const name = 'exportacao-recriada-teste.json';
     adb('logcat', '-c');
-    adb('shell', 'settings', 'put', 'global', 'always_finish_activities', '1');
-    try {
-      page.evaluate(({ n, name }) => window.Capacitor.nativePromise('OficioFiles', 'saveDocument', {
-        filename: name, content: `{"dados":"${'b'.repeat(n)}"}`, mimeType: 'application/json', encoding: 'utf8',
-      }), { n, name }).catch(() => undefined); // a página é recriada: a resposta não volta para esta chamada
-      await eventually(() => /documentsui/.test(resumedPackage()), 'janela "Salvar como" do Android não abriu');
-      await wait(2500);
-      await saveInSystemDialog();
-    } finally {
-      adb('shell', 'settings', 'put', 'global', 'always_finish_activities', '0');
-    }
-    const path = await eventually(() => adb('shell', `ls /sdcard/Download/${name} 2>/dev/null; true`).trim() || null, 'arquivo não foi gravado depois de recriar a tela');
+    const pidBefore = adb('shell', `pidof ${PKG}; true`).trim();
+    page.evaluate(({ n, name }) => window.Capacitor.nativePromise('OficioFiles', 'saveDocument', {
+      filename: name, content: `{"dados":"${'b'.repeat(n)}"}`, mimeType: 'application/json', encoding: 'utf8',
+    }), { n, name }).catch(() => undefined); // o processo é encerrado: a resposta não volta para esta chamada
+    await eventually(() => /documentsui/.test(resumedPackage()), 'janela "Salvar como" do Android não abriu');
+    await eventually(() => /Saving instance state/.test(adb('logcat', '-d', '-s', 'Capacitor:D')) || null, 'o estado da tela não foi salvo ao abrir a janela');
+    adb('shell', 'am', 'kill', PKG); // encerra o processo em segundo plano, como o Android faz com pouca memória
+    await eventually(() => !adb('shell', `pidof ${PKG}; true`).trim() || null, 'o processo do app não foi encerrado');
+    await saveInSystemDialog(); // o Android recria o app e entrega o resultado da janela
+    const pidAfter = adb('shell', `pidof ${PKG}; true`).trim();
+    assert(pidAfter && pidAfter !== pidBefore, `o app não foi recriado em outro processo (${pidBefore} → ${pidAfter || 'nenhum'})`);
+    const path = await eventually(() => adb('shell', `ls /sdcard/Download/${name} 2>/dev/null; true`).trim() || null, 'arquivo não foi gravado depois de recriar o app');
     const size = Number(adb('shell', `wc -c < '${path}'`).trim());
-    assert(size === n + 12, `arquivo gravado com ${size} bytes (esperado ${n + 12}) depois de recriar a tela`);
+    assert(size === n + 12, `arquivo gravado com ${size} bytes (esperado ${n + 12}) depois de recriar o app`);
     adb('shell', 'rm', '-f', path);
-    // A tela foi mesmo destruída e recriada (registro de depuração do Capacitor).
-    const life = adb('logcat', '-d', '-s', 'Capacitor:D');
-    assert(/Saving instance state/.test(life) && /App destroyed/.test(life), 'a tela do app não foi destruída enquanto a janela estava aberta');
     // Um único texto para o shell do aparelho (o adb junta os argumentos e perderia as aspas).
     const leftovers = adb('shell', `run-as ${PKG} sh -c 'ls cache/exportacao-pendente 2>/dev/null; true'`).trim();
     assert(!leftovers, `arquivo temporário da exportação não foi apagado: ${leftovers}`);
-    page = await launch({ newProcess: false });
+    page = await launch();
     await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
-    console.log(`\n  exportação após recriar a tela: ${size} bytes`);
+    console.log(`\n  exportação após recriar o app: ${size} bytes (processo ${pidBefore} → ${pidAfter})`);
   });
 
   // Estabilização da 0.5.0: o FileProvider só expõe cache/compartilhar (e as fotos da câmera do próprio app).
