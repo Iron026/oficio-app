@@ -877,8 +877,9 @@ try {
     adb('shell', 'am', 'kill', PKG); // encerra o processo em segundo plano, como o Android faz com pouca memória
     await eventually(() => !adb('shell', `pidof ${PKG}; true`).trim() || null, 'o processo do app não foi encerrado');
     await saveInSystemDialog(); // o Android recria o app e entrega o resultado da janela
-    const pidAfter = adb('shell', `pidof ${PKG}; true`).trim();
-    assert(pidAfter && pidAfter !== pidBefore, `o app não foi recriado em outro processo (${pidBefore} → ${pidAfter || 'nenhum'})`);
+    // O Android sobe o processo novo para entregar o resultado; pode levar alguns segundos.
+    const pidAfter = await eventually(() => { const p = adb('shell', `pidof ${PKG}; true`).trim(); return p && p !== pidBefore ? p : null; },
+      `o app não foi recriado em outro processo (antes ${pidBefore})`, 30_000);
     const path = await eventually(() => adb('shell', `ls /sdcard/Download/${name} 2>/dev/null; true`).trim() || null, 'arquivo não foi gravado depois de recriar o app');
     // O app ainda está abrindo (WebView, Capacitor): a gravação acontece quando ele recebe o resultado da janela.
     let size = 0;
