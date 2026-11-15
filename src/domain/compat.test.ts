@@ -42,4 +42,16 @@ describe('compatibilidade com a 0.5', () => {
     expect(compareVersions('1.0.0', '0.9.9')).toBe(1);
     expect(compareVersions('lixo', '0.4.0')).toBeNull();
   });
+
+  it('0.5.0-rc.1: beta.5 < rc.1 < rc.2 < 0.5.0 (backup da beta.5 é "anterior" na RC; o da RC é "anterior" na final)', async () => {
+    expect(compareVersions('0.5.0-beta.5', '0.5.0-rc.1')).toBe(-1);
+    expect(compareVersions('0.5.0-rc.1', '0.5.0-beta.5')).toBe(1);
+    expect(compareVersions('0.5.0-rc.1', '0.5.0-rc.2')).toBe(-1);
+    expect(compareVersions('0.5.0-rc.1', '0.5.0')).toBe(-1);
+    expect(compareVersions('0.4.0-beta.7', '0.5.0-rc.1')).toBe(-1);
+    const { backupCompatibility } = await import('./backupPreview');
+    expect(backupCompatibility('0.5.0-beta.5', '0.5.0-rc.1')).toBe('anterior');
+    expect(backupCompatibility('0.5.0-rc.1', '0.5.0-rc.1')).toBe('mesma');
+    expect(backupCompatibility('0.5.0-rc.1', '0.5.0-beta.5')).toBe('mais-nova');
+  });
 });

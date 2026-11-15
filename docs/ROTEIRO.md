@@ -1,6 +1,6 @@
 # Roteiro
 
-## 0.5 (em desenvolvimento — branch `feat/v0.5-gestao`, a partir de `18fd752`, 0.4.0-beta.7 aprovada)
+## 0.5 (candidata interna 0.5.0-rc.1 — branch `feat/v0.5-gestao`, a partir de `18fd752`, 0.4.0-beta.7 aprovada)
 Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0.5.md`.
 - 0.5.0-beta.1: **pagamentos** — concluir com escolha explícita (recebi tudo que faltava / uma parte /
   ainda não recebi), pagamentos integrais, parciais e antecipados, estornos que não apagam o histórico,
@@ -31,6 +31,12 @@ Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0
   **backup com SHA-256** e restauração com pré-visualização completa, confirmação explícita e gravação segura
   também com conta conectada, e **configuração inicial por profissão** (opcional, só para cadastros novos, também em
   Ajustes). Teste Android: 0.4.0-beta.7 → 0.5.0-beta.4 (com lembrete agendado) → beta.5.
+- 0.5.0-rc.1 (a partir de `bc027c7`, beta.5 aprovada no S26 + auditoria pré-RC + estabilização): **candidata
+  interna, escopo congelado** — sem funcionalidades novas. Restauração recusa arquivos com risco de perda
+  silenciosa; integridade financeira entre aparelhos; arquivos compartilhados limpos do cache; limite de erro por
+  tela; desempenho com volumes grandes; FileProvider restrito; exportação grande preservada quando o Android para ou
+  encerra o app. Ver `docs/NOTAS-0.5.0-rc.1.md`, `docs/AUDITORIA-0.5.md` e `docs/ESTABILIZACAO-0.5.md`. Teste
+  Android: 0.4.0-beta.7 → 0.5.0-beta.5 → rc.1.
 
 ## 0.4 (em desenvolvimento — branch `feat/v0.4-design`)
 Design, estética e experiência. Etapas: 0 rede de segurança visual · 1 fundamentos do design
