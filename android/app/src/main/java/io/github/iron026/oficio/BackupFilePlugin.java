@@ -88,7 +88,11 @@ public class BackupFilePlugin extends Plugin {
 
     @ActivityCallback
     private void onDocumentCreated(PluginCall call, ActivityResult result) {
-        if (call == null) return;
+        if (call == null) {
+            // Processo recriado sem a chamada restaurada: ainda grava o conteúdo preparado (não deixa documento vazio).
+            completeWithoutCall(result);
+            return;
+        }
         File pending = pendingFileOf(call);
         Intent data = result.getData();
         Uri uri = data != null ? data.getData() : null;
@@ -165,6 +169,28 @@ public class BackupFilePlugin extends Plugin {
             return null;
         }
         return file.isFile() ? file : null;
+    }
+
+    /** O único arquivo preparado na pasta temporária (só há uma janela "Salvar como" por vez). */
+    private File singlePending() {
+        File[] files = pendingDir().listFiles();
+        return files != null && files.length == 1 && files[0].isFile() ? files[0] : null;
+    }
+
+    private void completeWithoutCall(ActivityResult result) {
+        File pending = singlePending();
+        Intent data = result.getData();
+        Uri uri = data != null ? data.getData() : null;
+        if (result.getResultCode() == Activity.RESULT_OK && uri != null) {
+            ContentResolver resolver = getContext().getContentResolver();
+            try {
+                if (pending == null) throw new FileNotFoundException("Arquivo preparado não encontrado.");
+                write(resolver, uri, readAll(pending));
+            } catch (Exception e) {
+                deleteQuietly(resolver, uri);
+            }
+        }
+        deletePending(pending);
     }
 
     private static void deletePending(File file) {

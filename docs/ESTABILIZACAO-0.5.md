@@ -99,7 +99,9 @@ regressão completa.
   - antes de abrir a janela, o conteúdo vai para um arquivo privado em `cache/exportacao-pendente` (fora do
     FileProvider), e a chamada guarda só o caminho;
   - a gravação lê desse arquivo, que é apagado ao concluir, cancelar ou falhar;
-  - se o arquivo preparado não existir, o documento vazio criado pela janela é removido.
+  - se o arquivo preparado não existir, o documento vazio criado pela janela é removido;
+  - se o Android recriar o app e entregar o resultado sem a chamada restaurada, o plugin usa o único arquivo
+    preparado da pasta temporária, em vez de deixar um documento vazio.
 - **Observação:** em compilações de depuração, o Capacitor registra no logcat os parâmetros de cada chamada,
   inclusive o conteúdo exportado. Em compilações de produção esse registro fica desligado (`loggingBehavior` padrão
   `debug`).

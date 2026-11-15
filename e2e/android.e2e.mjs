@@ -880,12 +880,19 @@ try {
     const pidAfter = adb('shell', `pidof ${PKG}; true`).trim();
     assert(pidAfter && pidAfter !== pidBefore, `o app não foi recriado em outro processo (${pidBefore} → ${pidAfter || 'nenhum'})`);
     const path = await eventually(() => adb('shell', `ls /sdcard/Download/${name} 2>/dev/null; true`).trim() || null, 'arquivo não foi gravado depois de recriar o app');
-    const size = Number(adb('shell', `wc -c < '${path}'`).trim());
-    assert(size === n + 12, `arquivo gravado com ${size} bytes (esperado ${n + 12}) depois de recriar o app`);
+    // O app ainda está abrindo (WebView, Capacitor): a gravação acontece quando ele recebe o resultado da janela.
+    let size = 0;
+    await eventually(() => {
+      size = Number(adb('shell', `wc -c < '${path}'`).trim());
+      return size === n + 12 || null;
+    }, `arquivo continuou com ${size} bytes (esperado ${n + 12}) depois de recriar o app`, 45_000).catch((e) => { throw new Error(`arquivo gravado com ${size} bytes (esperado ${n + 12}) depois de recriar o app: ${e.message}`); });
     adb('shell', 'rm', '-f', path);
     // Um único texto para o shell do aparelho (o adb junta os argumentos e perderia as aspas).
-    const leftovers = adb('shell', `run-as ${PKG} sh -c 'ls cache/exportacao-pendente 2>/dev/null; true'`).trim();
-    assert(!leftovers, `arquivo temporário da exportação não foi apagado: ${leftovers}`);
+    let leftovers = '';
+    await eventually(() => {
+      leftovers = adb('shell', `run-as ${PKG} sh -c 'ls cache/exportacao-pendente 2>/dev/null; true'`).trim();
+      return !leftovers || null;
+    }, 'arquivo temporário da exportação não foi apagado', 15_000).catch(() => { throw new Error(`arquivo temporário da exportação não foi apagado: ${leftovers}`); });
     page = await launch();
     await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
     console.log(`\n  exportação após recriar o app: ${size} bytes (processo ${pidBefore} → ${pidAfter})`);
