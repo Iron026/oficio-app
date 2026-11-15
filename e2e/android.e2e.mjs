@@ -866,6 +866,7 @@ try {
   await step('Exportação concluída mesmo se o Android recriar a tela com a janela "Salvar como" aberta', async () => {
     const n = 300_000;
     const name = 'exportacao-recriada-teste.json';
+    adb('logcat', '-c');
     adb('shell', 'settings', 'put', 'global', 'always_finish_activities', '1');
     try {
       page.evaluate(({ n, name }) => window.Capacitor.nativePromise('OficioFiles', 'saveDocument', {
@@ -881,7 +882,11 @@ try {
     const size = Number(adb('shell', `wc -c < '${path}'`).trim());
     assert(size === n + 12, `arquivo gravado com ${size} bytes (esperado ${n + 12}) depois de recriar a tela`);
     adb('shell', 'rm', '-f', path);
-    const leftovers = adb('shell', 'run-as', PKG, 'sh', '-c', 'ls cache/exportacao-pendente 2>/dev/null; true').trim();
+    // A tela foi mesmo destruída e recriada (registro de depuração do Capacitor).
+    const life = adb('logcat', '-d', '-s', 'Capacitor:D');
+    assert(/Saving instance state/.test(life) && /App destroyed/.test(life), 'a tela do app não foi destruída enquanto a janela estava aberta');
+    // Um único texto para o shell do aparelho (o adb junta os argumentos e perderia as aspas).
+    const leftovers = adb('shell', `run-as ${PKG} sh -c 'ls cache/exportacao-pendente 2>/dev/null; true'`).trim();
     assert(!leftovers, `arquivo temporário da exportação não foi apagado: ${leftovers}`);
     page = await launch({ newProcess: false });
     await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
