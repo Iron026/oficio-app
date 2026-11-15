@@ -145,10 +145,20 @@ export function useThemeEffect(theme: DevicePrefs['theme']) {
     apply();
     // O Capacitor injeta as áreas seguras após o carregamento: reavalia depois.
     const t = setTimeout(apply, 600);
+    // Estabilização da 0.5.0: a injeção pode chegar depois desses 600 ms (a primeira tentativa do Capacitor falha
+    // se a página ainda não existe). Reavalia quando o valor gravado no elemento raiz mudar.
+    const readInset = () => document.documentElement.style.getPropertyValue('--safe-area-inset-top');
+    let lastInset = readInset();
+    const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => {
+      const now = readInset();
+      if (now !== lastInset) { lastInset = now; apply(); }
+    });
+    observer?.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
     media?.addEventListener?.('change', apply);
     window.addEventListener('resize', apply);
     return () => {
       clearTimeout(t);
+      observer?.disconnect();
       media?.removeEventListener?.('change', apply);
       window.removeEventListener('resize', apply);
     };

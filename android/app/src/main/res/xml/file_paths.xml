@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Estabilização da 0.5.0: o FileProvider expõe só o necessário.
+  - compartilhar: arquivos entregues ao menu de compartilhar (src/platform/files.ts, pasta limpa a cada uso).
+  - captura: foto tirada pela câmera via <input capture> (Capacitor grava em getExternalFilesDir(Pictures)).
+  Antes: todo o armazenamento compartilhado (external-path ".") e todo o cache do app (cache-path ".").
+-->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
-    <cache-path name="my_cache_images" path="." />
+    <cache-path name="compartilhar" path="compartilhar/" />
+    <external-files-path name="captura" path="Pictures/" />
 </paths>

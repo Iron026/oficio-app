@@ -836,6 +836,53 @@ try {
     assert(size > 1500, `PDF pequeno demais (${size} bytes)`);
   });
 
+  // Estabilização da 0.5.0: o conteúdo da exportação ia junto no estado salvo da atividade quando a janela
+  // "Salvar como" abria (Capacitor guarda os parâmetros da chamada). Com um backup de ~1 ano (≈ 1,9 MB) o estado
+  // passa do limite do Android (~1 MB) e o app é encerrado com a janela aberta, perdendo a exportação.
+  await step('Exportação grande (1,5 MB) sobrevive à janela "Salvar como" e grava o arquivo inteiro', async () => {
+    const pidBefore = adb('shell', `pidof ${PKG}; true`).trim();
+    const n = 1_500_000;
+    const name = 'exportacao-grande-teste.json';
+    const pending = page.evaluate(({ n, name }) => window.Capacitor.nativePromise('OficioFiles', 'saveDocument', {
+      filename: name, content: `{"dados":"${'a'.repeat(n)}"}`, mimeType: 'application/json', encoding: 'utf8',
+    }), { n, name });
+    pending.catch(() => undefined);
+    await eventually(() => /documentsui/.test(resumedPackage()), 'janela "Salvar como" do Android não abriu');
+    await wait(2500); // a atividade do app para e o Android grava o estado dela
+    const pidDuring = adb('shell', `pidof ${PKG}; true`).trim();
+    assert(pidDuring && pidDuring === pidBefore, `o app foi encerrado com a janela "Salvar como" aberta (processo ${pidBefore} → ${pidDuring || 'nenhum'})`);
+    await saveInSystemDialog();
+    const res = await pending;
+    assert(res && res.cancelled === false, `exportação não concluída: ${JSON.stringify(res)}`);
+    const path = await eventually(() => adb('shell', `ls /sdcard/Download/${name} 2>/dev/null; true`).trim() || null, 'arquivo grande não encontrado');
+    const size = Number(adb('shell', `wc -c < '${path}'`).trim());
+    assert(size === n + 12, `arquivo gravado com ${size} bytes (esperado ${n + 12})`);
+    adb('shell', 'rm', '-f', path);
+    console.log(`\n  exportação grande: ${size} bytes, mesmo processo (${pidDuring})`);
+  });
+
+  // Estabilização da 0.5.0: o FileProvider só expõe cache/compartilhar (e as fotos da câmera do próprio app).
+  // Compartilhar continua abrindo o menu do Android com o arquivo, sem erro de caminho não configurado.
+  await step('Compartilhar extrato em PDF abre o menu do Android (FileProvider restrito)', async () => {
+    adb('logcat', '-c');
+    await tap(page.getByRole('navigation').getByRole('link', { name: /finanças/i }));
+    await tap(page.getByRole('button', { name: /^exportar extrato/i }));
+    const sheet = page.getByRole('dialog', { name: /exportar extrato/i });
+    await tap(sheet.getByRole('radio', { name: /pdf/i }));
+    await tap(sheet.getByRole('button', { name: /^compartilhar$/i }));
+    const chooser = await eventually(() => { const p = resumedPackage(); return p && p !== PKG ? p : null; }, 'o menu de compartilhar do Android não abriu');
+    console.log('\n  menu de compartilhar:', chooser);
+    const shared = adb('shell', 'run-as', PKG, 'ls', 'cache/compartilhar').trim();
+    assert(/^oficio-extrato-\d{4}-\d{2}\.pdf$/m.test(shared), `arquivo compartilhado fora de cache/compartilhar: ${JSON.stringify(shared)}`);
+    const log = adb('logcat', '-d', '-s', 'AndroidRuntime:E', 'Capacitor:E', 'Capacitor/Plugin:E', 'Share:E');
+    assert(!/Failed to find configured root/.test(log), 'FileProvider recusou o arquivo (caminho não configurado)');
+    shot('05c-compartilhar-extrato');
+    back();
+    await eventually(() => resumedPackage() === PKG, 'o app não voltou após fechar o menu de compartilhar');
+    await page.keyboard.press('Escape').catch(() => undefined);
+    await sheet.waitFor({ state: 'detached' }).catch(() => undefined);
+  });
+
   await step('Botão Voltar no Painel minimiza o app', async () => {
     await tap(page.getByRole('navigation').getByRole('link', { name: /painel/i }));
     await page.waitForFunction(() => location.hash === '#/painel');

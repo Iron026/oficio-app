@@ -286,8 +286,23 @@ async function checks(page, tag) {
         if (it.left < area.left - 0.5 || it.right > area.right + 0.5) trail.push(`#${i} sai do cartão`);
       });
     }
-    return { overflow, fabOverlap, trail };
+    // Estabilização da 0.5.0: controles segmentados (abas) cabem inteiros no próprio grupo — o transbordo da
+    // página não pega um botão que vaza do contêiner arredondado ou um rótulo cortado.
+    const segments = [];
+    for (const g of document.querySelectorAll('[role="radiogroup"], [role="tablist"]')) {
+      const gr = g.getBoundingClientRect();
+      if (!gr.width) continue;
+      if (g.scrollWidth > g.clientWidth + 1) { segments.push(`${g.getAttribute('aria-label') || 'grupo'} precisa rolar (${g.scrollWidth - g.clientWidth}px)`); continue; }
+      for (const b of g.querySelectorAll('[role="radio"], [role="tab"]')) {
+        const r = b.getBoundingClientRect();
+        const name = (g.getAttribute('aria-label') || 'grupo') + ' › ' + (b.textContent || '').trim();
+        if (r.left < gr.left - 0.5 || r.right > gr.right + 0.5) segments.push(`${name} sai do grupo (${Math.round(Math.max(gr.left - r.left, r.right - gr.right))}px)`);
+        else if (b.scrollWidth > b.clientWidth + 1) segments.push(`${name} com rótulo cortado`);
+      }
+    }
+    return { overflow, fabOverlap, trail, segments };
   });
+  if (m.segments.length) fail(`${tag}: ${m.segments.join('; ')}`);
   if (m.overflow > 0) fail(`${tag}: transbordo horizontal de ${m.overflow}px`);
   if (m.trail.length) fail(`${tag}: trilha da Evolução: ${m.trail.join(', ')}`);
   if (m.fabOverlap > 0) fail(`${tag}: botão flutuante cobre o último item da lista (${m.fabOverlap}px²)`);

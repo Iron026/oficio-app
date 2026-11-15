@@ -50,4 +50,16 @@ describe('AndroidManifest: permissões mínimas', () => {
     expect(pkg.dependencies['@capacitor/haptics']).toBeUndefined();
     expect(readFileSync('android/capacitor.settings.gradle', 'utf8')).not.toMatch(/haptics/);
   });
+
+  it('estabilização 0.5.0: FileProvider expõe só a pasta de compartilhamento e as fotos da câmera do próprio app', () => {
+    const paths = readFileSync('android/app/src/main/res/xml/file_paths.xml', 'utf8');
+    const entries = [...paths.matchAll(/<([\w-]+-path)\s+name="([^"]+)"\s+path="([^"]*)"\s*\/>/g)].map((m) => `${m[1]} ${m[3]}`);
+    // Antes: external-path "." (todo o armazenamento compartilhado) e cache-path "." (todo o cache).
+    expect(entries).toEqual(['cache-path compartilhar/', 'external-files-path Pictures/']);
+    expect(manifest).toMatch(/android:exported="false"/);
+    expect(manifest).toMatch(/android:grantUriPermissions="true"/);
+    // A pasta usada pelo app (src/platform/files.ts) é a mesma liberada no FileProvider.
+    expect(readFileSync('src/platform/files.ts', 'utf8')).toMatch(/const SHARE_DIR = 'compartilhar';/);
+  });
 });
+

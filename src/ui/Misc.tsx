@@ -45,7 +45,10 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
 
 export function Segmented<T extends string>({ value, onChange, options, label, onHero }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string; onHero?: boolean }) {
   return (
-    <div role="radiogroup" aria-label={label} className={cx('flex rounded-xl p-1', onHero ? 'border border-white/25 bg-on-hero-fill' : 'bg-surface-2')}>
+    // Estabilização da 0.5.0: em telas estreitas (320 px) os rótulos ficam um pouco mais compactos para caber; se
+    // ainda assim não couberem (ex.: fonte ampliada no Android), o grupo rola por dentro em vez de vazar.
+    // O tamanho vai no grupo: `button { font: inherit }` (index.css) faz o botão herdar a fonte do contêiner.
+    <div role="radiogroup" aria-label={label} className={cx('flex overflow-x-auto rounded-xl p-1 [scrollbar-width:none] max-[359px]:text-[13px]', onHero ? 'border border-white/25 bg-on-hero-fill' : 'bg-surface-2')}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -54,7 +57,7 @@ export function Segmented<T extends string>({ value, onChange, options, label, o
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cx(
-            'press min-h-10 flex-1 rounded-lg px-2 text-sm font-semibold transition-colors',
+            'press min-h-10 flex-1 whitespace-nowrap rounded-lg px-2 text-sm font-semibold transition-colors max-[359px]:px-1.5',
             onHero
               ? value === o.value ? 'bg-white text-[var(--hero-2)] shadow-sm' : 'text-on-hero-soft hover:text-white'
               : value === o.value ? 'bg-surface text-fg shadow-sm' : 'text-muted hover:text-fg',
