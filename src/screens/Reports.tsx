@@ -167,7 +167,7 @@ export function Reports() {
       <Card className="!p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-muted">Evolução</h3>
-          <div className="w-44"><Segmented label="Período do gráfico" value={span} onChange={setSpan} options={[{ value: '6', label: '6 meses' }, { value: '12', label: '12 meses' }]} /></div>
+          <div className="min-w-44"><Segmented label="Período do gráfico" value={span} onChange={setSpan} options={[{ value: '6', label: '6 meses' }, { value: '12', label: '12 meses' }]} /></div>
         </div>
         <CashChart points={history} />
         <details className="mt-2 rounded-xl bg-surface-2 p-3">

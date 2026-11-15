@@ -19,6 +19,9 @@ regressão completa.
 
 - **Reprodução:** varredura visual a 320 px. A aba "Histórico" saía 37 px do grupo e ficava cortada na borda da
   tela, nos dois temas.
+- **A nova checagem encontrou mais dois casos** (CI 43738699572, 32 falhas):
+  - a Evolução também passava 9 px do grupo a 360 px, a largura do S26;
+  - o seletor "6 meses / 12 meses" de Relatórios passava 9 px da caixa fixa de 176 px em todas as larguras.
 - **Teste:** a varredura (`e2e/visual.mjs`, no CI com `--strict`) passou a falhar quando, em qualquer controle
   segmentado ou lista de abas:
   - um botão sai do grupo;
@@ -31,6 +34,9 @@ regressão completa.
   vale, e eles herdam 16 px do grupo.
 - **Correção (`src/ui/Misc.tsx`, `Segmented`):**
   - abaixo de 360 px, o grupo usa 13 px e os botões, espaçamento lateral de 6 px;
+  - abaixo de 400 px, só o espaçamento lateral diminui (8 → 6 px). No S26 (360 px) as abas cabem sem mudar o
+    tamanho da fonte;
+  - em Relatórios, a caixa do seletor passou de largura fixa (`w-44`) para largura mínima (`min-w-44`);
   - o tamanho fica no grupo, porque os botões herdam a fonte;
   - se ainda não couber (fonte ampliada do Android), o grupo rola por dentro em vez de vazar.
 
@@ -75,6 +81,12 @@ regressão completa.
   - O limite do Android para esse estado é ~1 MB (TransactionTooLargeException).
   - Resultado: o app é encerrado com a janela aberta, e a exportação se perde.
   - Arquivos pequenos (os do teste Android até aqui) não chegavam ao limite.
+- **Reprodução no Android:** run 43738699587, com o código anterior à correção. A etapa de 1,5 MB falhou com
+  "o app foi encerrado com a janela 'Salvar como' aberta (processo 9806 → nenhum)". No logcat:
+  `FATAL EXCEPTION: main … java.lang.RuntimeException: android.os.TransactionTooLargeException: data parcel size
+  6006428 bytes`.
+  - O conteúdo entra duas vezes e em UTF-16, então o estado fica com cerca de 4 vezes o tamanho do arquivo.
+  - Por essa proporção, exportações a partir de ~250 KB (alguns meses de uso) já passam do limite.
 - **Testes:**
   - etapa Android que exporta 1,5 MB e confere que o processo continua o mesmo e o arquivo chega inteiro;
   - etapa com "Não manter atividades": o Android destrói a tela quando a janela abre, e o arquivo de 300 KB ainda
