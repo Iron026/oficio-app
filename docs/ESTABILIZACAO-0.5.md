@@ -105,3 +105,77 @@ regressão completa.
 - **Observação:** em compilações de depuração, o Capacitor registra no logcat os parâmetros de cada chamada,
   inclusive o conteúdo exportado. Em compilações de produção esse registro fica desligado (`loggingBehavior` padrão
   `debug`).
+
+## Evidências finais (commit `44c9842`)
+
+### CI 43752964009
+
+| Verificação | Resultado |
+|---|---|
+| `check` | Aprovado: typecheck, lint, 1.297 testes e build |
+| Regras e sincronização no Firestore Emulator | Aprovado. Regras de produção inalteradas |
+| Varredura visual e de acessibilidade, modo estrito | Aprovado, sem falhas e sem violação axe WCAG 2.1 AA |
+
+A varredura cobriu 320, 360 e 412 px, tablet e computador, temas claro e escuro e as 8 paletas. Ela inclui a nova
+checagem de controles segmentados, que falhava em 32 capturas no CI 43738699572.
+
+### Android 43752963985 (emulador API 35): 29/29 etapas
+
+**Cadeia de atualização**, sem perda de dados:
+
+| Salto | Clientes | Atendimentos | Lançamentos |
+|---|---|---|---|
+| 0.4.0-beta.7 → 0.5.0-beta.5 | 1 | 1 | 1 |
+| 0.5.0-beta.5 → atual | 1 | 3 | 2 |
+
+O lembrete agendado na beta.5 chegou depois da atualização.
+
+**Exportação (E4):**
+
+| Cenário | Resultado |
+|---|---|
+| 1,5 MB | 1.500.012 bytes, mesmo processo. Antes da correção: app encerrado, `TransactionTooLargeException` (run 43738699587) |
+| Android encerra o app com a janela aberta | 300.012 bytes gravados depois de recriar o app (processo 10237 → 11804) e temporário apagado |
+
+**Compartilhamento (E2):** com o FileProvider restrito, o menu `com.android.intentresolver` abriu e o arquivo estava
+em `cache/compartilhar`, sem erro de caminho.
+
+**Demais etapas:**
+- backup salvo, cancelado, alterado (recusado) e restaurado;
+- extrato e recibo em PDF;
+- lembretes reais com o app aberto, em segundo plano e fechado.
+
+### Rodadas que falharam no caminho
+
+As falhas abaixo foram todas do próprio teste novo; os registros ficam aqui como evidência.
+
+| Run | O que aconteceu | Ajuste |
+|---|---|---|
+| 43744240008 | "Não manter atividades" não destruía a tela no Android 15 | Etapa trocada para o encerramento do processo |
+| 43741610977 | Aspas perdidas no `adb` | Comando num único texto |
+| 43747095697 | Tamanho conferido com o app ainda abrindo | Espera pela gravação |
+| 43750095043 | Processo novo conferido cedo demais | Espera pelo processo |
+
+Também entrou uma salvaguarda no plugin: se o resultado chegar sem a chamada restaurada, grava o arquivo preparado.
+O teste não distingue qual dos dois caminhos gravou o arquivo no run final; o resultado esperado foi conferido.
+
+## Avaliação de prontidão para a 0.5.0-rc.1
+
+**Pronta para a RC.1, com uma ressalva de validação no aparelho.**
+
+**Por que está pronta:**
+- todos os defeitos desta etapa foram reproduzidos, corrigidos com teste de regressão e validados no CI e no
+  emulador;
+- o defeito mais grave, a perda da exportação de backups a partir de ~250 KB, foi reproduzido com o código anterior
+  e não ocorre mais;
+- não houve nova funcionalidade nem mudança de identidade. A única alteração visual é o controle segmentado mais
+  compacto abaixo de 400 px (espaçamento) e de 360 px (fonte).
+
+**Ressalvas:**
+1. Confirmar no S26:
+   - exportar um backup real de tamanho grande pela janela "Salvar como";
+   - compartilhar um recibo ou extrato (FileProvider restrito);
+   - conferir as abas da Evolução.
+2. Continuam valendo as ressalvas de desempenho em uso muito longo e de dependências (`AUDITORIA-0.5.md`).
+3. A regra `button { font: inherit }` foi mantida de propósito, para não mudar o tamanho de todos os botões
+   aprovados.
