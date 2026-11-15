@@ -61,5 +61,17 @@ describe('AndroidManifest: permissões mínimas', () => {
     // A pasta usada pelo app (src/platform/files.ts) é a mesma liberada no FileProvider.
     expect(readFileSync('src/platform/files.ts', 'utf8')).toMatch(/const SHARE_DIR = 'compartilhar';/);
   });
+
+  it('estabilização 0.5.0: a exportação não leva o conteúdo no estado salvo da atividade', () => {
+    const plugin = readFileSync('android/app/src/main/java/io/github/iron026/oficio/BackupFilePlugin.java', 'utf8');
+    // O conteúdo vai para um arquivo privado antes de abrir a janela; a chamada guarda só o caminho.
+    const save = plugin.slice(plugin.indexOf('public void saveDocument'), plugin.indexOf('@ActivityCallback'));
+    expect(save.indexOf('call.getData().remove("content")')).toBeGreaterThan(-1);
+    expect(save.indexOf('call.getData().remove("content")')).toBeLessThan(save.indexOf('startActivityForResult'));
+    expect(plugin).toMatch(/PENDING_DIR = "exportacao-pendente"/);
+    expect(plugin).toMatch(/getCacheDir\(\), PENDING_DIR/);
+    // A pasta temporária não é exposta pelo FileProvider.
+    expect(readFileSync('android/app/src/main/res/xml/file_paths.xml', 'utf8')).not.toMatch(/exportacao-pendente/);
+  });
 });
 

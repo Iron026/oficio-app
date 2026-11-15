@@ -861,6 +861,33 @@ try {
     console.log(`\n  exportação grande: ${size} bytes, mesmo processo (${pidDuring})`);
   });
 
+  // Estabilização da 0.5.0: com "Não manter atividades" o Android destrói a tela do app quando a janela abre e a
+  // recria ao voltar. A gravação precisa acontecer mesmo assim (o conteúdo fica num arquivo temporário privado).
+  await step('Exportação concluída mesmo se o Android recriar a tela com a janela "Salvar como" aberta', async () => {
+    const n = 300_000;
+    const name = 'exportacao-recriada-teste.json';
+    adb('shell', 'settings', 'put', 'global', 'always_finish_activities', '1');
+    try {
+      page.evaluate(({ n, name }) => window.Capacitor.nativePromise('OficioFiles', 'saveDocument', {
+        filename: name, content: `{"dados":"${'b'.repeat(n)}"}`, mimeType: 'application/json', encoding: 'utf8',
+      }), { n, name }).catch(() => undefined); // a página é recriada: a resposta não volta para esta chamada
+      await eventually(() => /documentsui/.test(resumedPackage()), 'janela "Salvar como" do Android não abriu');
+      await wait(2500);
+      await saveInSystemDialog();
+    } finally {
+      adb('shell', 'settings', 'put', 'global', 'always_finish_activities', '0');
+    }
+    const path = await eventually(() => adb('shell', `ls /sdcard/Download/${name} 2>/dev/null; true`).trim() || null, 'arquivo não foi gravado depois de recriar a tela');
+    const size = Number(adb('shell', `wc -c < '${path}'`).trim());
+    assert(size === n + 12, `arquivo gravado com ${size} bytes (esperado ${n + 12}) depois de recriar a tela`);
+    adb('shell', 'rm', '-f', path);
+    const leftovers = adb('shell', 'run-as', PKG, 'sh', '-c', 'ls cache/exportacao-pendente 2>/dev/null; true').trim();
+    assert(!leftovers, `arquivo temporário da exportação não foi apagado: ${leftovers}`);
+    page = await launch({ newProcess: false });
+    await page.getByRole('navigation', { name: /navegação principal/i }).waitFor();
+    console.log(`\n  exportação após recriar a tela: ${size} bytes`);
+  });
+
   // Estabilização da 0.5.0: o FileProvider só expõe cache/compartilhar (e as fotos da câmera do próprio app).
   // Compartilhar continua abrindo o menu do Android com o arquivo, sem erro de caminho não configurado.
   await step('Compartilhar extrato em PDF abre o menu do Android (FileProvider restrito)', async () => {
