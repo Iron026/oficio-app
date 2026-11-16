@@ -32,7 +32,10 @@ padrão do Capacitor e agora é explícito).
 | `86c4d49` | Versão `0.5.0` e `versionCode` de release; assinatura de release por variáveis de ambiente; workflow `release.yml` + ação `release-build` (APK e AAB); conferência `ci/verify-release.mjs`; teste da release no emulador `e2e/release-smoke.mjs`; etapa de migração no teste Android; testes estáticos da configuração; `docs/RELEASE-0.5.0.md` |
 | `746598b` | Conferência: acha o `file_paths.xml` pelo caminho real (o Gradle encurta os nomes dos recursos na release) |
 | `650caad` | Conferência: lê os atributos do FileProvider (sem namespace) e o certificado em qualquer formato do `apksigner` (`V2 Signer: …`); grava as saídas públicas das ferramentas |
-| este relatório | `docs/PRONTIDAO-0.5.0.md` |
+| `3727746` | Teste da release no emulador: buffer maior para o `adb` (o logcat completo passava de 1 MB) e logcat filtrado pelo processo do app |
+| `70973d8` | Teste da release: aceita só a linha fixa `Starting BridgeActivity`, que o Capacitor grava antes de ler a configuração (ver abaixo) |
+| `779a140` | Emulador da release com imagem **"user"** (`google_apis_playstore`, como um celular comum). A conferência também lê o `capacitor.config.json` embutido no APK |
+| `ea2b9eb` e este | `docs/PRONTIDAO-0.5.0.md` |
 
 ### Versões
 
@@ -53,8 +56,8 @@ usam a mesma versão; a conferência falha se divergirem.
 | `applicationId` | `io.github.iron026.oficio` (inalterado) |
 | Origem da WebView | `https://localhost` (inalterada) |
 | Depuração | Release com `debuggable false`; conferido no APK, no AAB e no aparelho (`run-as` recusado, sem `DEBUGGABLE`) |
-| Registros | Capacitor só registra em depuração; o teste no emulador confirma zero linhas `Capacitor` no logcat da release |
-| Inspeção da WebView | Desligada na release (sem `webview_devtools_remote_<pid>`) |
+| Registros | `loggingBehavior: "debug"` conferido no `capacitor.config.json` do APK. No logcat da release aparece só `Starting BridgeActivity`: linha fixa, sem dados, gravada pelo Capacitor antes de carregar a configuração (`BridgeActivity.load()` antes de `Logger.init`). Nenhum outro registro do Capacitor, inclusive parâmetros de chamadas |
+| Inspeção da WebView | Desligada na release. O Capacitor só a liga se o app for depurável, e a configuração não força. No emulador com imagem "user" (`ro.debuggable=0`) não há `webview_devtools_remote_<pid>` |
 | `allowBackup` | `false` |
 | Permissões | `INTERNET`, `ACCESS_NETWORK_STATE`, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`, além de duas internas (Google Play Services e receptor dinâmico do AndroidX). Nenhuma de armazenamento, alarme exato, câmera, localização ou contatos |
 | FileProvider | Só `cache-path compartilhar/` e `external-files-path Pictures/` |
@@ -83,9 +86,9 @@ Uma build de teste nunca passa na conferência de produção, e vice-versa: o ce
 | Verificação | Execução | Commit | Resultado |
 |---|---|---|---|
 | CI: typecheck, lint, testes, build, Firestore Emulator e varredura visual e de acessibilidade | 43882275057 | `86c4d49` | Aprovado |
-| Testes locais (`npm run check`) | — | `650caad` | Aprovado: 1.303 testes (3 ignorados), 101 arquivos |
+| Testes locais (`npm run check`) | — | `650caad` | Aprovado: 1.303 testes (3 ignorados), 101 arquivos. Testes de configuração de release também em `779a140` |
 | Android: depuração + e2e completo | 43882274961 | `86c4d49` | **30/30 etapas** |
-| Release de teste: build, conferência e emulador | 43890434478 | `650caad` | Em execução (preenchido ao concluir) |
+| Release de teste: build, conferência e emulador | **43899036074** | `779a140` | **Aprovado**: conferência sem falhas, emulador **4/4** |
 
 O e2e Android (30/30) inclui:
 - a cadeia de atualização 0.4.0-beta.7 → 0.5.0-rc.1 aprovada → 0.5.0, sem perda de dados;
@@ -111,14 +114,37 @@ cobertura fica assim:
 - **o que só a release mostra:** no artefato de release (assinatura, depuração desligada, registros, inspeção,
   manifesto e recursos).
 
-Entre `86c4d49` e `650caad` só mudaram scripts de CI e documentação.
+Entre `86c4d49` e `779a140` só mudaram scripts de CI, o workflow de release e documentação.
+
+### Ajustes no próprio teste da release (não no app)
+
+Os primeiros runs da release falharam por defeitos dos scripts de conferência, todos corrigidos:
+- **Formato de saída das ferramentas:** o FileProvider sem namespace e o certificado rotulado `V2 Signer:` no
+  `apksigner` atual.
+- **Buffer do `adb`:** o logcat completo passava do limite padrão de 1 MB.
+- **Downloads do SDK do Google:** "Premature EOF" em duas tentativas, falha de infraestrutura.
+
+Dois achados foram investigados na fonte, para não esconder defeito real:
+1. **Linha `D/Capacitor: Starting BridgeActivity` na release.**
+   - **Causa:** o Capacitor 8 grava essa linha antes de `Logger.init(config)`. Sem configuração carregada,
+     `shouldLog()` devolve verdadeiro.
+   - **Conclusão:** é fixa e não contém dados. Todo registro posterior obedece a `loggingBehavior: "debug"`.
+   - **Como fica o teste:** aceita exatamente essa linha e nenhuma outra.
+2. **Porta de inspeção da WebView no emulador `google_apis`.**
+   - **Causa:** essa imagem de sistema é "userdebug" (`ro.debuggable=1`), e nela a WebView abre a porta para
+     qualquer app.
+   - **Prova:** numa imagem "user", igual à de um celular comum, a porta não aparece.
+   - **Como fica o teste:** agora exige imagem "user" antes de concluir.
 
 ## Artefatos (privados do CI, nada publicado)
 
 | Artefato | Identificação |
 |---|---|
 | Depuração `oficio-0.5.0-build.128-debug.apk` | Run 43882274961, artefato 14233766199 (expira em 16/12/2026). SHA-256 do arquivo `70064816dabea84337660cb5b6ae94caf5e6627acbbc80a535f2713fbe8738d0`. Certificado de depuração SHA-256 `d39f3729…bb67a3`, SHA-1 `7a36ce3d…a556bc9` |
-| Release de teste (APK + AAB) | Run 43890434478, em execução: identificadores preenchidos ao concluir |
+| Release de teste `oficio-0.5.0-TESTE-NAO-PUBLICAR.apk` | Run 43899036074, artefato 14241336522 (expira em 23/11/2026). Commit `779a140`. `versionName` `0.5.0`, `versionCode` 50099. SHA-256 do arquivo `c12c50dba02813129f0a5d0e4d5e18ff920de2e97ad314432edbad6baf44c8f7` (5.572.381 bytes) |
+| Release de teste `oficio-0.5.0-TESTE-NAO-PUBLICAR.aab` | Mesmo run e artefato. SHA-256 do arquivo `c821ee3a1ec80bf45496b69ad5370f1caa8388331d2f701526f63a5f7260b6fe` (5.216.505 bytes) |
+| Certificado de **teste** (APK e AAB iguais) | DN `CN=Oficio TESTE NAO PUBLICAR, O=Oficio`, RSA 2048, válido por 7 dias. SHA-256 `5ef881b5a5d1b0ac92f5a47455ce3cfa3e740653d98c7465ff8c256d244e09e9`, SHA-1 `161e22a3d0fc2cb8e5e9166131258b434673ce23`. **Não publicável:** a chave muda a cada execução e é apagada |
+| Teste da release no emulador | Run 43899036074, artefato 14241172360 (`release-smoke.json` e captura da tela inicial) |
 
 O `release-manifest.json` de cada build de release registra:
 - commit, versão e `versionCode`;
