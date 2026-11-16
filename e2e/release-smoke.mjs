@@ -12,7 +12,9 @@ const [releaseApk, debugApk, expectedCode, expectedName] = process.argv.slice(2)
 const PKG = 'io.github.iron026.oficio';
 const OUT = 'e2e-results';
 mkdirSync(OUT, { recursive: true });
-const adb = (...args) => execFileSync('adb', args, { encoding: 'utf8' });
+// Buffer grande: o logcat completo do emulador e a captura de tela passam do limite padrão de 1 MB (ENOBUFS).
+const MAX_BUFFER = 64 * 1024 * 1024;
+const adb = (...args) => execFileSync('adb', args, { encoding: 'utf8', maxBuffer: MAX_BUFFER });
 const tryAdb = (...args) => { try { return { ok: true, out: adb(...args) }; } catch (e) { return { ok: false, out: `${e.stdout ?? ''}${e.stderr ?? ''}${e.message}` }; } };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
@@ -72,12 +74,14 @@ await step('Abre sem queda, sem registros de depuração e sem inspeção da Web
   assert(pid, 'o app não ficou aberto');
   const log = adb('logcat', '-d', '-v', 'brief');
   assert(!new RegExp(`FATAL EXCEPTION[\\s\\S]{0,400}${PKG}`).test(log), 'queda (FATAL EXCEPTION) ao abrir');
-  const appLog = log.split('\n').filter((l) => l.includes(`(${pid.padStart(5)})`) || l.includes(`( ${pid})`) || l.includes(`(${pid})`));
+  // Só as linhas do processo do app (filtro do próprio logcat por pid).
+  const appLog = adb('logcat', '-d', '-v', 'brief', `--pid=${pid}`).split('\n').filter(Boolean);
+  assert(appLog.length > 0, `logcat sem linhas do processo ${pid}: a conferência dos registros não seria válida`);
   const capacitorLines = appLog.filter((l) => /\/Capacitor/.test(l));
   assert(capacitorLines.length === 0, `registros de depuração do Capacitor no APK de release: ${capacitorLines.slice(0, 3).join(' | ')}`);
   const sockets = adb('shell', 'cat', '/proc/net/unix');
   assert(!new RegExp(`webview_devtools_remote_${pid}\\b`).test(sockets), 'porta de inspeção da WebView aberta no APK de release');
-  writeFileSync(`${OUT}/release-aberto.png`, execFileSync('adb', ['exec-out', 'screencap', '-p']));
+  writeFileSync(`${OUT}/release-aberto.png`, execFileSync('adb', ['exec-out', 'screencap', '-p'], { maxBuffer: MAX_BUFFER }));
   const resumed = /ResumedActivity.*?\{[^}]*\s([\w.]+)\//.exec(adb('shell', 'dumpsys', 'activity', 'activities'))?.[1];
   assert(resumed === PKG, `tela em primeiro plano: ${resumed}`);
   return `processo ${pid}; ${appLog.length} linhas do app no logcat, nenhuma do Capacitor; sem porta de inspeção`;
