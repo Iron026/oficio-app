@@ -41,10 +41,14 @@ const manifest = run(aapt2, ['dump', 'xmltree', '--file', 'AndroidManifest.xml',
 check(!/:debuggable\([^)]*\)=true/.test(manifest), 'android:debuggable=true no manifesto');
 check(/:allowBackup\([^)]*\)=false/.test(manifest), 'android:allowBackup não é false');
 check(new RegExp(`authorities\\([^)]*\\)="${PACKAGE.replace(/\./g, '\\.')}\\.fileprovider"`).test(manifest), 'FileProvider ausente');
-const paths = run(aapt2, ['dump', 'xmltree', '--file', 'res/xml/file_paths.xml', opt.apk]);
+// Em release, o Gradle encurta os caminhos dos recursos (res/xml/file_paths.xml → res/Xy.xml): o caminho real vem da
+// tabela de recursos.
+const resources = run(aapt2, ['dump', 'resources', opt.apk]);
+const pathsFile = /xml\/file_paths\b[\s\S]*?\(file\) (\S+)/.exec(resources)?.[1];
+check(!!pathsFile, 'recurso xml/file_paths (FileProvider) não encontrado');
+const paths = pathsFile ? run(aapt2, ['dump', 'xmltree', '--file', pathsFile, opt.apk]) : '';
 const pathEntries = [...paths.matchAll(/E: ([\w-]+-path)[\s\S]*?:path\([^)]*\)="([^"]*)"/g)].map((m) => `${m[1]} ${m[2]}`);
 check(JSON.stringify(pathEntries) === JSON.stringify(['cache-path compartilhar/', 'external-files-path Pictures/']), `FileProvider com escopo inesperado: ${pathEntries.join(', ')}`);
-const resources = run(aapt2, ['dump', 'resources', opt.apk]);
 const firebaseIncluded = /string\/google_app_id/.test(resources);
 if (opt.firebase === 'true') check(firebaseIncluded, 'configuração do Firebase (google_app_id) ausente no APK');
 
