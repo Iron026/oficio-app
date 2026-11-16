@@ -77,7 +77,11 @@ await step('Abre sem queda, sem registros de depuração e sem inspeção da Web
   // Só as linhas do processo do app (filtro do próprio logcat por pid).
   const appLog = adb('logcat', '-d', '-v', 'brief', `--pid=${pid}`).split('\n').filter(Boolean);
   assert(appLog.length > 0, `logcat sem linhas do processo ${pid}: a conferência dos registros não seria válida`);
-  const capacitorLines = appLog.filter((l) => /\/Capacitor/.test(l));
+  // Única exceção, fixa e sem dados: o Capacitor registra "Starting BridgeActivity" em BridgeActivity.load() ANTES de
+  // Logger.init(config) (Bridge.java), quando a configuração ainda não existe e Logger.shouldLog() devolve true. Todo
+  // registro posterior (inclusive parâmetros das chamadas) obedece a loggingBehavior 'debug' e precisa estar ausente.
+  const PRE_CONFIG_LINE = /\/Capacitor\(\s*\d+\): Starting BridgeActivity\s*$/;
+  const capacitorLines = appLog.filter((l) => /\/Capacitor/.test(l) && !PRE_CONFIG_LINE.test(l));
   assert(capacitorLines.length === 0, `registros de depuração do Capacitor no APK de release: ${capacitorLines.slice(0, 3).join(' | ')}`);
   const sockets = adb('shell', 'cat', '/proc/net/unix');
   assert(!new RegExp(`webview_devtools_remote_${pid}\\b`).test(sockets), 'porta de inspeção da WebView aberta no APK de release');
