@@ -83,12 +83,16 @@ await step('Abre sem queda, sem registros de depuração e sem inspeção da Web
   const PRE_CONFIG_LINE = /\/Capacitor\(\s*\d+\): Starting BridgeActivity\s*$/;
   const capacitorLines = appLog.filter((l) => /\/Capacitor/.test(l) && !PRE_CONFIG_LINE.test(l));
   assert(capacitorLines.length === 0, `registros de depuração do Capacitor no APK de release: ${capacitorLines.slice(0, 3).join(' | ')}`);
+  // Em imagens de sistema depuráveis (userdebug), a WebView abre a porta de inspeção para qualquer app: o teste só
+  // vale numa imagem "user", como a de um celular comum.
+  const systemDebuggable = adb('shell', 'getprop', 'ro.debuggable').trim();
+  assert(systemDebuggable === '0', `imagem do emulador depurável (ro.debuggable=${systemDebuggable}): teste de inspeção inconclusivo`);
   const sockets = adb('shell', 'cat', '/proc/net/unix');
   assert(!new RegExp(`webview_devtools_remote_${pid}\\b`).test(sockets), 'porta de inspeção da WebView aberta no APK de release');
   writeFileSync(`${OUT}/release-aberto.png`, execFileSync('adb', ['exec-out', 'screencap', '-p'], { maxBuffer: MAX_BUFFER }));
   const resumed = /ResumedActivity.*?\{[^}]*\s([\w.]+)\//.exec(adb('shell', 'dumpsys', 'activity', 'activities'))?.[1];
   assert(resumed === PKG, `tela em primeiro plano: ${resumed}`);
-  return `processo ${pid}; ${appLog.length} linhas do app no logcat, nenhuma do Capacitor; sem porta de inspeção`;
+  return `processo ${pid}; ${appLog.length} linhas do app no logcat, nenhuma do Capacitor além da anterior à configuração; sem porta de inspeção (imagem user, ro.debuggable=0)`;
 });
 
 writeFileSync(`${OUT}/release-smoke.json`, JSON.stringify(results, null, 2));

@@ -56,6 +56,12 @@ export const fileProviderEntries = (xml) => xml.split(/\n(?=\s*E: )/).flatMap((b
 const pathEntries = fileProviderEntries(paths);
 check(JSON.stringify(pathEntries) === JSON.stringify(['cache-path compartilhar/', 'external-files-path Pictures/']), `FileProvider com escopo inesperado: ${pathEntries.join(', ')}`);
 const firebaseIncluded = /string\/google_app_id/.test(resources);
+// Configuração do Capacitor embutida: registros só em depuração e inspeção da WebView não forçada (o padrão do
+// Capacitor liga a inspeção apenas quando o app é depurável).
+const capConfig = JSON.parse(run('unzip', ['-p', opt.apk, 'assets/capacitor.config.json']) || '{}');
+check(capConfig.loggingBehavior === 'debug', `loggingBehavior do Capacitor: ${capConfig.loggingBehavior} (esperado "debug")`);
+check(capConfig.android?.webContentsDebuggingEnabled !== true, 'inspeção da WebView forçada (android.webContentsDebuggingEnabled)');
+check(capConfig.appId === PACKAGE && capConfig.server?.hostname === 'localhost' && capConfig.server?.androidScheme === 'https', 'appId ou origem https://localhost alterados na configuração do Capacitor');
 if (opt.firebase === 'true') check(firebaseIncluded, 'configuração do Firebase (google_app_id) ausente no APK');
 
 // ---- APK: assinatura
@@ -94,6 +100,7 @@ const result = {
   certificate: { dn: certDn, sha256: certSha256, sha1: certSha1 },
   firebaseIncluded,
   debuggable: false,
+  capacitor: { loggingBehavior: capConfig.loggingBehavior, webContentsDebuggingEnabled: capConfig.android?.webContentsDebuggingEnabled ?? 'padrão (só se depurável)' },
   permissions,
   fileProvider: pathEntries,
   files: {
