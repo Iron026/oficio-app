@@ -301,7 +301,7 @@ describe('beta.4: backup com campos da 0.5', () => {
     const { a } = await pair();
     const json = JSON.parse(a.service.exportBackup());
     expect(a.service.previewBackup(signed(json)).newerApp).toBe(false);
-    json.appVersion = '0.5.0';
+    json.appVersion = '99.0.0'; // sempre mais nova que a versão do app
     expect(a.service.previewBackup(signed(json)).newerApp).toBe(true);
     json.version = 2;
     expect(() => a.service.previewBackup(signed(json))).toThrow(/versão mais nova/);

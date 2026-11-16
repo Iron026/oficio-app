@@ -21,6 +21,21 @@ android {
     // OFICIO_DEBUG_SEED (ver ci/debug_keystore.py). Sem a variável, usa a
     // chave de depuração padrão do Android. Não é a chave de produção.
     signingConfigs {
+        // Assinatura de RELEASE (0.5.0 estável): só por variáveis de ambiente preenchidas a partir de segredos
+        // protegidos no CI (ver docs/RELEASE-0.5.0.md). Nenhuma chave ou senha fica no repositório. Sem as
+        // variáveis, o release sai SEM assinatura (nunca com a chave de depuração).
+        release {
+            def releaseKeystore = System.getenv('OFICIO_RELEASE_KEYSTORE')
+            if (releaseKeystore) {
+                storeFile file(releaseKeystore)
+                storeType System.getenv('OFICIO_RELEASE_STORE_TYPE') ?: 'pkcs12'
+                storePassword System.getenv('OFICIO_RELEASE_STORE_PASSWORD')
+                keyAlias System.getenv('OFICIO_RELEASE_KEY_ALIAS')
+                keyPassword System.getenv('OFICIO_RELEASE_KEY_PASSWORD')
+                enableV1Signing true
+                enableV2Signing true
+            }
+        }
         debug {
             def oficioKeystore = System.getenv('OFICIO_DEBUG_KEYSTORE')
             if (oficioKeystore) {
@@ -37,8 +52,14 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
+            // Não depurável e sem otimização de código (R8 desligado: mesmo comportamento validado na RC.1).
+            debuggable false
             minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (System.getenv('OFICIO_RELEASE_KEYSTORE')) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

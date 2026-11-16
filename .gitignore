@@ -18,3 +18,10 @@ firestore-debug.log
 android/app/google-services.json
 .oficio-keys/
 visual-results
+# Chaves de assinatura e senhas nunca entram no repositório (0.5.0 estável).
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+release-signing.properties

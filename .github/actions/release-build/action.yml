@@ -1,0 +1,129 @@
+# Compilação de RELEASE do Ofício (APK + AAB), usada por .github/workflows/release.yml.
+# - assinatura "teste": chave efêmera criada no runner (validade 7 dias, senha aleatória, nunca salva nem enviada).
+#   Os artefatos levam "TESTE-NAO-PUBLICAR" no nome e não servem para publicação.
+# - assinatura "producao": chave do ambiente protegido "producao" (segredos OFICIO_RELEASE_*). Sem eles, falha.
+# Nenhuma senha ou chave privada é impressa nem vai para os artefatos (só certificados e somas SHA-256).
+name: Ofício release build
+description: Compila, assina e confere APK e AAB de release
+inputs:
+  assinatura: { description: 'teste | producao', required: true }
+  google_services_json: { description: 'Segredo GOOGLE_SERVICES_JSON', required: false, default: '' }
+  release_keystore_base64: { description: 'Segredo OFICIO_RELEASE_KEYSTORE_BASE64', required: false, default: '' }
+  release_store_password: { description: 'Segredo OFICIO_RELEASE_STORE_PASSWORD', required: false, default: '' }
+  release_key_alias: { description: 'Segredo OFICIO_RELEASE_KEY_ALIAS', required: false, default: '' }
+  release_key_password: { description: 'Segredo OFICIO_RELEASE_KEY_PASSWORD', required: false, default: '' }
+outputs:
+  apk: { description: 'Caminho do APK', value: '${{ steps.verify.outputs.apk }}' }
+runs:
+  using: composite
+  steps:
+    - name: Versão e versionCode
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION=$(node -p "require('./package.json').version")
+        CODE=$(node ci/version-code.mjs "$VERSION")
+        if [ "${{ inputs.assinatura }}" = "producao" ] && ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Assinatura de produção só para versão final (sem -rc/-beta). Versão: $VERSION"; exit 1
+        fi
+        echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+        echo "RELEASE_CODE=$CODE" >> "$GITHUB_ENV"
+        echo "Versão $VERSION · versionCode $CODE · commit $GITHUB_SHA"
+
+    - name: Build web
+      shell: bash
+      run: |
+        if [ -n "${VITE_SYNC_SEALS_PHOTO:-}" ]; then echo "::error::VITE_SYNC_SEALS_PHOTO não pode ser definido antes da publicação das regras"; exit 1; fi
+        npm run build
+
+    - name: Configuração do Firebase (Android)
+      id: firebase
+      shell: bash
+      env:
+        GOOGLE_SERVICES_JSON: ${{ inputs.google_services_json }}
+      run: |
+        set -euo pipefail
+        if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+        elif [ -n "${FIREBASE_ANDROID_APP_ID:-}" ]; then
+          node ci/make-google-services.mjs
+        fi
+        if [ -f android/app/google-services.json ]; then
+          python3 -c "import json;d=json.load(open('android/app/google-services.json'));assert any(c['client_info']['android_client_info']['package_name']=='io.github.iron026.oficio' for c in d['client']), 'google-services.json sem o pacote io.github.iron026.oficio'"
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.assinatura }}" = "producao" ]; then echo "::error::Release de produção sem configuração do Firebase (login Google)."; exit 1; fi
+          echo "::notice::Sem configuração Firebase do Android: release de teste sem login Google."
+        fi
+
+    - uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: 21
+        cache: gradle
+
+    - name: Chave de assinatura
+      shell: bash
+      env:
+        KS_B64: ${{ inputs.release_keystore_base64 }}
+        KS_PASS: ${{ inputs.release_store_password }}
+        KEY_ALIAS: ${{ inputs.release_key_alias }}
+        KEY_PASS: ${{ inputs.release_key_password }}
+      run: |
+        set -euo pipefail
+        umask 077
+        KS="$RUNNER_TEMP/oficio-release.p12"
+        if [ "${{ inputs.assinatura }}" = "producao" ]; then
+          missing=()
+          [ -n "$KS_B64" ] || missing+=(OFICIO_RELEASE_KEYSTORE_BASE64)
+          [ -n "$KS_PASS" ] || missing+=(OFICIO_RELEASE_STORE_PASSWORD)
+          [ -n "$KEY_ALIAS" ] || missing+=(OFICIO_RELEASE_KEY_ALIAS)
+          [ -n "$KEY_PASS" ] || missing+=(OFICIO_RELEASE_KEY_PASSWORD)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Segredos de produção ausentes no ambiente 'producao': ${missing[*]}. Ver docs/RELEASE-0.5.0.md."; exit 1
+          fi
+          printf '%s' "$KS_B64" | base64 -d > "$KS"
+          { echo "OFICIO_RELEASE_STORE_PASSWORD=$KS_PASS"; echo "OFICIO_RELEASE_KEY_ALIAS=$KEY_ALIAS"; echo "OFICIO_RELEASE_KEY_PASSWORD=$KEY_PASS"; } >> "$GITHUB_ENV"
+        else
+          PW=$(openssl rand -hex 24)
+          echo "::add-mask::$PW"
+          keytool -genkeypair -keystore "$KS" -storetype PKCS12 -alias oficio-teste -keyalg RSA -keysize 2048 -validity 7 \
+            -dname "CN=Oficio TESTE NAO PUBLICAR, O=Oficio" -storepass "$PW" -keypass "$PW" > /dev/null 2>&1
+          { echo "OFICIO_RELEASE_STORE_PASSWORD=$PW"; echo "OFICIO_RELEASE_KEY_ALIAS=oficio-teste"; echo "OFICIO_RELEASE_KEY_PASSWORD=$PW"; } >> "$GITHUB_ENV"
+        fi
+        test -s "$KS" || { echo "::error::Arquivo de assinatura não foi preparado."; exit 1; }
+        echo "OFICIO_RELEASE_KEYSTORE=$KS" >> "$GITHUB_ENV"
+        echo "Chave de assinatura (${{ inputs.assinatura }}) pronta."
+
+    - name: Sincronizar Capacitor
+      shell: bash
+      run: npx cap sync android
+
+    - name: Compilar APK e AAB de release
+      shell: bash
+      working-directory: android
+      run: |
+        ./gradlew assembleRelease bundleRelease --no-daemon \
+          -PoficioVersionCode="$RELEASE_CODE" -PoficioVersionName="$RELEASE_VERSION"
+
+    - name: Conferir artefatos
+      id: verify
+      shell: bash
+      env:
+        MODE: ${{ inputs.assinatura }}
+        FIREBASE: ${{ steps.firebase.outputs.configured }}
+      run: |
+        set -euo pipefail
+        rm -f "$OFICIO_RELEASE_KEYSTORE" # a chave não é mais necessária
+        BT=$(ls $ANDROID_HOME/build-tools | sort -V | tail -1); TOOLS="$ANDROID_HOME/build-tools/$BT"
+        SUFFIX=$([ "$MODE" = "producao" ] && echo "release" || echo "TESTE-NAO-PUBLICAR")
+        mkdir -p out
+        APK="out/oficio-${RELEASE_VERSION}-${SUFFIX}.apk"; AAB="out/oficio-${RELEASE_VERSION}-${SUFFIX}.aab"
+        cp android/app/build/outputs/apk/release/app-release.apk "$APK"
+        cp android/app/build/outputs/bundle/release/app-release.aab "$AAB"
+        curl -sSfL -o "$RUNNER_TEMP/bundletool.jar" https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+        node ci/verify-release.mjs --apk "$APK" --aab "$AAB" --tools "$TOOLS" --bundletool "$RUNNER_TEMP/bundletool.jar" \
+          --mode "$MODE" --firebase "$FIREBASE" --version "$RELEASE_VERSION" --code "$RELEASE_CODE" --commit "$GITHUB_SHA" \
+          --out out/release-manifest.json --summary "$GITHUB_STEP_SUMMARY"
+        echo "apk=$APK" >> "$GITHUB_OUTPUT"

@@ -30,6 +30,9 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     hostname: 'localhost',
   },
+  // Registros do Capacitor (parâmetros das chamadas, inclusive conteúdo exportado) só em compilações de depuração.
+  // Explícito para a 0.5.0 estável; a inspeção da WebView também fica só na depuração (padrão do Capacitor).
+  loggingBehavior: 'debug',
   android: {
     allowMixedContent: false,
     captureInput: true,

@@ -1,0 +1,141 @@
+# Release do Ofício (APK + AAB). NÃO publica nada: os arquivos ficam só como artefatos privados desta execução.
+# - Em todo push: build de release assinada com chave de TESTE efêmera ("TESTE-NAO-PUBLICAR") + conferência +
+#   teste rápido no emulador. Serve para validar a configuração de release; não é distribuível.
+# - Produção: só manual (Actions → "Android release" → Run workflow → assinatura = producao), no ambiente
+#   protegido "producao" (segredos OFICIO_RELEASE_*). Publicar na Play Store ou criar release/tag continua manual.
+# Ver docs/RELEASE-0.5.0.md.
+name: Android release
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      assinatura:
+        description: 'teste = chave efêmera (não publicar) · producao = chave do ambiente protegido "producao"'
+        type: choice
+        options: [teste, producao]
+        default: teste
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}-${{ github.event_name }}-${{ inputs.assinatura }}
+  cancel-in-progress: true
+
+env:
+  VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+  VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+  VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+  VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+  VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+  VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+  FIREBASE_ANDROID_APP_ID: ${{ vars.FIREBASE_ANDROID_APP_ID }}
+  FIREBASE_WEB_CLIENT_ID: ${{ vars.FIREBASE_WEB_CLIENT_ID }}
+  FIREBASE_ANDROID_API_KEY: ${{ vars.FIREBASE_ANDROID_API_KEY }}
+
+jobs:
+  teste:
+    name: Release com chave de teste (não publicar)
+    if: github.event_name != 'workflow_dispatch' || inputs.assinatura != 'producao'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/release-build
+        with:
+          assinatura: teste
+          google_services_json: ${{ secrets.GOOGLE_SERVICES_JSON }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: oficio-release-TESTE-nao-publicar
+          path: |
+            out/*.apk
+            out/*.aab
+            out/release-manifest.json
+          retention-days: 7
+          if-no-files-found: error
+
+  emulador:
+    name: Release no emulador (instalação, depuração desligada, migração)
+    needs: teste
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: oficio-release-TESTE-nao-publicar
+          path: release
+      # APK de depuração da 0.5.0-rc.1 aprovada no S26: a release não pode atualizar por cima dela.
+      - name: APK de depuração da 0.5.0-rc.1 aprovada
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          name: oficio-apk-debug
+          path: apk-rc1
+          run-id: 43759248206
+          github-token: ${{ github.token }}
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Teste da release no emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim
+          script: node e2e/release-smoke.mjs "$(ls release/*.apk | head -1)" "$(ls apk-rc1/*.apk 2>/dev/null | head -1)" "$(node -p "require('./release/release-manifest.json').versionCode")" "$(node -p "require('./release/release-manifest.json').version")"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: oficio-release-emulador
+          path: e2e-results
+          retention-days: 7
+
+  producao:
+    name: Release de produção (assinatura definitiva)
+    if: github.event_name == 'workflow_dispatch' && inputs.assinatura == 'producao'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Ambiente protegido: os segredos de assinatura só existem aqui; configure revisores obrigatórios.
+    environment: producao
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verificações (testes, tipos, lint)
+        run: npm run typecheck && npm run lint && npm test
+      - uses: ./.github/actions/release-build
+        with:
+          assinatura: producao
+          google_services_json: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          release_keystore_base64: ${{ secrets.OFICIO_RELEASE_KEYSTORE_BASE64 }}
+          release_store_password: ${{ secrets.OFICIO_RELEASE_STORE_PASSWORD }}
+          release_key_alias: ${{ secrets.OFICIO_RELEASE_KEY_ALIAS }}
+          release_key_password: ${{ secrets.OFICIO_RELEASE_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: oficio-release-producao
+          path: |
+            out/*.apk
+            out/*.aab
+            out/release-manifest.json
+          retention-days: 30
+          if-no-files-found: error

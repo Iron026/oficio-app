@@ -37,6 +37,11 @@ Gestão profissional. Plano em `docs/PLANO-0.5.md`; proposta em `docs/PROPOSTA-0
   tela; desempenho com volumes grandes; FileProvider restrito; exportação grande preservada quando o Android para ou
   encerra o app. Ver `docs/NOTAS-0.5.0-rc.1.md`, `docs/AUDITORIA-0.5.md` e `docs/ESTABILIZACAO-0.5.md`. Teste
   Android: 0.4.0-beta.7 → 0.5.0-beta.5 → rc.1.
+- 0.5.0 (preparação técnica da versão estável, a partir de `2b7342f`, RC.1 aprovada no S26; **não publicada**): mesmo
+  comportamento da RC.1. Versão 0.5.0 com `versionCode` de release determinístico (50099); build release separada
+  (APK + AAB), não depurável, assinada só por segredos do ambiente protegido `producao` (ou chave de teste efêmera, não
+  publicável); conferência automática dos artefatos; migração dos APKs de depuração por backup testada no Android. Ver
+  `docs/RELEASE-0.5.0.md`.
 
 ## 0.4 (em desenvolvimento — branch `feat/v0.4-design`)
 Design, estética e experiência. Etapas: 0 rede de segurança visual · 1 fundamentos do design
