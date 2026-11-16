@@ -47,7 +47,13 @@ const resources = run(aapt2, ['dump', 'resources', opt.apk]);
 const pathsFile = /xml\/file_paths\b[\s\S]*?\(file\) (\S+)/.exec(resources)?.[1];
 check(!!pathsFile, 'recurso xml/file_paths (FileProvider) não encontrado');
 const paths = pathsFile ? run(aapt2, ['dump', 'xmltree', '--file', pathsFile, opt.apk]) : '';
-const pathEntries = [...paths.matchAll(/E: ([\w-]+-path)[\s\S]*?:path\([^)]*\)="([^"]*)"/g)].map((m) => `${m[1]} ${m[2]}`);
+// Os atributos de file_paths (name, path) não têm namespace: aparecem como `A: path="…"` (sem `android:` nem id).
+export const fileProviderEntries = (xml) => xml.split(/\n(?=\s*E: )/).flatMap((block) => {
+  const el = /E: ([\w-]+-path)\b/.exec(block)?.[1];
+  const path = /(?:^|[\s:])path(?:\([^)]*\))?="([^"]*)"/m.exec(block)?.[1];
+  return el ? [`${el} ${path ?? ''}`] : [];
+});
+const pathEntries = fileProviderEntries(paths);
 check(JSON.stringify(pathEntries) === JSON.stringify(['cache-path compartilhar/', 'external-files-path Pictures/']), `FileProvider com escopo inesperado: ${pathEntries.join(', ')}`);
 const firebaseIncluded = /string\/google_app_id/.test(resources);
 if (opt.firebase === 'true') check(firebaseIncluded, 'configuração do Firebase (google_app_id) ausente no APK');
@@ -56,9 +62,12 @@ if (opt.firebase === 'true') check(firebaseIncluded, 'configuração do Firebase
 const apksigner = join(opt.tools, 'apksigner');
 const signer = run(apksigner, ['verify', '--verbose', '--print-certs', opt.apk]);
 check(/Verified using v2 scheme \(APK Signature Scheme v2\): true/.test(signer), 'APK sem assinatura v2 válida');
-const certSha256 = /Signer #1 certificate SHA-256 digest: ([0-9a-f]+)/.exec(signer)?.[1];
-const certSha1 = /Signer #1 certificate SHA-1 digest: ([0-9a-f]+)/.exec(signer)?.[1];
-const certDn = /Signer #1 certificate DN: (.+)/.exec(signer)?.[1]?.trim();
+// O rótulo do assinante varia com a versão do apksigner ("Signer #1" ou "Signer (minSdkVersion=…)"): usa o primeiro.
+const signerCerts = new Set([...signer.matchAll(/certificate SHA-256 digest: ([0-9a-f]{64})/g)].map((m) => m[1]));
+check(signerCerts.size === 1, `esperado 1 certificado no APK, encontrados ${signerCerts.size}`);
+const certSha256 = /certificate SHA-256 digest: ([0-9a-f]{64})/.exec(signer)?.[1];
+const certSha1 = /certificate SHA-1 digest: ([0-9a-f]{40})/.exec(signer)?.[1];
+const certDn = /certificate DN: (.+)/.exec(signer)?.[1]?.trim();
 check(!!certSha256 && !!certSha1, 'certificado do APK não lido');
 check(certSha256 !== DEBUG_CERT_SHA256, 'APK de release assinado com a chave de DEPURAÇÃO');
 check(!/Android Debug/i.test(certDn ?? ''), 'APK assinado com a chave de depuração padrão do Android');
@@ -94,6 +103,10 @@ const result = {
   failures,
 };
 writeFileSync(opt.out, JSON.stringify(result, null, 2));
+// Saídas brutas das ferramentas (só dados públicos: certificados e manifesto) para conferência manual.
+writeFileSync(opt.out.replace(/\.json$/, '-ferramentas.txt'), [
+  '== apksigner verify --print-certs', signer, '== aapt2 xmltree file_paths', paths, '== keytool -printcert (AAB)', aabCert,
+].join('\n'));
 const colon = (h) => h?.toUpperCase().match(/../g)?.join(':');
 const lines = [
   `### Release ${opt.version} (${opt.mode === 'producao' ? 'PRODUÇÃO' : 'TESTE — NÃO PUBLICAR'})`,
@@ -107,4 +120,8 @@ const lines = [
 ];
 console.log(lines.join('\n'));
 if (opt.summary) appendFileSync(opt.summary, lines.join('\n') + '\n');
-if (failures.length) { console.error(`\nFalhas na conferência:\n- ${failures.join('\n- ')}`); process.exit(1); }
+if (failures.length) {
+  console.error(`\nFalhas na conferência:\n- ${failures.join('\n- ')}`);
+  console.error(`\n--- apksigner ---\n${signer}\n--- file_paths ---\n${paths}`);
+  process.exit(1);
+}

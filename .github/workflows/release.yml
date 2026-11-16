@@ -58,6 +58,7 @@ jobs:
             out/*.apk
             out/*.aab
             out/release-manifest.json
+            out/release-manifest-ferramentas.txt
           retention-days: 7
           if-no-files-found: error
 
@@ -137,5 +138,6 @@ jobs:
             out/*.apk
             out/*.aab
             out/release-manifest.json
+            out/release-manifest-ferramentas.txt
           retention-days: 30
           if-no-files-found: error
